@@ -1,0 +1,18 @@
+{
+    "contents" : "s %>%\n  filter(neuron==\"Patos1\",Eye==\"R\") %>%\n  lm(fr~Hep+Vep,data=.)\n  ",
+    "created" : 1443553449990.000,
+    "dirty" : true,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "4009106266",
+    "id" : "BA091993",
+    "lastKnownWriteTime" : 7011605692497750387,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "type" : "r_source"
+}

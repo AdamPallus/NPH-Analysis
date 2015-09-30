@@ -1,0 +1,17 @@
+{
+    "contents" : "---\ntitle: \"NPH static analysis\"\nauthor: \"Adam\"\ndate: \"September 23, 2015\"\noutput: word_document\n---\nThis is my first effort at analysis of the activity of the purported NPH cells. \n\nIn Matlab, I did spike sorting and created a spike density function by convolving the spiketimes with a Gaussian with a standard deviation of 20ms. I then saved that as a table containing the right and left eye position and velocity (calculated using a 7 point parabolic differentiation function) and the spike density function, scaled to approximate firing rate.\n\n```{r,message=FALSE}\nt1 <- read.csv(\"~/GitHub/NPHanalysis/917BTcell.csv\")\nt2 <- read.csv(\"~/GitHub/NPHanalysis/datatest1914.csv\")\n\nlibrary(ggplot2)\nlibrary(dplyr)\nlibrary(knitr)\n```\n\nFirst I will plot the average firing rate of the neuron while the eyes are in various positions. I've restricted my analysis to periods when the eyes are not in motion using a simple eye velocity threshold. I require both the vertical and horizontal eye position to be less than one. This allows for pre-movement burst activity to potentially interfere with the static analysis. \n\n```{r}\nmeanfr <- function(t){\n  t %>%\n    filter(rev<1, revV<1) %>%\n    mutate(Hep=round(rep),Vep=round(repV)) %>%\n    group_by(Hep,Vep) %>%\n    summarize(fr=mean(sdf)) ->\n    s\n  return(s)\n}\ns1<-meanfr(t1)\ns2<-meanfr(t2)\nm<-ggplot(s1,aes(Hep,Vep,fill=fr,z=fr))\nm+geom_tile()+scale_fill_gradient(low='black',high='orange')+\n  xlab('Horizontal Eye Position')+\n  ylab('Vertical Eye Position')\n  m<-ggplot(s2,aes(Hep,Vep,fill=fr,z=fr))\nm+geom_tile()+scale_fill_gradient(low='black',high='orange')+\n  xlab('Horizontal Eye Position')+\n  ylab('Vertical Eye Position')\n\n\n\n```\n\nNext, I calculate the sensitivity of the neuron to horizontal and vertical eye position:\n\n```{r}\ncompareslope <- function(s) {\n  horizontalSlope<-summary(lm(fr~Hep,data=s))$coefficients[2]\n  verticalSlope<-summary(lm(fr~Vep,data=s))$coefficients[2]\n  preferredDirection<-atan2(verticalSlope,horizontalSlope)*180/pi\n  return(data.frame(horizontalSlope=horizontalSlope,verticalSlope=verticalSlope,preferredDirection=preferredDirection))\n}\nx1<-compareslope(s1)\nx2<-compareslope(s2)\n\nx<-rbind(x1,x2)\nkable(x,digits=2)\n```\n\nFor the first cell: The slope is `r round(x1$horizontalSlope,3)` (spikes/s per degree) for horizontal eye positions and `r round(x1$verticalSlope,3)` for vertical eye positions. This corresponds with a preferred angle of `r round(x1$preferredDirection,3)` degrees.\n\nFor the second cell: The slope is `r round(x2$horizontalSlope,3)` (spikes/s per degree) for horizontal eye positions and `r round(x2$verticalSlope,3)` for vertical eye positions. This corresponds with a preferred angle of `r round(x2$preferredDirection,3)` degrees.\n\n",
+    "created" : 1443553610899.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "4278334649",
+    "id" : "E35F97E8",
+    "lastKnownWriteTime" : 1443210017,
+    "path" : "~/GitHub/NPH/Static1.Rmd",
+    "project_path" : null,
+    "properties" : {
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "type" : "r_markdown"
+}

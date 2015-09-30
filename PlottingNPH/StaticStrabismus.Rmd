@@ -1,0 +1,80 @@
+---
+title: "NPH static analysis"
+author: "Adam"
+date: "September 23, 2015"
+output: word_document
+---
+This is my first effort at analysis of the activity of the purported NPH cells. 
+
+In Matlab, I did spike sorting and created a spike density function by convolving the spiketimes with a Gaussian with a standard deviation of 20ms. I then saved that as a table containing the right and left eye position and velocity (calculated using a 7 point parabolic differentiation function) and the spike density function, scaled to approximate firing rate.
+
+```{r,message=FALSE}
+t1 <- read.csv("~/GitHub/NPHanalysis/Patos_2014_03_27_1435_Radial.csv")
+t2 <- read.csv("~/GitHub/NPHanalysis/Bee_Mark_2015_09_17_1440_Radial.csv")
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+```
+
+First I will plot the average firing rate of the neuron while the eyes are in various positions. I've restricted my analysis to periods when the eyes are not in motion using a simple eye velocity threshold. I require both the vertical and horizontal eye position to be less than one. This allows for pre-movement burst activity to potentially interfere with the static analysis. 
+
+```{r}
+meanfr <- function(t){
+  thresh=1.5
+  t %>%
+    filter(abs(rev)<thresh,abs(revV)<thresh,abs(lev)<thresh,abs(levV)<thresh) %>%
+    mutate(RHep=round(rep),RVep=round(repV), LHep=round(lep),LVep=round(lepV)) %>%
+    group_by(RHep,RVep,LHep,LVep) %>%
+    summarize(fr=mean(sdf)) %>%
+    ungroup(.) ->
+    s
+  return(s)
+}
+s1<-meanfr(t1)
+s2<-meanfr(t2)
+
+plottile<-function(s){
+  m<-ggplot(s,aes(RHep,RVep,fill=fr,z=fr))
+  m1<-m+geom_tile()+scale_fill_gradient(low='black',high='orange')+
+    xlab('Horizontal Eye Position')+ylab('Vertical Eye Position')+
+    ggtitle('Right Eye')
+  m<-ggplot(s,aes(LHep,LVep,fill=fr,z=fr))
+  m2<-m+geom_tile()+scale_fill_gradient(low='black',high='orange')+
+    xlab('Horizontal Eye Position')+ylab('Vertical Eye Position')+
+    ggtitle('Left Eye')
+  return(list(m1, m2))
+}
+
+m1<-plottile(s1)
+m2<-plottile(s2)
+
+m1[1]
+m2[1]
+m1[2]
+m2[2]
+```
+
+Next, I calculate the sensitivity of the neuron to horizontal and vertical eye position:
+
+```{r}
+compareslope <- function(s) {
+  Left.Horizontal.Slope <- summary(lm(fr~LHep,data=s))$coefficients[2]
+  Left.Vertical.Slope <- summary(lm(fr~LVep,data=s))$coefficients[2]
+  Left.Preferred.Direction <- atan2(Left.Vertical.Slope,Left.Horizontal.Slope)*180/pi
+  
+  Right.Horizontal.Slope<-summary(lm(fr~RHep,data=s))$coefficients[2]
+  Right.Vertical.Slope<-summary(lm(fr~RVep,data=s))$coefficients[2]
+  Right.Preferred.Direction<-atan2(Right.Vertical.Slope,Right.Horizontal.Slope)*180/pi
+  return(data.frame(Left.Horizontal.Slope,Left.Vertical.Slope,Left.Preferred.Direction,
+                    Right.Horizontal.Slope,Right.Vertical.Slope,Right.Preferred.Direction))
+}
+
+x1<-compareslope(s1)
+x2<-compareslope(s2)
+
+x<-rbind(x1,x2)
+kable(x,digits=2)
+```
+
+

@@ -1,0 +1,18 @@
+{
+    "contents" : "library(ggplot2)\nlibrary(dplyr)\nlibrary(tidyr)\n\nt1 <- read.csv(\"~/GitHub/NPH-Strabismus/Bee_Mark_2015_09_17_1440_Radial.csv\")\nt2 <- read.csv(\"~/GitHub/NPH-Strabismus/Patos_2014_03_27_1435_Radial.csv\")\nt3 <- read.csv(\"~/GitHub/NPH-Strabismus/Patos_2014_03_27_1439_Radial.csv\")\nt4 <- read.csv(\"~/GitHub/NPH-Strabismus/Patos_2014_04_03_1532_Radial.csv\")\nt5 <- read.csv(\"~/GitHub/NPH-Strabismus/Patos_2014_04_10_1428_Radial.csv\")\n\nt1$neuron <- \"Bee6\"\nt2$neuron <- \"Patos1\"\nt3$neuron <- \"Patos2\"\nt4$neuron <- \"Patos4\"\nt5$neuron <-\"Patos5\"\n\nt<- rbind(t1,t2,t3,t4,t5)\n\nthresh=1.5\nt %>%\n  filter(abs(rev)<thresh,abs(revV)<thresh,abs(lev)<thresh,abs(levV)<thresh) %>%\n  mutate(R.Hep=round(rep),R.Vep=round(repV), L.Hep=round(lep),L.Vep=round(lepV)) %>%\n  group_by(R.Hep,R.Vep,L.Hep,L.Vep,neuron) %>%\n  summarize(fr=mean(sdf)) %>%\n  ungroup(.) %>%\n  mutate(time=row_number(fr)) %>%\n  gather(temp,P,1:4) %>%\n  separate(temp,c(\"Eye\",\"HV\")) %>%\n  spread(HV,P) ->\n  s\nlevels(s$Eye)<-c(\"Right Eye\",\"Left Eye\")\n\n#qplot(HP,VP,data=s,fill=fr)+geom_tile()+facet_grid(neuron~Eye)\n\ns %>%\n  group_by(neuron) %>%\n  mutate(maxFR=max(fr),scaledFR=fr/maxFR) ->\n  ss\nqplot(Hep,Vep,data=ss,fill=scaledFR)+geom_tile()+facet_grid(neuron~Eye)+\n  scale_fill_gradient(low='black',high='orange')\n\n  ",
+    "created" : 1443556283025.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2938418293",
+    "id" : "11B878DF",
+    "lastKnownWriteTime" : 1443553349,
+    "path" : "~/GitHub/NPH/PlottingNPH/multiplotscript.R",
+    "project_path" : "multiplotscript.R",
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "type" : "r_source"
+}
