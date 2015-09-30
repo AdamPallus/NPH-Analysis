@@ -4,7 +4,7 @@ library(tidyr)
 
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
-path<-"~/GitHub/NPH/data/"
+path<-"~/GitHub/NPH-Analysis/data/"
 files <- list.files(path=path,pattern='*.csv')
 t<-data.frame()
 for (i in 1:length(files)) {
