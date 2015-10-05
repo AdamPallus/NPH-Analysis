@@ -1,3 +1,48 @@
+%The purpose of this function is to take the data dumped from spike2 and
+%convert it into a .csv file that is usable by R or Matlab. It will allow
+%you to choose a .mat file with raw data from spike2, sort spikes and
+%re-save the .mat file containing the sorted spikes. It has buttons to
+%allow you to analyze multiple clusters and save as multiple .csv files.
+
+function NPHGUI()
+% path='C:/Users/setup/Desktop/Nucleus Prepositus Hypoglossi/';
+% [filename, filepath]=uigetfile({[path,'*.mat']},'Select File to Analyze',...
+%     'multiselect','off');
+% if filename==0
+%     return
+% end
+% b=load([filepath filename]);
+b=[];
+b.f=figure;
+b.clusters=uicontrol('style','list','units','normalized',...
+    'string', {'Gaze Shift Trials','Pursuit Trials'},...
+    'position',[.1,.5,.4,.1]);
+
+b.sort=uicontrol(b.f,'string','Sort Spikes','units','normalized',...
+    'position',[0.3 0.2 0.2 0.1],...
+    'callback',{@sortspikes b});
+
+% if ~isfield(b,'spiketimes')
+%     b.spiketimes=sortspikes({b.Unit.values}); 
+% end
+
+b.plotwf=uicontrol(b.f,'string','See Waveform','units','normalized',...
+    'position',[0.5 0.2 0.2 0.1],...
+    'callback',{@plotwf b});
+
+
+
+function plotwf(~,~,b)
+figure
+plot(b.Unit.values)
+if isfield(b,'spiketimes')
+    hold on
+    plot(b.spiketimes,-0.07,'^r')
+end
+    
+
+
+
 function tableout=NPHAnalysis()
 [filename, filepath]=uigetfile('.mat','Select Data File');
 b=load([filepath filename]);
@@ -7,7 +52,7 @@ if ~isfield(b,'spiketimes')
     if strcmp(q,'Yes')
         b.spiketimes=sortspikes({b.Unit.values});
         try
-        save([filepath, filename(1:end-4), '-sorted.mat'],'st'b')
+            save([filepath, filename(1:end-4), '-sorted.mat'],'-struct','b')
         catch
             display('Save Failed')
         end

@@ -1,6 +1,16 @@
-function tableout=NPHAnalysis()
-[filename, filepath]=uigetfile('.mat','Select Data File');
-b=load([filepath filename]);
+function tableout=NPHAnalysis(b)
+if nargin<1
+    [filename, filepath]=uigetfile('.mat','Select Data File');
+    b=load([filepath filename]);
+else %user supplied a loaded spike2 export
+    if isfield(b,'spiketimes')
+        savespikes=questdlg('Save Spiketimes?','Save?');
+        if savespikes
+            save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
+        end
+    end
+end
+
 if ~isfield(b,'spiketimes')
     display('need to sort spikes on this file')
     q=questdlg('Sort Spikes Now?','Needs Spiketimes');
@@ -16,7 +26,6 @@ if ~isfield(b,'spiketimes')
     else
         return
     end
-    
 end
 %Create data table for export to R
 
@@ -40,7 +49,7 @@ t=table(sdf,rep,rev,repV,revV,...
 if nargout>0
     tableout=t;
 end
-[filename, filepath]=uiputfile('*.csv','Save Table',filename(1:end-4));
+[filename, filepath]=uiputfile('*.csv','Save Table');
 display([filepath filename])
 writetable(t,[filepath filename])
 

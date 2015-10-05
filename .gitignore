@@ -45,3 +45,10 @@ Temporary Items
 # data files
 *.csv
 .RData
+*.rdb
+
+#matlab autosave
+*.asv
+
+#pdf files - these might be too big for github
+*.pdf
