@@ -9,13 +9,16 @@ library(ggplot2)
 library(dplyr)
 library(knitr)
 library(tidyr)
+library(grid)
 ```
 
 
 ```r
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
-path<-"~/GitHub/NPH-Analysis/data/"
+
+#path<-"~/GitHub/NPH-Analysis/data/"
+path<-"~/GitHub/NPH-Analysis/testdata/"
 files <- list.files(path=path,pattern='*.csv')
 t<-data.frame()
 for (i in 1:length(files)) {
@@ -65,7 +68,7 @@ qplot(Hep,Vep,data=ss,fill=scaledFR)+geom_tile()+facet_grid(neuron~Eye)+
   scale_fill_gradient(low='black',high='orange')
 ```
 
-![](RatePositionAnalysis_files/figure-html/unnamed-chunk-4-1.png) 
+![](RatePositionAnalysis_files/figure-html/gridplot-1.png) 
 
 Next, let's show the rate position curves for horizontal and vertical individually.
 
@@ -116,8 +119,10 @@ static %>%
   spread(HV,P) %>%
   filter(Eye =="R") %>%
   group_by(neuron) %>%
-  do(r.h.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[2],r.v.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[3]) %>%
-  mutate(r.angle=atan2(r.v.slope,r.h.slope)*180/pi)->
+  do(m=summary(lm(fr~Hep+Vep,data=.))$coefficients) %>%
+  mutate(r.h.slope=m[2],r.v.slope=m[3],r.h.p=m[11],r.v.p=m[12]) %>%
+  select(-m) %>%
+  mutate(r.angle=atan2(r.v.slope,r.h.slope)*180/pi) ->
   r
 
 static %>% 
@@ -125,28 +130,73 @@ static %>%
   spread(HV,P) %>%
   filter(Eye =="L") %>%
   group_by(neuron) %>%
-  do(l.h.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[2],l.v.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[3]) %>%
-  mutate(l.angle=atan2(l.v.slope,l.h.slope)*180/pi)->
+  do(m=summary(lm(fr~Hep+Vep,data=.))$coefficients) %>%
+  mutate(l.h.slope=m[2],l.v.slope=m[3],l.h.p=m[11],l.v.p=m[12]) %>%
+  select(-m) %>%
+  mutate(l.angle=atan2(l.v.slope,l.h.slope)*180/pi) ->
   l
 
 rl<-left_join(r,l,by="neuron")
-rl<-rl[c(1,2,3,5,6,4,7)] #rearrange columns 
+
+rl %>% 
+  separate(neuron,c("animal","cellnum")) %>%
+  arrange(animal,as.numeric(cellnum)) ->
+  rl
+
 kable(rl)
 ```
 
 
 
-neuron   r.h.slope    r.v.slope     l.h.slope     l.v.slope          r.angle       l.angle
--------  -----------  ------------  ------------  ------------  ------------  ------------
-Bee10    0.1800969    -1.937002     0.1470745     -1.797811       -84.688073    -85.323187
-Bee11    1.469062     0.788065      1.541067      0.8797986        28.210922     29.722136
-Bee12    0.5284778    0.8859174     0.5571954     0.9543114        59.182583     59.720554
-Bee6     1.735839     -0.05681147   1.649801      -0.05552225      -1.874538     -1.927499
-Bee7     0.6158252    0.1529736     0.6461562     0.1642704        13.950157     14.263958
-Bee8     0.8226882    -0.2534351    0.8486388     -0.222565       -17.121828    -14.695501
-Bee9     0.3358553    -0.07143891   0.3489107     -0.06770831     -12.008268    -10.982110
-Patos1   -0.3932655   -0.5568464    -0.8835133    -0.2871528     -125.231152   -161.995195
-Patos2   -0.747143    1.359032      -0.06232936   1.321568        118.800293     92.700251
-Patos4   2.293573     0.576631      3.440755      -0.1134202       14.112345     -1.888000
-Patos5   0.1240371    -0.1737813    0.3982019     -0.1098076      -54.482495    -15.416656
-Patos9   0.2074481    -0.8128656    0.7667854     0.3766382       -75.683369     26.159861
+animal   cellnum     r.h.slope    r.v.slope       r.h.p       r.v.p      r.angle    l.h.slope    l.v.slope       l.h.p       l.v.p      l.angle
+-------  --------  -----------  -----------  ----------  ----------  -----------  -----------  -----------  ----------  ----------  -----------
+Bee      130        -0.0099431   -0.2998211   0.6220495   0.0000000    -91.89943   -0.0195333   -0.2972187   0.3416032   0.0000000    -93.76009
+Patos    11          0.0776148   -0.0523454   0.0000000   0.0095589    -33.99672    0.0957764   -0.0873672   0.0000000   0.0000504    -42.37107
+Patos    12          0.6094422   -0.5712989   0.0000000   0.0000000    -43.14973    0.5439059   -0.9136145   0.0000000   0.0000000    -59.23322
+Patos    121        -0.3154791   -0.0531709   0.0000000   0.0002178   -170.43326   -0.3936174   -0.0051393   0.0000000   0.7511216   -179.25195
+
+Now, let's plot the vectors of the preferred position for each cell.
+
+```r
+rl %>%
+  select(c(1,2,3,4,8,9)) %>%
+  gather("type","slope",3:6) %>%
+  separate(type,c("eye","HV","x")) %>%
+  select(-x) %>%
+  spread(HV,slope)%>%
+  ggplot(.) +
+  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
+  facet_grid(animal~.)+
+  xlab("Horizontal Slope")+
+  ylab("Vertical Slope") +
+  scale_color_manual(values=c("blue","red"))+
+  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
+  coord_fixed()
+```
+
+![](RatePositionAnalysis_files/figure-html/DirectionPlot-1.png) 
+
+
+```r
+rl %>%
+  filter(r.h.p<0.001, r.v.p<0.001) %>%
+  select(c(1,2,3,4,8,9)) %>%
+  gather("type","slope",3:6) %>%
+  separate(type,c("eye","HV","x")) %>%
+  select(-x) %>%
+  spread(HV,slope)-> 
+  p
+if (nrow(p)> 0) { #make sure at least one cell is significant
+  ggplot(p) +
+  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
+  facet_grid(animal~.)+
+  xlab("Horizontal Slope")+
+  ylab("Vertical Slope") +
+  scale_color_manual(values=c("blue","red"))+
+  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
+  coord_fixed()+
+  ggtitle("Only Signficant Slopes")
+}
+```
+
+![](RatePositionAnalysis_files/figure-html/DirectionPlotSig-1.png) 

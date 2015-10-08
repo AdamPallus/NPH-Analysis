@@ -5,6 +5,7 @@ date: "October 5, 2015"
 output: 
   html_document: 
     keep_md: yes
+    toc: yes
 ---
 
 
@@ -14,12 +15,16 @@ library(ggplot2)
 library(dplyr)
 library(knitr)
 library(tidyr)
+library(grid)
+
 ```
 
 ```{r,cache=FALSE}
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
-path<-"~/GitHub/NPH-Analysis/data/"
+
+#path<-"~/GitHub/NPH-Analysis/data/"
+path<-"~/GitHub/NPH-Analysis/testdata/"
 files <- list.files(path=path,pattern='*.csv')
 t<-data.frame()
 for (i in 1:length(files)) {
@@ -51,7 +56,7 @@ t %>%
 levels(s$Eye)<-c("Right Eye","Left Eye") #Change R/L into Right Eye/Left Eye
 ```
 
-```{r, fig.height=12,fig.width=9}
+```{r gridplot, fig.height=22,fig.width=10}
 
 #Just show cells I want
 #s <- filter(s,neuron %in% c("Bee6","BeeX1","BeeX2","BeeX3a","BeeX3b","BeeY1","BeeZ1"))
@@ -82,7 +87,7 @@ t %>%
   static
 ```
 
-```{r RightEye, fig.height=11,fig.width=8}
+```{r RightEye, fig.height=22,fig.width=10}
 static$plotHV<-as.factor(static$HV)
 levels(static$plotHV)<-c("Horizontal Eye Position","Vertical Eye Position")
 
@@ -94,7 +99,7 @@ static %>%
 
 ```
 
-```{r LeftEye, fig.height=11,fig.width=8}
+```{r LeftEye, fig.height=22,fig.width=10}
 static %>%
   filter(Eye=="L") %>%
   qplot(P,fr,data=.)+facet_grid(neuron~plotHV)+
@@ -110,8 +115,10 @@ static %>%
   spread(HV,P) %>%
   filter(Eye =="R") %>%
   group_by(neuron) %>%
-  do(r.h.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[2],r.v.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[3]) %>%
-  mutate(r.angle=atan2(r.v.slope,r.h.slope)*180/pi)->
+  do(m=summary(lm(fr~Hep+Vep,data=.))$coefficients) %>%
+  mutate(r.h.slope=m[2],r.v.slope=m[3],r.h.p=m[11],r.v.p=m[12]) %>%
+  select(-m) %>%
+  mutate(r.angle=atan2(r.v.slope,r.h.slope)*180/pi) ->
   r
 
 static %>% 
@@ -119,14 +126,60 @@ static %>%
   spread(HV,P) %>%
   filter(Eye =="L") %>%
   group_by(neuron) %>%
-  do(l.h.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[2],l.v.slope=summary(lm(fr~Hep+Vep,data=.))$coefficients[3]) %>%
-  mutate(l.angle=atan2(l.v.slope,l.h.slope)*180/pi)->
+  do(m=summary(lm(fr~Hep+Vep,data=.))$coefficients) %>%
+  mutate(l.h.slope=m[2],l.v.slope=m[3],l.h.p=m[11],l.v.p=m[12]) %>%
+  select(-m) %>%
+  mutate(l.angle=atan2(l.v.slope,l.h.slope)*180/pi) ->
   l
 
 rl<-left_join(r,l,by="neuron")
-rl<-rl[c(1,2,3,5,6,4,7)] #rearrange columns 
+
+rl %>% 
+  separate(neuron,c("animal","cellnum")) %>%
+  arrange(animal,as.numeric(cellnum)) ->
+  rl
+
 kable(rl)
+```
 
+Now, let's plot the vectors of the preferred position for each cell.
+```{r DirectionPlot,fig.height=10,fig.width=5}
+rl %>%
+  select(c(1,2,3,4,8,9)) %>%
+  gather("type","slope",3:6) %>%
+  separate(type,c("eye","HV","x")) %>%
+  select(-x) %>%
+  spread(HV,slope)%>%
+  ggplot(.) +
+  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
+  facet_grid(animal~.)+
+  xlab("Horizontal Slope")+
+  ylab("Vertical Slope") +
+  scale_color_manual(values=c("blue","red"))+
+  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
+  coord_fixed()
 
+```
+
+```{r DirectionPlotSig,fig.height=10,fig.width=5}
+rl %>%
+  filter(r.h.p<0.001, r.v.p<0.001) %>%
+  select(c(1,2,3,4,8,9)) %>%
+  gather("type","slope",3:6) %>%
+  separate(type,c("eye","HV","x")) %>%
+  select(-x) %>%
+  spread(HV,slope)-> 
+  p
+if (nrow(p)> 0) { #make sure at least one cell is significant
+  ggplot(p) +
+  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
+  facet_grid(animal~.)+
+  xlab("Horizontal Slope")+
+  ylab("Vertical Slope") +
+  scale_color_manual(values=c("blue","red"))+
+  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
+  coord_fixed()+
+  ggtitle("Only Signficant Slopes")
+}
 
 ```

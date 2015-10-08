@@ -49,7 +49,7 @@ t=table(sdf,rep,rev,repV,revV,...
 if nargout>0
     tableout=t;
 end
-[filename, filepath]=uiputfile('*.csv','Save Table');
+[filename, filepath]=uiputfile('*.csv','Save Table','~/data');
 display([filepath filename])
 writetable(t,[filepath filename])
 
