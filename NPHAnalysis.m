@@ -1,13 +1,17 @@
-function tableout=NPHAnalysis(b)
+function tableout=NPHAnalysis(b,spiketimes)
 if nargin<1
     [filename, filepath]=uigetfile('.mat','Select Data File');
     b=load([filepath filename]);
 else %user supplied a loaded spike2 export
-    if isfield(b,'spiketimes')
-        savespikes=questdlg('Save Spiketimes?','Save?');
-        if savespikes
-            save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
+    if nargin<2
+        if isfield(b,'spiketimes')
+            savespikes=questdlg('Save Spiketimes?','Save?');
+            if savespikes
+                save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
+            end
         end
+    else
+        b.spiketimes=spiketimes;
     end
 end
 

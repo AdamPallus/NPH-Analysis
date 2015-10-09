@@ -8,13 +8,9 @@ output:
     toc: yes
 ---
 
-```{r echo=FALSE} 
-library(knitr)
-opts_chunk$set(echo=FALSE)
-```
 
 ```{r,message=FALSE}
-opts_chunk$set(echo=FALSE)
+
 library(ggplot2)
 library(dplyr)
 library(knitr)
@@ -27,8 +23,8 @@ library(grid)
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
-path<-"~/GitHub/NPH-Analysis/data/"
-#path<-"~/GitHub/NPH-Analysis/testdata/"
+#path<-"~/GitHub/NPH-Analysis/data/"
+path<-"~/GitHub/NPH-Analysis/testdata/"
 files <- list.files(path=path,pattern='*.csv')
 t<-data.frame()
 for (i in 1:length(files)) {
@@ -60,7 +56,7 @@ t %>%
 levels(s$Eye)<-c("Right Eye","Left Eye") #Change R/L into Right Eye/Left Eye
 ```
 
-```{r gridplot, fig.height=40,fig.width=10}
+```{r gridplot, fig.height=22,fig.width=10}
 
 #Just show cells I want
 #s <- filter(s,neuron %in% c("Bee6","BeeX1","BeeX2","BeeX3a","BeeX3b","BeeY1","BeeZ1"))
@@ -91,22 +87,22 @@ t %>%
   static
 ```
 
-```{r RightEye, fig.height=40,fig.width=10}
+```{r RightEye, fig.height=22,fig.width=10}
 static$plotHV<-as.factor(static$HV)
 levels(static$plotHV)<-c("Horizontal Eye Position","Vertical Eye Position")
 
 static %>%
   filter(Eye=="R") %>%
-  ggplot(aes(P,fr))+facet_grid(neuron~plotHV)+geom_point(alpha=1/20)+
+  qplot(P,fr,data=.)+facet_grid(neuron~plotHV)+
   ggtitle('Right Eye')+
   stat_smooth(method='lm')
 
 ```
 
-```{r LeftEye, fig.height=40,fig.width=10}
+```{r LeftEye, fig.height=22,fig.width=10}
 static %>%
   filter(Eye=="L") %>%
-  ggplot(aes(P,fr))+facet_grid(neuron~plotHV)+geom_point(alpha=1/20)+
+  qplot(P,fr,data=.)+facet_grid(neuron~plotHV)+
   ggtitle('Left Eye')+
   stat_smooth(method='lm')
 ```
@@ -147,8 +143,7 @@ kable(rl)
 ```
 
 Now, let's plot the vectors of the preferred position for each cell.
-
-```{r DirectionPlot,fig.height=5,fig.width=5}
+```{r DirectionPlot,fig.height=10,fig.width=5}
 rl %>%
   select(c(1,2,3,4,8,9)) %>%
   gather("type","slope",3:6) %>%
@@ -166,7 +161,7 @@ rl %>%
 
 ```
 
-```{r DirectionPlotSig,fig.height=5,fig.width=5}
+```{r DirectionPlotSig,fig.height=10,fig.width=5}
 rl %>%
   filter(r.h.p<0.001, r.v.p<0.001) %>%
   select(c(1,2,3,4,8,9)) %>%
@@ -187,25 +182,4 @@ if (nrow(p)> 0) { #make sure at least one cell is significant
   ggtitle("Only Signficant Slopes")
 }
 
-```
-
-The follwing plot shows the average of the absolute value of the slopes for each animal.
-
-```{r AverageSlopes}
-rl %>%
-  select(c(1,2,3,4,8,9)) %>%
-  gather("type","slope",3:6) %>%
-  separate(type,c("eye","HV","x")) %>%
-  select(-x) %>%
-  spread(HV,slope)%>%
-  group_by(animal,eye) %>%
-  summarize(h=mean(abs(h)),v=mean(abs(v))) %>%
-  ggplot(.) +
-  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
-  facet_grid(animal~.)+
-  xlab("Horizontal Slope")+
-  ylab("Vertical Slope") +
-  scale_color_manual(values=c("blue","red"))+
-  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
-  coord_fixed()
 ```
