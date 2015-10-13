@@ -4,6 +4,7 @@ b.spiketimes= evalin('base','spiketimes');
 
 savespikes=questdlg('Save Spiketimes?','Save?');
 if savespikes
+    b.spikes=evalin('base','spikes');
     save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
 end
 

@@ -1,0 +1,18 @@
+{
+    "contents" : "#desaccade script\n\nev<-t$rev[1:10000]\n\nfindSaccades<-function(ev){\n  \ni<-which(abs(ev)>10) #find all the times when speed > threshold\nsacoff<-which(diff(i)>15) #minimum duration of an accepted saccade\nsacon<-c(1,sacoff+1) #first saccade\nsacoff<-c(sacoff,length(i)) #end of last saccade\nsaccade.onset<-i[sacon] #get actual times\nsaccade.offset<-i[sacoff] \nreturn(data.frame(saccade.onset,saccade.offset))\n}\n\nmarkSaccades<-function(ev){\n  #this function finds and marks saccades given a velocity input\n  stimes<-findSaccades(ev)\n  \n  nsaccades=nrow(stimes)\n  \n  #add 10ms buffer to saccade onset and offset\n  #extra code to make sure there is at least that much space in the data\n  buffer<- 15\n  if(stimes$saccade.onset[1]>buffer+1){\n  stimes$saccade.onset=stimes$saccade.onset-10\n  }else{\n    stimes$saccade.onset[2:nsaccades] = stimes$saccade.onset[2:nsaccades]-10\n    stimes$saccade.onset[1]=1\n  }\n  if (stimes$saccade.offset[nsaccades]+buffer<length(ev)){\n    stimes$saccade.offset=stimes$saccade.offset+buffer\n  }else{\n    stimes$saccade.offset[1:nsaccades-1]=stimes$saccade.offset[1:nsaccades-1]+buffer\n    stimes$saccade.offset[nsaccades]=length(ev)\n  }\n    \n  s<-1:length(ev)*0\n  \n  for (k in 1:nsaccades){\n    s[stimes$saccade.onset[k]:stimes$saccade.offset[k]]<-k\n    if(k>1){\n      s[stimes$saccade.offset[k-1]:stimes$saccade.onset[k]]<-(k*-1)\n    }\n  }\n  s[1:stimes$saccade.onset[1]]<- -1\n  s[stimes$saccade.offset[nrow(stimes)]:length(s)]<- (nrow(stimes)*-1)\n  return(s)\n}\n\n\nms<-markSaccades(t$rev)\nms%>%\n  mutate(rev=ev) %>%\n  left_join(t,ms,by=\"rev\") ->\n  tt\n\nt %>%\n  mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2)) %>%\n  filter(s<0) %>%\n  group_by(s,neuron) %>%\n  summarize(R.Hep=mean(rep),L.Hep=mean(lep),R.Vep=mean(repV),L.Vep=mean(lepV),fr=mean(sdf)) %>%\n  gather(temp,P,3:6) %>%\n  separate(temp,c(\"Eye\",\"HV\")) %>%\n  group_by(neuron)%>%\n  mutate(maxFR=max(fr),scaledfr=fr/maxFR) ->\n  tt\n\nt %>%\n  filter(abs(rev)<thresh,abs(revV)<thresh,abs(lev)<thresh,abs(levV)<thresh) %>%\n  select(1,2,4,6,8,10) %>%\n  rename(R.Hep=rep,R.Vep=repV, L.Hep=lep,L.Vep=lepV,fr=sdf) %>%\n  #use tidyr functions to make columns for eye (left or right), vertrical and horizontal eye position\n  mutate(time=row_number(fr))%>%\n  gather(temp,P,2:5) %>%\n  separate(temp,c(\"Eye\",\"HV\")) ->\n  static",
+    "created" : 1444670915811.000,
+    "dirty" : true,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "2986575763",
+    "id" : "5CB3791D",
+    "lastKnownWriteTime" : 7011605692497750387,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "type" : "r_source"
+}

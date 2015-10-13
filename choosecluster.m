@@ -30,8 +30,8 @@ if strcmp(doplot,'Yes')
     hold on
     plot(spiketimes,-0.07,'^r')
     title(['Cluster: ',xx{choice},' #spikes: ',num2str(length(spiketimes))])
+    waitfor(a)
 end
-waitfor(a)
 keep= questdlg('Keep Choice','Keep?');
 
 if strcmp(keep,'Yes')

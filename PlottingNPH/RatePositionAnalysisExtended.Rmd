@@ -1,0 +1,298 @@
+---
+title: "NPH rate position analysis"
+author: "Adam"
+date: "October 12, 2015"
+output: 
+  html_document: 
+    keep_md: yes
+    toc: yes
+---
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
+
+```{r,message=FALSE}
+opts_chunk$set(echo=FALSE)
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(grid)
+
+```
+
+```{r,cache=FALSE}
+#load all the .csv files in the data folder, then add a column naming the neuron, 
+#using the file name as the default name, then put them all together in one long data frame
+
+path<-"~/GitHub/NPH-Analysis/data/"
+#path<-"~/GitHub/NPH-Analysis/testdata/"
+files <- list.files(path=path,pattern='*.csv')
+t<-data.frame()
+for (i in 1:length(files)) {
+  temp <- read.csv(paste(path,files[i],sep=''))
+  temp$neuron<-gsub('.csv','',files[i])
+  t <-rbind(t,temp)
+}
+```
+
+First I will plot the average firing rate of the neuron while the eyes are in various positions. I've restricted my analysis to periods when the eyes are not in motion using a simple eye velocity threshold. I require both the vertical and horizontal eye position to be less than one. This allows for pre-movement burst activity to potentially interfere with the static analysis. 
+
+```{r}
+thresh=1.5 #points with velocity below threshold are considered fixation
+
+#choose just the points of fixation, then bin the data into 1 degree bins (using round)
+#and calculate the mean firing rate during all the times when the eye is at each position
+t %>%
+  filter(abs(rev)<thresh,abs(revV)<thresh,abs(lev)<thresh,abs(levV)<thresh) %>%
+  mutate(R.Hep=round(rep),R.Vep=round(repV), L.Hep=round(lep),L.Vep=round(lepV)) %>%
+  group_by(R.Hep,R.Vep,L.Hep,L.Vep,neuron) %>%
+  summarize(fr=mean(sdf)) %>%
+  ungroup(.) %>%
+  #use tidyr functions to make columns for eye (left or right), vertrical and horizontal eye position
+  mutate(time=row_number(fr)) %>%
+  gather(temp,P,1:4) %>%
+  separate(temp,c("Eye","HV")) %>%
+  spread(HV,P) ->
+  s
+levels(s$Eye)<-c("Right Eye","Left Eye") #Change R/L into Right Eye/Left Eye
+```
+
+```{r gridplot, fig.height=40,fig.width=10}
+
+#Just show cells I want
+#s <- filter(s,neuron %in% c("Bee6","BeeX1","BeeX2","BeeX3a","BeeX3b","BeeY1","BeeZ1"))
+#s <- filter(s,neuron %in% c("Bee6","BeeZ1"))
+
+#Create a scaled firing rate by simply dividing by the maximum firing rate in any bin
+s %>%
+  group_by(neuron) %>%
+  mutate(maxFR=max(fr),scaledFR=fr/maxFR) ->
+  ss
+
+#plot
+qplot(Hep,Vep,data=ss,fill=scaledFR)+geom_tile()+facet_grid(neuron~Eye)+
+  scale_fill_gradient(low='black',high='orange')
+```
+
+Next, let's show the rate position curves for horizontal and vertical individually.
+
+```{r}
+t %>%
+  filter(abs(rev)<thresh,abs(revV)<thresh,abs(lev)<thresh,abs(levV)<thresh) %>%
+  select(1,2,4,6,8,10) %>%
+  rename(R.Hep=rep,R.Vep=repV, L.Hep=lep,L.Vep=lepV,fr=sdf) %>%
+  #use tidyr functions to make columns for eye (left or right), vertrical and horizontal eye position
+  mutate(time=row_number(fr))%>%
+  gather(temp,P,2:5) %>%
+  separate(temp,c("Eye","HV")) ->
+  static
+```
+
+```{r RightEye, fig.height=40,fig.width=10}
+static$plotHV<-as.factor(static$HV)
+levels(static$plotHV)<-c("Horizontal Eye Position","Vertical Eye Position")
+
+static %>%
+  filter(Eye=="R") %>%
+  ggplot(aes(P,fr))+facet_grid(neuron~plotHV)+geom_point(alpha=1/20)+
+  ggtitle('Right Eye')+
+  stat_smooth(method='lm')
+
+```
+
+```{r LeftEye, fig.height=40,fig.width=10}
+static %>%
+  filter(Eye=="L") %>%
+  ggplot(aes(P,fr))+facet_grid(neuron~plotHV)+geom_point(alpha=1/20)+
+  ggtitle('Left Eye')+
+  stat_smooth(method='lm')
+```
+
+Next, I will create a table of the linear regression coefficients for the formula $$F_r=b+k_hE_h + k_hE_v$$, where $E_h$ and $E_v$ are the horizontal and vertical eye positions during periods where the eye velocity is less than `r thresh`. 
+
+```{r statTable}
+static %>% 
+  select(-plotHV) %>%
+  spread(HV,P) %>%
+  filter(Eye =="R") %>%
+  group_by(neuron) %>%
+  do(m=summary(lm(fr~Hep+Vep,data=.))$coefficients) %>%
+  mutate(r.h.slope=m[2],r.v.slope=m[3],r.h.p=m[11],r.v.p=m[12]) %>%
+  select(-m) %>%
+  mutate(r.angle=atan2(r.v.slope,r.h.slope)*180/pi) ->
+  r
+
+static %>% 
+  select(-plotHV) %>%
+  spread(HV,P) %>%
+  filter(Eye =="L") %>%
+  group_by(neuron) %>%
+  do(m=summary(lm(fr~Hep+Vep,data=.))$coefficients) %>%
+  mutate(l.h.slope=m[2],l.v.slope=m[3],l.h.p=m[11],l.v.p=m[12]) %>%
+  select(-m) %>%
+  mutate(l.angle=atan2(l.v.slope,l.h.slope)*180/pi) ->
+  l
+
+rl<-left_join(r,l,by="neuron")
+
+rl %>% 
+  separate(neuron,c("animal","cellnum")) %>%
+  arrange(animal,as.numeric(cellnum)) ->
+  rl
+
+kable(rl)
+```
+
+Now, let's plot the vectors of the preferred position for each cell.
+
+```{r DirectionPlot,fig.height=5,fig.width=5}
+rl %>%
+  select(c(1,2,3,4,8,9)) %>%
+  gather("type","slope",3:6) %>%
+  separate(type,c("eye","HV","x")) %>%
+  select(-x) %>%
+  spread(HV,slope)%>%
+  ggplot(.) +
+  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
+  facet_grid(animal~.)+
+  xlab("Horizontal Slope")+
+  ylab("Vertical Slope") +
+  scale_color_manual(values=c("blue","red"))+
+  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
+  coord_fixed()
+
+```
+
+```{r DirectionPlotSig,fig.height=5,fig.width=5}
+rl %>%
+  filter(r.h.p<0.001, r.v.p<0.001) %>%
+  select(c(1,2,3,4,8,9)) %>%
+  gather("type","slope",3:6) %>%
+  separate(type,c("eye","HV","x")) %>%
+  select(-x) %>%
+  spread(HV,slope)-> 
+  p
+if (nrow(p)> 0) { #make sure at least one cell is significant
+  ggplot(p) +
+  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
+  facet_grid(animal~.)+
+  xlab("Horizontal Slope")+
+  ylab("Vertical Slope") +
+  scale_color_manual(values=c("blue","red"))+
+  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
+  coord_fixed()+
+  ggtitle("Only Signficant Slopes")
+}
+
+```
+
+The follwing plot shows the average of the absolute value of the slopes for each animal.
+
+```{r AverageSlopes}
+rl %>%
+  select(c(1,2,3,4,8,9)) %>%
+  gather("type","slope",3:6) %>%
+  separate(type,c("eye","HV","x")) %>%
+  select(-x) %>%
+  spread(HV,slope)%>%
+  group_by(animal,eye) %>%
+  summarize(h=mean(abs(h)),v=mean(abs(v))) %>%
+  ggplot(.) +
+  geom_segment(aes(x=0,xend=h,y=0,yend=v,col=eye),size=1.0,arrow=arrow(20))+
+  facet_grid(animal~.)+
+  xlab("Horizontal Slope")+
+  ylab("Vertical Slope") +
+  scale_color_manual(values=c("blue","red"))+
+  coord_cartesian(xlim=c(-3.5,3.5),ylim=c(-3.5,3.5)) +
+  coord_fixed()
+```
+
+In the next analyses, we will evaluate the average firing rate during each period of fixation. First, we identify saccades using a simple velocity threshold and mark them using a buffer of 15ms. The remaining periods are considered fixations.
+
+```{r meanFixation}
+
+findSaccades<-function(ev){
+  
+  i<-which(abs(ev)>10) #find all the times when speed > threshold
+  sacoff<-which(diff(i)>15) #minimum duration of an accepted saccade
+  sacon<-c(1,sacoff+1) #first saccade
+  sacoff<-c(sacoff,length(i)) #end of last saccade
+  saccade.onset<-i[sacon] #get actual times
+  saccade.offset<-i[sacoff] 
+  return(data.frame(saccade.onset,saccade.offset))
+}
+
+markSaccades<-function(ev){
+  #this function finds and marks saccades given a velocity input
+  stimes<-findSaccades(ev)
+  
+  nsaccades=nrow(stimes)
+  
+  #add 10ms buffer to saccade onset and offset
+  #extra code to make sure there is at least that much space in the data
+  buffer<- 15
+  if(stimes$saccade.onset[1]>buffer+1){
+  stimes$saccade.onset=stimes$saccade.onset-10
+  }else{
+    stimes$saccade.onset[2:nsaccades] = stimes$saccade.onset[2:nsaccades]-10
+    stimes$saccade.onset[1]=1
+  }
+  if (stimes$saccade.offset[nsaccades]+buffer<length(ev)){
+    stimes$saccade.offset=stimes$saccade.offset+buffer
+  }else{
+    stimes$saccade.offset[1:nsaccades-1]=stimes$saccade.offset[1:nsaccades-1]+buffer
+    stimes$saccade.offset[nsaccades]=length(ev)
+  }
+    
+  s<-1:length(ev)*0
+  
+  for (k in 1:nsaccades){
+    s[stimes$saccade.onset[k]:stimes$saccade.offset[k]]<-k
+    if(k>1){
+      s[stimes$saccade.offset[k-1]:stimes$saccade.onset[k]]<-(k*-1)
+    }
+  }
+  s[1:stimes$saccade.onset[1]]<- -1
+  s[stimes$saccade.offset[nrow(stimes)]:length(s)]<- (nrow(stimes)*-1)
+  return(s)
+}
+```
+
+```{r plotfixations,fig.height=46,fig.width=6}
+#use the created functions to mark the saccades
+t %>%
+  mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2)) %>%
+  filter(s<0) %>% #just look at periods of fixation
+  group_by(s,neuron) %>%
+  summarize(R.Horizontal=mean(rep),L.Horizontal=mean(lep),R.Vertical=mean(repV),L.Vertical=mean(lepV),fr=mean(sdf)) %>%
+  group_by(neuron)%>%
+  mutate(maxFR=max(fr),scaledfr=fr/maxFR) ->
+  tt
+qplot(R.Horizontal,R.Vertical,color=scaledfr,size=8,data=tt)+facet_grid(neuron~.)
+```
+
+```{r plotregressions,fig.height=46,fig.width=10}
+
+tt %>%
+  gather(temp,P,3:6) %>%
+  separate(temp,c("Eye","HV")) ->
+  tc
+  qplot(P,scaledfr,data=tc,color=Eye,alpha=0.2)+facet_grid(neuron~HV)+
+    xlab('Eye Position (degrees)')+
+    ggtitle("Mean FR (scaled) during Fixation")
+  
+  qplot(P,fr,data=tc,color=Eye,alpha=0.2)+facet_grid(neuron~HV)+
+    xlab('Eye Position (degrees)')+
+    ggtitle("Mean FR during Fixation")
+```
+
+
+```{r replot,fig.height=46,fig.width=10}
+#    qplot(P,fr,data=static,color=Eye,alpha=0.2)+facet_grid(neuron~HV)+
+#    xlab('Eye Position (degrees)')+
+#    ggtitle("Mean FR during Fixation")
+```
+  
