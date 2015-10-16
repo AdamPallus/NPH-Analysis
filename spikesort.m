@@ -1,6 +1,6 @@
 function b=spikesort(~,~)
 
-h=evalin('base','h');
+h=evalin('base','handles');
 data=evalin('base','data');
 
 threshold=str2double(h.thresh.String);

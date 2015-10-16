@@ -1,5 +1,5 @@
 function choosecluster(~,~)
-h=evalin('base','h');
+h=evalin('base','handles');
 try
     spikes=evalin('base','spikes');
 catch
