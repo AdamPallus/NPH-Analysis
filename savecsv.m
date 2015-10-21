@@ -11,13 +11,28 @@ end
 %create spike density function
 sdf=makesdf(b,20);
 rep=b.H_Eye.values;%horizontal right eye position
-rev=parabolicdiff(smooth(rep,15),5);%horizontal right eye velocity
+lep=b.H_Eye2.values;%horizontal right eye position
 repV=b.V_Eye.values;%vertical right eye position
+lepV=b.V_Eye2.values;%vertical right eye position
+
+if length(rep)>length(lep)
+    rep=rep(1:length(lep));
+    repV=repV(1:length(lep));
+elseif length(lep)<length(rep)
+    lep=lep(1:length(rep));
+    lepV=lepV(1:length(rep));
+end
+if length(sdf)>length(lep)
+    sdf=sdf(1:length(lep));
+end
+    
+rev=parabolicdiff(smooth(rep,15),5);%horizontal right eye velocity
+
 revV=parabolicdiff(smooth(repV,15),5);%vertical right eye velocity
 
-lep=b.H_Eye2.values;%horizontal right eye position
+
 lev=parabolicdiff(smooth(lep,15),5);%horizontal right eye velocity
-lepV=b.V_Eye2.values;%vertical right eye position
+
 levV=parabolicdiff(smooth(lepV,15),5);%vertical right eye velocity
 
 % sdf=[sdf zeros[1 length(rep)-length(sdf)]] %pad sdf
