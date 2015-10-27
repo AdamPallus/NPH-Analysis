@@ -1,0 +1,18 @@
+{
+    "contents" : "tc %>%\n  separate(neuron,c(\"monkey\",\"cellnumber\"),remove=FALSE) %>%\n  filter(monkey==\"Patos\",as.numeric(cellnumber)<10) ->\n  tpatos\n\nstatic %>% \n  spread(HV,P) %>%\n  filter(Eye ==\"R\",neuron=\"Bee-1\")  -> xx\n\n%>%\n  group_by(neuron) %>%\n  do(m=summary(lm(fr~Hep+Vep,data=.))$coefficients) %>%\n  mutate(r.h.slope=m[2],r.v.slope=m[3],r.h.p=m[11],r.v.p=m[12]) %>%\n  select(-m) %>%\n  mutate(r.angle=atan2(r.v.slope,r.h.slope)*180/pi) ->\n  r",
+    "created" : 1445535345878.000,
+    "dirty" : true,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "3231817591",
+    "id" : "9454CED6",
+    "lastKnownWriteTime" : 7011605692497750387,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "tempName" : "Untitled2"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "type" : "r_source"
+}

@@ -1,0 +1,18 @@
+{
+    "contents" : "bootstrap <- function(df, m) {\n  n <- nrow(df)\n  \n  attr(df, \"indices\") <- replicate(m, sample(n, replace = TRUE) - 1, \n                                   simplify = FALSE)\n  attr(df, \"drop\") <- TRUE\n  attr(df, \"group_sizes\") <- rep(n, m)\n  attr(df, \"biggest_group_size\") <- n\n  attr(df, \"labels\") <- data.frame(replicate = 1:m)\n  attr(df, \"vars\") <- list(quote(replicate))\n  class(df) <- c(\"grouped_df\", \"tbl_df\", \"tbl\", \"data.frame\")\n  \n  df\n}",
+    "created" : 1445624216245.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "92113694",
+    "id" : "7DED1181",
+    "lastKnownWriteTime" : 1445624234,
+    "path" : "~/GitHub/NPH-Analysis/PlottingNPH/bootstrap.R",
+    "project_path" : "bootstrap.R",
+    "properties" : {
+        "tempName" : "Untitled3"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "type" : "r_source"
+}

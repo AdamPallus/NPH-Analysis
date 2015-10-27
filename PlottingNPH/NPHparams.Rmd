@@ -1,0 +1,78 @@
+---
+title: "NPH Bootstrap Parameter Estimates"
+author: "Adam"
+date: "October 23, 2015"
+output: 
+  html_document: 
+  keep_md: yes
+toc: yes
+---
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
+
+```{r,message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(grid)
+library(broom)
+source('~/GitHub/NPH-Analysis/PlottingNPH/bootstrap.R')
+```
+
+```{r,cache=FALSE}
+#load all the .csv files in the data folder, then add a column naming the neuron, 
+#using the file name as the default name, then put them all together in one long data frame
+
+#path <- "~/GitHub/NPH-Analysis/data/"
+path <- "~/GitHub/NPH-Analysis/testdata/"
+files <- list.files(path=path,pattern='*.csv')
+t<-data.frame()
+for (i in 1:length(files)) {
+  temp <- read.csv(paste(path,files[i],sep=''))
+  temp$neuron<-gsub('.csv','',files[i])
+  t <-rbind(t,temp)
+}
+```
+
+
+```{r bootstrapfor}
+#it looks like this function works, but will need to be rewritten to use larger bootstrap numbers
+t %>% 
+  group_by(neuron) %>% 
+  do(boot=bootstrap(.,100)) -> 
+  b
+ci<-data.frame()
+alpha<- 0.5
+#this is a hack because the boostrap function doesn't keep track of groups that go into the function
+for (i in 1:nrow(b)){
+  b$boot[[i]] %>%
+    #do(tidy(lm(sdf~rep+lep+repV+lepV,.))) %>%
+    do(tidy(lm(sdf~rep+lep+repV+lepV+rev+lev+revV+levV,.))) %>%
+    group_by(term) %>%
+    summarize(low=quantile(estimate, alpha / 2),
+            high=quantile(estimate, 1 - alpha / 2))->
+    x
+  x$neuron<- b$neuron[i]
+  ci<-rbind(ci,x)
+}
+
+```
+
+```{r paramstable}
+ci %>% 
+  select(c(1,2,4)) %>% 
+  spread(term,low) -> 
+  c
+ci %>% 
+  select(c(1,3,4)) %>% 
+  spread(term,high) -> 
+  ch
+full_join(c,ch) %>%
+  arrange(neuron) %>%
+  kable(.)
+
+```
