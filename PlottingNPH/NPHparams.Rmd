@@ -28,7 +28,7 @@ source('~/GitHub/NPH-Analysis/PlottingNPH/bootstrap.R')
 #using the file name as the default name, then put them all together in one long data frame
 
 #path <- "~/GitHub/NPH-Analysis/data/"
-path <- "~/GitHub/NPH-Analysis/testdata/"
+path <- "~/GitHub/NPH-Analysis/practicedata/"
 files <- list.files(path=path,pattern='*.csv')
 t<-data.frame()
 for (i in 1:length(files)) {
@@ -50,8 +50,8 @@ alpha<- 0.5
 #this is a hack because the boostrap function doesn't keep track of groups that go into the function
 for (i in 1:nrow(b)){
   b$boot[[i]] %>%
-    #do(tidy(lm(sdf~rep+lep+repV+lepV,.))) %>%
-    do(tidy(lm(sdf~rep+lep+repV+lepV+rev+lev+revV+levV,.))) %>%
+    do(tidy(lm(sdf~rep+lep+repV+lepV,.))) %>%
+    #do(tidy(lm(sdf~rep+lep+repV+lepV+rev+lev+revV+levV,.))) %>%
     group_by(term) %>%
     summarize(low=quantile(estimate, alpha / 2),
             high=quantile(estimate, 1 - alpha / 2))->
@@ -72,7 +72,8 @@ ci %>%
   spread(term,high) -> 
   ch
 full_join(c,ch) %>%
-  arrange(neuron) %>%
-  kable(.)
+  arrange(neuron) ->
+  cij
+kable(cij)
 
 ```
