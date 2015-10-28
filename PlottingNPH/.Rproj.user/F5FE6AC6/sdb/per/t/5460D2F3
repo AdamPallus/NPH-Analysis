@@ -1,0 +1,17 @@
+{
+    "contents" : "---\ntitle: \"NPH Bootstrap 2\"\nauthor: \"Adam\"\ndate: \"October 27, 2015\"\noutput: html_document\n---\n\n```{r echo=FALSE} \nlibrary(knitr)\n#opts_chunk$set(echo=FALSE)\n```\n\n```{r,message=FALSE}\nlibrary(ggplot2)\nlibrary(dplyr)\nlibrary(knitr)\nlibrary(tidyr)\nlibrary(grid)\nlibrary(broom)\nsource('~/GitHub/NPH-Analysis/PlottingNPH/bootstrap.R')\n```\n\n```{r,cache=FALSE}\n#load all the .csv files in the data folder, then add a column naming the neuron, \n#using the file name as the default name, then put them all together in one long data frame\n\nbootci <- function(t,n=100,alpha=0.05,formula='sdf~rep+lep',leadtime=10){\n  t %>%\n    mutate(sdf=lag(sdf,leadtime)) %>%\n    bootstrap(n) %>%\n    do(tidy(lm(formula,.))) %>%\n    group_by(term) %>%\n    summarize(low=quantile(estimate, alpha / 2),\n            high=quantile(estimate, 1 - alpha / 2)) ->\n    ci\n  return(ci)\n}\n\n\n#path <- \"~/GitHub/NPH-Analysis/data/\"\npath <- \"~/GitHub/NPH-Analysis/practicedata/\"\nfiles <- list.files(path=path,pattern='*.csv')\nci<- data.frame()\nfor (i in 1:length(files)) {\n  t <- read.csv(paste(path,files[i],sep=''))\n  temp<-bootci(t,n=30,alpha=0.01,formula='sdf~rep+repV+rev+revV')\n  temp$neuron<-gsub('.csv','',files[i])\n  \n  ci<-rbind(ci,temp)\n}\n```\n\n\n\n```{r paramstable}\nci %>% \n  select(c(1,2,4)) %>% \n  spread(term,low) -> \n  c\nci %>% \n  select(c(1,3,4)) %>% \n  spread(term,high) -> \n  ch\nfull_join(c,ch) %>%\n  arrange(neuron) %>%\n  mutate(angle=atan2(repV,rep)*180/pi)->\n  cij\nkable(cij)\n\n```",
+    "created" : 1446055173643.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1537217870",
+    "id" : "5460D2F3",
+    "lastKnownWriteTime" : 1445993392,
+    "path" : "~/GitHub/NPH-Analysis/PlottingNPH/NPHBootstrap.Rmd",
+    "project_path" : "NPHBootstrap.Rmd",
+    "properties" : {
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "type" : "r_markdown"
+}
