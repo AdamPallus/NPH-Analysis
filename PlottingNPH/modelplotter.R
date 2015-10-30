@@ -12,7 +12,8 @@ t
 library(dplyr)
 library(broom)
 
-path <- "~/GitHub/NPH-Analysis/practicedata/"
+#path <- "~/GitHub/NPH-Analysis/practicedata/"
+path <- "~/GitHub/NPH-Analysis/data/"
 files <- list.files(path=path,pattern='*.csv')
 tt<- data.frame()
 for (i in 1:length(files)) {

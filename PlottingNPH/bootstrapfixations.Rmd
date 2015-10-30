@@ -1,0 +1,194 @@
+---
+title: "Bootstrap Fixations"
+author: "Adam"
+date: "October 28, 2015"
+output: html_document
+---
+
+The following analysis identifies periods of fixation and calculate the average eye position and firing rate during each fixation. Next, it performs a bootstrap analysis to find the confidence intervals of a linear model.
+
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(broom)
+library(grid)
+
+```
+
+```{r,cache=FALSE}
+#load all the .csv files in the data folder, then add a column naming the neuron, 
+#using the file name as the default name, then put them all together in one long data frame
+
+#path<-"~/GitHub/NPH-Analysis/practicedata/"
+path<-"~/GitHub/NPH-Analysis/data/"
+#path<-"~/GitHub/NPH-Analysis/testdata/"
+files <- list.files(path=path,pattern='*.csv')
+files<-files[grepl('Patos',files)] # just look at patos files
+#files<-files[grepl('Bee',files)] # just look at bee files
+t<-data.frame()
+for (i in 1:length(files)) {
+  temp <- read.csv(paste(path,files[i],sep=''))
+  temp$neuron<-gsub('.csv','',files[i])
+  t <-rbind(t,temp)
+}
+```
+
+```{r meanFixation}
+
+findSaccades<-function(ev){
+  
+  i<-which(abs(ev)>10) #find all the times when speed > threshold
+  sacoff<-which(diff(i)>15) #minimum duration of an accepted saccade
+  sacon<-c(1,sacoff+1) #first saccade
+  sacoff<-c(sacoff,length(i)) #end of last saccade
+  saccade.onset<-i[sacon] #get actual times
+  saccade.offset<-i[sacoff] 
+  return(data.frame(saccade.onset,saccade.offset))
+}
+
+markSaccades<-function(ev){
+  #this function finds and marks saccades given a velocity input
+  stimes<-findSaccades(ev)
+  
+  nsaccades=nrow(stimes)
+  
+  #add 10ms buffer to saccade onset and offset
+  #extra code to make sure there is at least that much space in the data
+  buffer<- 15
+  if(stimes$saccade.onset[1]>buffer+1){
+  stimes$saccade.onset=stimes$saccade.onset-10
+  }else{
+    stimes$saccade.onset[2:nsaccades] = stimes$saccade.onset[2:nsaccades]-10
+    stimes$saccade.onset[1]=1
+  }
+  if (stimes$saccade.offset[nsaccades]+buffer<length(ev)){
+    stimes$saccade.offset=stimes$saccade.offset+buffer
+  }else{
+    stimes$saccade.offset[1:nsaccades-1]=stimes$saccade.offset[1:nsaccades-1]+buffer
+    stimes$saccade.offset[nsaccades]=length(ev)
+  }
+    
+  s<-1:length(ev)*0
+  
+  for (k in 1:nsaccades){
+    s[stimes$saccade.onset[k]:stimes$saccade.offset[k]]<-k
+    if(k>1){
+      s[stimes$saccade.offset[k-1]:stimes$saccade.onset[k]]<-(k*-1)
+    }
+  }
+  s[1:stimes$saccade.onset[1]]<- -1
+  s[stimes$saccade.offset[nrow(stimes)]:length(s)]<- (nrow(stimes)*-1)
+  return(s)
+}
+```
+
+```{r plotfixations,fig.height=46,fig.width=6}
+#use the created functions to mark the saccades
+t %>%
+  mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2)) %>%
+  filter(s<0) %>% #just look at periods of fixation
+  group_by(s,neuron) %>%
+  summarize(R.Horizontal=mean(rep),L.Horizontal=mean(lep),R.Vertical=mean(repV),L.Vertical=mean(lepV),fr=mean(sdf)) %>%
+  group_by(neuron)%>%
+  mutate(maxFR=max(fr),scaledfr=fr/maxFR) ->
+  tt
+qplot(R.Horizontal,R.Vertical,color=scaledfr,size=8,data=tt)+facet_grid(neuron~.)
+```
+
+```{r plotregressions,fig.height=46,fig.width=10}
+
+tt %>%
+  gather(temp,P,3:6) %>%
+  separate(temp,c("Eye","HV")) ->
+  tc
+  qplot(P,scaledfr,data=tc,color=Eye,alpha=0.2)+facet_grid(neuron~HV)+
+    xlab('Eye Position (degrees)')+
+    ggtitle("Mean FR (scaled) during Fixation")+
+    scale_color_manual(values=c('blue','red'))
+  
+  qplot(P,fr,data=tc,color=Eye,alpha=0.2)+facet_grid(neuron~HV)+
+    xlab('Eye Position (degrees)')+
+    ggtitle("Mean FR during Fixation")+
+    scale_color_manual(values=c('blue','red'))
+```
+
+Now the boostrap analysis will begin here. We will probably have to use a loop because I haven't figured out how to get the boostrap.R. function to work for grouped data without losing the groups.
+
+```{r BoostrapTime}
+  bootci <- function(t,n=100,alpha=0.05,formula='sdf~rep+lep'){
+  t %>%
+    bootstrap(n) %>%
+    do(tidy(lm(formula,.))) %>%
+    group_by(term) %>%
+    summarize(low=quantile(estimate, alpha / 2),
+            high=quantile(estimate, 1 - alpha / 2)) ->
+    ci
+  return(ci)
+}
+  tt<- ungroup(tt)
+  n<- unique(tt$neuron)
+  ci <- data.frame()
+  for (i in 1:length(n)){
+    tt %>%
+      filter(neuron==n[i]) %>%
+      bootci(n=1999,alpha=0.05,formula='fr~R.Horizontal+L.Horizontal+R.Vertical+L.Vertical') ->
+      #bootci(n=1999,alpha=0.05,formula='fr~R.Horizontal+R.Vertical') ->
+      #bootci(n=1999,alpha=0.05,formula='fr~L.Horizontal+L.Vertical') ->
+      #bootci(n=1999,alpha=0.05,formula='fr~L.Horizontal+R.Horizontal') ->
+      temp
+      temp$neuron<-n[i]
+      ci<-rbind(ci,temp)
+      
+  }
+  
+```
+
+```{r paramstable}
+#ci %>% 
+#  select(c(1,2,4)) %>% 
+#  spread(term,low) -> 
+#  c
+#ci %>% 
+#  select(c(1,3,4)) %>% 
+#  spread(term,high) -> 
+#  ch
+#full_join(c,ch) %>%
+#  arrange(neuron) %>%
+#  mutate(angle=atan2(L.Vertical,L.Horizontal)*180/pi)->
+#  cij
+#kable(cij)
+
+```
+
+```{r plotci, fig.width=8,fig.height=30}
+ci %>%
+  mutate(m=(low+high)/2) %>%
+  filter(term != '(Intercept)') %>%
+  ggplot(aes(factor(term),m)) ->
+  g
+g+geom_linerange(aes(ymin=low,ymax=high,color=neuron),size=2)+
+  facet_grid(neuron~.)+
+  geom_hline(x=0)+
+  coord_flip()
+
+```
+
+```{r directionPlot}
+ci %>%
+  mutate(m=(low+high)/2,good=sign(low*high)>0) %>%
+  select(c(1,4,5,6)) %>%
+  spread(term,m) ->
+  sci
+  ggplot(sci) +
+  geom_segment(aes(x=0,xend=L.Horizontal,y=0,yend=L.Vertical),size=1.0,arrow=arrow(20))+
+    ylab('Left Eye Vertical') +xlab('Left Eye Horizontal')
+  ggplot(sci) +
+  geom_segment(aes(x=0,xend=R.Horizontal,y=0,yend=R.Vertical),size=1.0,arrow=arrow(20))+
+    ylab('Right Eye Vertical') +xlab('Right Eye Horizontal')
+  
+  #Next: Code to change CIs that cross zero to zero
+```

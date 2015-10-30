@@ -1,0 +1,18 @@
+{
+    "contents" : "\naddmodelprediction<-function(t){\n  \nt <-  mutate(t,sdflag=lag(sdf,50),time=row_number())\nm<-lm(sdflag~rep+lep,t)\nmv<-lm(sdflag~rep+lep+repV+lepV,t)\nt$posmodel<-predict(m,t)\nt$pvmodel<-predict(mv,t)\nt\n}\n\nlibrary(dplyr)\nlibrary(broom)\n\n#path <- \"~/GitHub/NPH-Analysis/practicedata/\"\npath <- \"~/GitHub/NPH-Analysis/data/\"\nfiles <- list.files(path=path,pattern='*.csv')\ntt<- data.frame()\nfor (i in 1:length(files)) {\n  t <- read.csv(paste(path,files[i],sep=''))\n  t$neuron<-gsub('.csv','',files[i])\n  t<-addmodelprediction(t)\n  tt<- rbind(tt,t)\n}\n\nlibrary(ggplot2)\n\nggplot(filter(tt,time<50000))+\ngeom_area(aes(time,sdflag))+\ngeom_line(aes(time,pvmodel),color=\"green\")+\ngeom_line(aes(time,posmodel),color=\"red\")+facet_grid(neuron~.)\n",
+    "created" : 1445986727235.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3307358769",
+    "id" : "1C032219",
+    "lastKnownWriteTime" : 1446077467,
+    "path" : "~/GitHub/NPH-Analysis/PlottingNPH/modelplotter.R",
+    "project_path" : "modelplotter.R",
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "type" : "r_source"
+}
