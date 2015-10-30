@@ -179,8 +179,8 @@ g+geom_linerange(aes(ymin=low,ymax=high,color=neuron),size=2)+
 
 ```{r directionPlot}
 ci %>%
-  mutate(m=(low+high)/2,good=sign(low*high)>0) %>%
-  select(c(1,4,5,6)) %>%
+  mutate(m=(low+high)/2) %>%
+  select(term,neuron,m) %>%
   spread(term,m) ->
   sci
   ggplot(sci) +
@@ -190,5 +190,24 @@ ci %>%
   geom_segment(aes(x=0,xend=R.Horizontal,y=0,yend=R.Vertical),size=1.0,arrow=arrow(20))+
     ylab('Right Eye Vertical') +xlab('Right Eye Horizontal')
   
-  #Next: Code to change CIs that cross zero to zero
 ```
+
+Now replace params that have zero in the CI with zero
+
+```{r directionGood}
+  ci <- mutate(ci,m=(low+high)/2,bad=((low*high)<0))
+  ci$m[ci$bad]=0
+  ci %>%
+    select(term,neuron,m) %>%
+    spread(term,m) ->
+    scigood
+   ggplot(scigood) +
+    geom_segment(aes(x=0,xend=L.Horizontal,y=0,yend=L.Vertical),size=1.0,arrow=arrow(20))+
+    ylab('Left Eye Vertical') +xlab('Left Eye Horizontal')+ggtitle('Significant Parameters')
+  ggplot(scigood) +
+  geom_segment(aes(x=0,xend=R.Horizontal,y=0,yend=R.Vertical),size=1.0,arrow=arrow(20))+
+    ylab('Right Eye Vertical') +xlab('Right Eye Horizontal')+ggtitle('Significant Paramters')
+```
+
+Next, we will identify cells with and without overlap in the CI between the parameters for each eye. 
+Next, we will plot the strabismus angle versus firing rate

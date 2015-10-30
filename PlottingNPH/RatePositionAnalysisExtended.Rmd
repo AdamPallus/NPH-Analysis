@@ -20,15 +20,15 @@ library(dplyr)
 library(knitr)
 library(tidyr)
 library(grid)
-
+# source('~/GitHub/NPH-Analysis/PlottingNPH/distance.R')
 ```
 
 ```{r,cache=FALSE}
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
-path<-"~/GitHub/NPH-Analysis/data/"
-#path<-"~/GitHub/NPH-Analysis/testdata/"
+#path<-"~/GitHub/NPH-Analysis/data/"
+path<-"~/GitHub/NPH-Analysis/testdata/"
 files <- list.files(path=path,pattern='*.csv')
 t<-data.frame()
 for (i in 1:length(files)) {
@@ -40,14 +40,26 @@ for (i in 1:length(files)) {
 
 First I will plot the average firing rate of the neuron while the eyes are in various positions. I've restricted my analysis to periods when the eyes are not in motion using a simple eye velocity threshold. I require both the vertical and horizontal eye position to be less than one. This allows for pre-movement burst activity to potentially interfere with the static analysis. 
 
+```{r viewingEyeCalc}
+# t <- mutate(t,RightViewing=distance(rep,repV,thp,tvp)<distance(lep,lepV,thp,tvp)) 
+# t$Veye='R'
+# t$Veye[!t$RightViewing]='L'
+# 
+# t<-select(t,-RightViewing)
+
+
+```
+
+
 ```{r}
-thresh=1.5 #points with velocity below threshold are considered fixation
+thresh=5 #points with velocity below threshold are considered fixation
 
 #choose just the points of fixation, then bin the data into 1 degree bins (using round)
 #and calculate the mean firing rate during all the times when the eye is at each position
 t %>%
   filter(abs(rev)<thresh,abs(revV)<thresh,abs(lev)<thresh,abs(levV)<thresh) %>%
   mutate(R.Hep=round(rep),R.Vep=round(repV), L.Hep=round(lep),L.Vep=round(lepV)) %>%
+  # group_by(R.Hep,R.Vep,L.Hep,L.Vep,neuron,Veye) %>%
   group_by(R.Hep,R.Vep,L.Hep,L.Vep,neuron) %>%
   summarize(fr=mean(sdf)) %>%
   ungroup(.) %>%
@@ -57,7 +69,8 @@ t %>%
   separate(temp,c("Eye","HV")) %>%
   spread(HV,P) ->
   s
-levels(s$Eye)<-c("Right Eye","Left Eye") #Change R/L into Right Eye/Left Eye
+
+
 ```
 
 ```{r gridplot, fig.height=40,fig.width=10}
@@ -68,6 +81,7 @@ levels(s$Eye)<-c("Right Eye","Left Eye") #Change R/L into Right Eye/Left Eye
 
 #Create a scaled firing rate by simply dividing by the maximum firing rate in any bin
 s %>%
+  # filter(Veye==Eye) %>%
   group_by(neuron) %>%
   mutate(maxFR=max(fr),scaledFR=fr/maxFR) ->
   ss
@@ -82,7 +96,8 @@ Next, let's show the rate position curves for horizontal and vertical individual
 ```{r}
 t %>%
   filter(abs(rev)<thresh,abs(revV)<thresh,abs(lev)<thresh,abs(levV)<thresh) %>%
-  select(1,2,4,6,8,10) %>%
+  # select(sdf,rep,repV,lep,lepV,neuron,Veye) %>%
+  select(sdf,rep,repV,lep,lepV,neuron) %>%
   rename(R.Hep=rep,R.Vep=repV, L.Hep=lep,L.Vep=lepV,fr=sdf) %>%
   #use tidyr functions to make columns for eye (left or right), vertrical and horizontal eye position
   mutate(time=row_number(fr))%>%
@@ -100,6 +115,12 @@ static %>%
   ggplot(aes(P,fr))+facet_grid(neuron~plotHV)+geom_point(alpha=1/20)+
   ggtitle('Right Eye')+
   stat_smooth(method='lm')
+
+# static %>%
+#   filter(Eye==Veye) %>%
+#   ggplot(aes(P,fr))+facet_grid(neuron~plotHV)+geom_point(alpha=1/20)+
+#   ggtitle('Viewing Eye')+
+#   stat_smooth(method='lm')
 
 ```
 
