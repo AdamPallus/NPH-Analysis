@@ -1,0 +1,201 @@
+---
+title: "BootstrapSaccades"
+author: "Adam"
+date: "November 3, 2015"
+output: html_document
+---
+
+The following analysis identifies periods of fixation and calculate the average eye position and firing rate during each fixation. Next, it performs a bootstrap analysis to find the confidence intervals of a linear model.
+
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(broom)
+library(grid)
+library(relaimpo)
+
+```
+
+```{r loadfiles,cache=FALSE}
+#load all the .csv files in the data folder, then add a column naming the neuron, 
+#using the file name as the default name, then put them all together in one long data frame
+
+#path<-"~/GitHub/NPH-Analysis/practicedata/"
+path<-"~/GitHub/NPH-Analysis/data/"
+#path<-"~/GitHub/NPH-Analysis/testdata/"
+files <- list.files(path=path,pattern='*.csv')
+# files<-files[grepl('Patos',files)] # just look at patos files
+files<-files[grepl('Bee',files)] # just look at bee files
+t<-data.frame()
+for (i in 1:length(files)) {
+  temp <- read.csv(paste(path,files[i],sep=''))
+  temp$neuron<-gsub('.csv','',files[i])
+  t <-rbind(t,temp)
+}
+```
+
+```{r markSaccades}
+
+findSaccades<-function(ev){
+  
+  i<-which(abs(ev)>10) #find all the times when speed > threshold
+  sacoff<-which(diff(i)>15) #minimum duration of an accepted saccade
+  sacon<-c(1,sacoff+1) #first saccade
+  sacoff<-c(sacoff,length(i)) #end of last saccade
+  saccade.onset<-i[sacon] #get actual times
+  saccade.offset<-i[sacoff] 
+  return(data.frame(saccade.onset,saccade.offset))
+}
+
+markSaccades<-function(ev){
+  #this function finds and marks saccades given a velocity input
+  stimes<-findSaccades(ev)
+  
+  nsaccades=nrow(stimes)
+  
+  #add 10ms buffer to saccade onset and offset
+  #extra code to make sure there is at least that much space in the data
+  buffer<- 15
+  if(stimes$saccade.onset[1]>buffer+1){
+  stimes$saccade.onset=stimes$saccade.onset-10
+  }else{
+    stimes$saccade.onset[2:nsaccades] = stimes$saccade.onset[2:nsaccades]-10
+    stimes$saccade.onset[1]=1
+  }
+  if (stimes$saccade.offset[nsaccades]+buffer<length(ev)){
+    stimes$saccade.offset=stimes$saccade.offset+buffer
+  }else{
+    stimes$saccade.offset[1:nsaccades-1]=stimes$saccade.offset[1:nsaccades-1]+buffer
+    stimes$saccade.offset[nsaccades]=length(ev)
+  }
+    
+  s<-1:length(ev)*0
+  
+  for (k in 1:nsaccades){
+    s[stimes$saccade.onset[k]:stimes$saccade.offset[k]]<-k
+    if(k>1){
+      s[stimes$saccade.offset[k-1]:stimes$saccade.onset[k]]<-(k*-1)
+    }
+  }
+  s[1:stimes$saccade.onset[1]]<- -1
+  s[stimes$saccade.offset[nrow(stimes)]:length(s)]<- (nrow(stimes)*-1)
+  return(s)
+}
+```
+
+```{r isolateSaccades,fig.height=46,fig.width=6}
+#use the created functions to mark the saccades
+t %>%
+  mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2)) %>%
+  filter(s>0) %>%
+  mutate(sdflag=lag(sdf,50),time=row_number())->
+  tt
+```
+
+```{r bootstrapModel}
+#   bootci <- function(t,n=100,alpha=0.05,formula='sdf~rep+lep'){
+#   t %>%
+#     bootstrap(n) %>%
+#     do(tidy(lm(formula,.))) %>%
+#     group_by(term) %>%
+#     summarize(low=quantile(estimate, alpha / 2),
+#             high=quantile(estimate, 1 - alpha / 2)) ->
+#     ci
+#   return(ci)
+#   }
+# 
+#   tt<- ungroup(tt)
+#   n<- unique(tt$neuron)
+#   ci <- data.frame()
+#   f<- "FRtd~R.P.Horizontal+L.P.Horizontal+R.V.Horizontal+L.V.Horizontal+R.P.Vertical+L.P.Vertical+R.V.Vertical+L.V.Vertical"
+#   tt %>%
+#     filter(sdflag>10) %>%
+#     rename(R.P.Horizontal=rep,L.P.Horizontal=lep,
+#              R.V.Horizontal=rev,L.V.Horizontal=lev,
+#              R.P.Vertical=repV,L.P.Vertical=lepV,
+#              R.V.Vertical=revV,L.V.Vertical=levV,
+#              FRtd=sdflag) ->
+#     tmodel
+#   for (i in 1:length(n)){
+#     tmodel %>%
+#       filter(neuron==n[i]) %>%
+#       bootci(n=1999,alpha=0.01,formula=f) ->
+#       temp
+#       temp$neuron<-n[i]
+#       ci<-rbind(ci,temp)
+#   }
+ ```
+ 
+```{r plotci, fig.width=7,fig.height=30}
+# ci %>%
+#   mutate(m=(low+high)/2) %>%
+#   filter(term != '(Intercept)') ->
+#     pci
+# #   g<-ggplot(pci,aes(factor(term),m)) 
+# #   
+# # g+geom_linerange(aes(ymin=low,ymax=high,color=neuron),size=2)+
+# #   facet_grid(neuron~.)+
+# #   geom_hline(x=0)+
+# #   coord_flip()
+# 
+# 
+# pci %>%
+#   separate(term,c('Direction','PV','HV'),remove=FALSE) %>%
+#   mutate(scale=9*as.numeric(PV=='V')+1,
+#          low=low*scale, high=high*scale,m=m*scale) ->
+#   ppci
+# 
+#   g<-ggplot(ppci,aes(factor(term),m)) 
+#   
+# g+geom_linerange(aes(ymin=low,ymax=high,color=neuron),size=2)+
+#   facet_grid(neuron~.)+
+#   geom_hline(x=0)+
+#   coord_flip()+
+#   ylab('Coefficient: Velocity scaled by 10')
+```
+
+```{r relativeImportance, message=FALSE}
+# library(relaimpo)
+# 
+# tt %>%
+#   group_by(neuron) %>%
+#   do(b=calc.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.))) ->
+#   bb
+# for (i in 1:nrow(bb)){
+#   plot(bb$b[[i]],main=bb$neuron[i])
+# }
+ ```
+
+```{r disjunctiveOnly}
+
+tt %>% 
+  group_by(neuron,s) %>% 
+  summarize(R.H.Amp=rep[1]-rep[length(rep)],
+            L.H.Amp=lep[1]-lep[length(lep)],
+            R.V.Amp=repV[1]-repV[length(repV)],
+            L.V.Amp=lepV[1]-lepV[length(lepV)],
+            maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp))) %>%
+  mutate(disjH=sign(R.H.Amp*L.H.Amp)<0,disjV=sign(R.V.Amp*L.V.Amp)<0,disjEither=disjH | disjV) ->
+  amp
+tt <-left_join(tt,amp,by=c('s','neuron'))
+
+nDisjunctive<-nrow(filter(amp,maxamp>2 & disjEither))
+nTotal<- nrow(filter(amp,maxamp>2))
+
+tt %>%
+  filter(maxamp>2 & disjEither) %>%
+    group_by(neuron) %>%
+  do(b=calc.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.))) ->
+  bb
+for (i in 1:nrow(bb)){
+  plot(bb$b[[i]],main=bb$neuron[i])
+}
+  
+
+```
+
+There were a total of `r nDisjunctive` disjunctive Saccades, out of `r nTotal` total saccades.

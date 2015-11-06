@@ -27,8 +27,8 @@ library(grid)
 path<-"~/GitHub/NPH-Analysis/data/"
 #path<-"~/GitHub/NPH-Analysis/testdata/"
 files <- list.files(path=path,pattern='*.csv')
-# files<-files[grepl('Patos',files)] # just look at patos files
-files<-files[grepl('Bee',files)] # just look at bee files
+files<-files[grepl('Patos',files)] # just look at patos files
+# files<-files[grepl('Bee',files)] # just look at bee files
 t<-data.frame()
 for (i in 1:length(files)) {
   temp <- read.csv(paste(path,files[i],sep=''))
@@ -92,9 +92,10 @@ t %>%
   mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2)) %>%
   filter(s<0) %>% #just look at periods of fixation
   group_by(s,neuron) %>%
-  summarize(R.Horizontal=mean(rep),L.Horizontal=mean(lep),R.Vertical=mean(repV),L.Vertical=mean(lepV),fr=mean(sdf)) %>%
+  summarize(nn=length(rep),R.Horizontal=mean(rep),L.Horizontal=mean(lep),R.Vertical=mean(repV),L.Vertical=mean(lepV),fr=mean(sdf)) %>%
   group_by(neuron)%>%
-  mutate(maxFR=max(fr),scaledfr=fr/maxFR) ->
+  mutate(maxFR=max(fr),scaledfr=fr/maxFR) %>%
+  filter(nn>500)->
   tt
 qplot(R.Horizontal,R.Vertical,color=scaledfr,size=8,data=tt)+facet_grid(neuron~.)
 ```
@@ -102,7 +103,7 @@ qplot(R.Horizontal,R.Vertical,color=scaledfr,size=8,data=tt)+facet_grid(neuron~.
 ```{r plotregressions,fig.height=46,fig.width=10}
 
 tt %>%
-  gather(temp,P,3:6) %>%
+  gather(temp,P,4:7) %>%
   separate(temp,c("Eye","HV")) ->
   tc
   qplot(P,scaledfr,data=tc,color=Eye,alpha=0.2)+facet_grid(neuron~HV)+
@@ -135,8 +136,8 @@ Now the boostrap analysis will begin here. We will probably have to use a loop b
   for (i in 1:length(n)){
     tt %>%
       filter(neuron==n[i]) %>%
-      # bootci(n=1999,alpha=0.05,formula='fr~R.Horizontal+L.Horizontal+R.Vertical+L.Vertical') ->
-      bootci(n=1999,alpha=0.05,formula='fr~R.Horizontal+R.Vertical') ->
+      bootci(n=1999,alpha=0.05,formula='fr~R.Horizontal+L.Horizontal+R.Vertical+L.Vertical') ->
+      # bootci(n=1999,alpha=0.05,formula='fr~R.Horizontal+R.Vertical') ->
       #bootci(n=1999,alpha=0.05,formula='fr~L.Horizontal+L.Vertical') ->
       #bootci(n=1999,alpha=0.05,formula='fr~L.Horizontal+R.Horizontal') ->
       temp
@@ -183,9 +184,9 @@ ci %>%
   select(term,neuron,m) %>%
   spread(term,m) ->
   sci
-#   ggplot(sci) +
-#   geom_segment(aes(x=0,xend=L.Horizontal,y=0,yend=L.Vertical),size=1.0,arrow=arrow(20))+
-#     ylab('Left Eye Vertical') +xlab('Left Eye Horizontal')
+  ggplot(sci) +
+  geom_segment(aes(x=0,xend=L.Horizontal,y=0,yend=L.Vertical),size=1.0,arrow=arrow(20))+
+    ylab('Left Eye Vertical') +xlab('Left Eye Horizontal')
   ggplot(sci) +
   geom_segment(aes(x=0,xend=R.Horizontal,y=0,yend=R.Vertical),size=1.0,arrow=arrow(20))+
     ylab('Right Eye Vertical') +xlab('Right Eye Horizontal')
@@ -201,9 +202,9 @@ Now replace params that have zero in the CI with zero
     select(term,neuron,m) %>%
     spread(term,m) ->
     scigood
-#    ggplot(scigood) +
-#     geom_segment(aes(x=0,xend=L.Horizontal,y=0,yend=L.Vertical),size=1.0,arrow=arrow(20))+
-#     ylab('Left Eye Vertical') +xlab('Left Eye Horizontal')+ggtitle('Significant Parameters')
+   ggplot(scigood) +
+    geom_segment(aes(x=0,xend=L.Horizontal,y=0,yend=L.Vertical),size=1.0,arrow=arrow(20))+
+    ylab('Left Eye Vertical') +xlab('Left Eye Horizontal')+ggtitle('Significant Parameters')
   ggplot(scigood) +
   geom_segment(aes(x=0,xend=R.Horizontal,y=0,yend=R.Vertical),size=1.0,arrow=arrow(20))+
     ylab('Right Eye Vertical') +xlab('Right Eye Horizontal')+ggtitle('Significant Paramters')
@@ -214,27 +215,27 @@ Next, we will identify cells with and without overlap in the CI between the para
 Next, we will plot the strabismus angle versus firing rate
 
 ```{r strabismusangle,fig.width=8,fig.height=40}
-#   tt %>%
-#     mutate(strab=R.Horizontal-L.Horizontal,dvd=R.Vertical-L.Vertical) ->
-#     tt
-#   strabangle<-ggplot(tt,aes(strab,fr))
-#   strabangle+geom_point()+facet_grid(neuron~.)+stat_smooth(method='lm')+
-#     xlab('Strabismus Angle')+ggtitle('Strabismus Angle')
-#   
+  tt %>%
+    mutate(strab=R.Horizontal-L.Horizontal,dvd=R.Vertical-L.Vertical) ->
+    tt
+  strabangle<-ggplot(tt,aes(strab,fr))
+  strabangle+geom_point()+facet_grid(neuron~.)+stat_smooth(method='lm')+
+    xlab('Strabismus Angle')+ggtitle('Strabismus Angle')
+  
 ```
 ```{r dvdplot,fig.width=8,fig.height=40}
 
-#   dvdplot<-ggplot(tt,aes(dvd,fr))
-#   dvdplot+geom_point()+facet_grid(neuron~.)+stat_smooth(method='lm')+
-#     xlab('DVD: Right minus Left')+ggtitle('DVD')
-#   
+  dvdplot<-ggplot(tt,aes(dvd,fr))
+  dvdplot+geom_point()+facet_grid(neuron~.)+stat_smooth(method='lm')+
+    xlab('DVD: Right minus Left')+ggtitle('DVD')
+  
 ```
 
 ```{r cyclopeanplot, fig.width=8,fig.height=40}
-#   tt %>%
-#     mutate(C.Horizontal=(L.Horizontal+R.Horizontal)/2,C.Vertical=(L.Vertical+R.Vertical)/2) %>%
-#     gather(HV,position,12:13) ->
-#     tc
-#   cycplot<- ggplot(tc,aes(position,fr))
-#   cycplot+geom_point()+facet_grid(neuron~HV)
+  tt %>%
+    mutate(C.Horizontal=(L.Horizontal+R.Horizontal)/2,C.Vertical=(L.Vertical+R.Vertical)/2) %>%
+    gather(HV,position,C.Horizontal,C.Vertical) ->
+    tc
+  cycplot<- ggplot(tc,aes(position,fr))
+  cycplot+geom_point()+facet_grid(neuron~HV)
 ```
