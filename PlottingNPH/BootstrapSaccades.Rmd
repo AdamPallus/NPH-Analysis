@@ -7,6 +7,10 @@ output: html_document
 
 The following analysis identifies periods of fixation and calculate the average eye position and firing rate during each fixation. Next, it performs a bootstrap analysis to find the confidence intervals of a linear model.
 
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
 
 ```{r,message=FALSE}
 
@@ -17,10 +21,11 @@ library(tidyr)
 library(broom)
 library(grid)
 library(relaimpo)
+library(leaps)
 
 ```
 
-```{r loadfiles,cache=FALSE}
+```{r loadfiles,cache=TRUE}
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
@@ -29,7 +34,7 @@ path<-"~/GitHub/NPH-Analysis/data/"
 #path<-"~/GitHub/NPH-Analysis/testdata/"
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
-files<-files[grepl('Bee',files)] # just look at bee files
+# files<-files[grepl('Bee',files)] # just look at bee files
 t<-data.frame()
 for (i in 1:length(files)) {
   temp <- read.csv(paste(path,files[i],sep=''))
@@ -96,6 +101,53 @@ t %>%
   tt
 ```
 
+
+```{r relativeImportance, message=FALSE}
+# library(relaimpo)
+# 
+# tt %>%
+#   group_by(neuron) %>%
+#   do(b=calc.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.))) ->
+#   bb
+# for (i in 1:nrow(bb)){
+#   plot(bb$b[[i]],main=bb$neuron[i])
+# }
+```
+
+```{r disjunctiveOnly, cached=TRUE}
+
+tt %>% 
+  group_by(neuron,s) %>% 
+  summarize(R.H.Amp=rep[1]-rep[length(rep)],
+            L.H.Amp=lep[1]-lep[length(lep)],
+            R.V.Amp=repV[1]-repV[length(repV)],
+            L.V.Amp=lepV[1]-lepV[length(lepV)],
+            maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp))) %>%
+  mutate(disjH=sign(R.H.Amp*L.H.Amp)<0,disjV=sign(R.V.Amp*L.V.Amp)<0,disjEither=disjH | disjV) ->
+  amp
+tt <-left_join(tt,amp,by=c('s','neuron'))
+
+nDisjunctive<-nrow(filter(amp,maxamp>2 & disjEither))
+nTotal<- nrow(filter(amp,maxamp>2))
+
+tt %>%
+  filter(maxamp>2 & disjEither) %>%
+    group_by(neuron) %>%
+  do(b=calc.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.)),
+     bic=regsubsets(sdflag~rep+rev+repV+revV+lep+lev+lepV+levV,.)) ->
+  bb
+```
+
+```{R plotdisjunctive}
+for (i in 1:nrow(bb)){
+  plot(bb$b[[i]],main=bb$neuron[i])
+  plot(bb$bic[[i]],main=bb$neuron[i])
+  plot(bb$bic[[i]],scale=c('adjr2'),main=bb$neuron[i])
+}
+```
+
+There were a total of `r nDisjunctive` disjunctive Saccades, out of `r nTotal` total saccades.
+
 ```{r bootstrapModel}
 #   bootci <- function(t,n=100,alpha=0.05,formula='sdf~rep+lep'){
 #   t %>%
@@ -113,7 +165,7 @@ t %>%
 #   ci <- data.frame()
 #   f<- "FRtd~R.P.Horizontal+L.P.Horizontal+R.V.Horizontal+L.V.Horizontal+R.P.Vertical+L.P.Vertical+R.V.Vertical+L.V.Vertical"
 #   tt %>%
-#     filter(sdflag>10) %>%
+#     filter(sdflag>10,maxamp>2, disjEither) %>%
 #     rename(R.P.Horizontal=rep,L.P.Horizontal=lep,
 #              R.V.Horizontal=rev,L.V.Horizontal=lev,
 #              R.P.Vertical=repV,L.P.Vertical=lepV,
@@ -127,8 +179,8 @@ t %>%
 #       temp
 #       temp$neuron<-n[i]
 #       ci<-rbind(ci,temp)
-#   }
- ```
+#  }
+```
  
 ```{r plotci, fig.width=7,fig.height=30}
 # ci %>%
@@ -155,47 +207,6 @@ t %>%
 #   facet_grid(neuron~.)+
 #   geom_hline(x=0)+
 #   coord_flip()+
-#   ylab('Coefficient: Velocity scaled by 10')
+  # ylab('Coefficient: Velocity scaled by 10')
 ```
 
-```{r relativeImportance, message=FALSE}
-# library(relaimpo)
-# 
-# tt %>%
-#   group_by(neuron) %>%
-#   do(b=calc.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.))) ->
-#   bb
-# for (i in 1:nrow(bb)){
-#   plot(bb$b[[i]],main=bb$neuron[i])
-# }
- ```
-
-```{r disjunctiveOnly}
-
-tt %>% 
-  group_by(neuron,s) %>% 
-  summarize(R.H.Amp=rep[1]-rep[length(rep)],
-            L.H.Amp=lep[1]-lep[length(lep)],
-            R.V.Amp=repV[1]-repV[length(repV)],
-            L.V.Amp=lepV[1]-lepV[length(lepV)],
-            maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp))) %>%
-  mutate(disjH=sign(R.H.Amp*L.H.Amp)<0,disjV=sign(R.V.Amp*L.V.Amp)<0,disjEither=disjH | disjV) ->
-  amp
-tt <-left_join(tt,amp,by=c('s','neuron'))
-
-nDisjunctive<-nrow(filter(amp,maxamp>2 & disjEither))
-nTotal<- nrow(filter(amp,maxamp>2))
-
-tt %>%
-  filter(maxamp>2 & disjEither) %>%
-    group_by(neuron) %>%
-  do(b=calc.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.))) ->
-  bb
-for (i in 1:nrow(bb)){
-  plot(bb$b[[i]],main=bb$neuron[i])
-}
-  
-
-```
-
-There were a total of `r nDisjunctive` disjunctive Saccades, out of `r nTotal` total saccades.
