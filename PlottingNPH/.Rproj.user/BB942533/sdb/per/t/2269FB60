@@ -1,7 +1,7 @@
 {
     "contents" : "bootstrap <- function(df, m) {\n  n <- nrow(df)\n  \n  attr(df, \"indices\") <- replicate(m, sample(n, replace = TRUE) - 1, \n                                   simplify = FALSE)\n  attr(df, \"drop\") <- TRUE\n  attr(df, \"group_sizes\") <- rep(n, m)\n  attr(df, \"biggest_group_size\") <- n\n  attr(df, \"labels\") <- data.frame(replicate = 1:m)\n  attr(df, \"vars\") <- list(quote(replicate))\n  class(df) <- c(\"grouped_df\", \"tbl_df\", \"tbl\", \"data.frame\")\n  \n  df\n}",
     "created" : 1446587382097.000,
-    "dirty" : false,
+    "dirty" : true,
     "encoding" : "UTF-8",
     "folds" : "",
     "hash" : "92113694",

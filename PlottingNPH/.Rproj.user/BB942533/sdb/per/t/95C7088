@@ -1,0 +1,18 @@
+{
+    "contents" : "#script to figure out the \"dynamic lead time\" of each neuron\n\ndynamiclead<-function(p,lags=seq(10,200,by=10)) {\n\nrsq<-NULL\nfor (i in 1:length(lags)) {\n  if (lags[i] > 0){\n  p$sdflag<-dplyr::lag(p$sdf,lags[i])\n  }\n  else{\n    p$sdflag<-dplyr::lead(p$sdf,lags[i]*-1)\n  }\n    \n  rsq[i]<- summary(lm(sdflag~rep+lep+repV+lepV,data=p))$r.squared\n}\n#return(rsq)\nreturn(lags[rsq==max(rsq)])\n}\n\ntt %>%\n  filter(maxamp>10,!disjEither)->\n  ttt\nttt%>%\n  group_by(neuron) %>%\n  do(leadtime=dynamiclead(.)) %>%\n  separate(neuron,c(\"Monkey\",\"cellnum\"),remove =FALSE) %>%\n  mutate(leadtime=as.numeric(leadtime), cellnum=as.numeric(cellnum))->\n  dltest\nqplot(cellnum,leadtime,data=dltest,binwidth=10)+facet_grid(Monkey~.)\n\n\nt %>%\n  group_by(neuron) %>%\n  mutate(sdflag=lag(sdf,as.numeric(dltest$leadtime[dltest$leadtime==neuron[1]]))) ->\n  tx",
+    "created" : 1447191427048.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3427159039",
+    "id" : "95C7088",
+    "lastKnownWriteTime" : 1447723465,
+    "path" : "~/GitHub/NPH-Analysis/PlottingNPH/dynamicleadtesting.R",
+    "project_path" : "dynamicleadtesting.R",
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 7,
+    "source_on_save" : false,
+    "type" : "r_source"
+}

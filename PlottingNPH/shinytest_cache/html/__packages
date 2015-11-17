@@ -1,0 +1,14 @@
+base
+shiny
+knitr
+ggplot2
+dplyr
+tidyr
+broom
+MASS
+boot
+survey
+mitools
+relaimpo
+leaps
+data.table

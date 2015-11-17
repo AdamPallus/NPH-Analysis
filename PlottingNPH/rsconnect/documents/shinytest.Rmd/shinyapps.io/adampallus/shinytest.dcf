@@ -1,0 +1,8 @@
+name: shinytest
+account: adampallus
+server: shinyapps.io
+bundleId: 312190
+url: https://adampallus.shinyapps.io/shinytest
+when: 1447722451.07315
+asMultiple: FALSE
+asStatic: FALSE
