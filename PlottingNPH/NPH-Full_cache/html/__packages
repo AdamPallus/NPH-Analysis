@@ -1,0 +1,14 @@
+base
+methods
+datasets
+utils
+grDevices
+graphics
+stats
+knitr
+ggplot2
+dplyr
+tidyr
+broom
+grid
+stringr

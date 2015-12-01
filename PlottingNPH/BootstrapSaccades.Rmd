@@ -36,13 +36,13 @@ library(data.table)
 
 ```
 
-```{r loadfiles,cache=TRUE}
+```{r loadfiles,cache=FALSE}
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
 #path<-"~/GitHub/NPH-Analysis/practicedata/"
-path<-"~/GitHub/NPH-Analysis/data/"
-#path<-"~/GitHub/NPH-Analysis/testdata/"
+#path<-"~/GitHub/NPH-Analysis/data/"
+path<-"~/GitHub/NPH-Analysis/testdata/"
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
 # files<-files[grepl('Bee',files)] # just look at bee files

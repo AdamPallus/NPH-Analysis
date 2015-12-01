@@ -1,0 +1,17 @@
+{
+    "contents" : "---\ntitle: \"NPH Interactive\"\nauthor: \"Adam\"\ndate: \"November 30, 2015\"\noutput:\n  html_document:\n    self_contained: no\nruntime: shiny\n---\n\n#Introduction\nThis is an analysis of cells believed to be recorded in the NPH of a normal monkey (Bee) and a monkey with exotropia (Patos). The NPH is thought to provide the horizontal integrator for the control of eye movements. Individual neurons in NPH are typically described as either burst-tonic or tonic cells, with activity related to either the position or position and velocity of the eyes. \n\n#Analysis\n* Calclate the lead time for each neuron.\n+ shift data from cell and eye coils to align based on lead time\n* Identify saccades.\n* Plot the firing rate during fixations\n* fit and evaluate a linear model: Firing Rate ~ eye position/velocity, horizontal/vertical, left/right (8 terms)\n+ Evaluate using Relative Importance\n+ Evaluate using BIC and adjusted R^2, using exhaustive search that finds the best model using 1-8 terms\n* Optionally, we can restrict our analysis to just disjunctive saccades. This can help to identify monocular cells, since the parameters during conjugate saccades are typically well correlated.\n\n\n```{r echo=FALSE} \nlibrary(knitr)\nopts_chunk$set(echo=FALSE)\n```\n\n```{r,message=FALSE}\n\nlibrary(ggplot2)\nlibrary(dplyr)\n#library(knitr)\n#library(tidyr)\n#library(broom)\n#library(grid)\nlibrary(relaimpo)\nlibrary(leaps)\n#library(data.table)\n\n```\n\n\n```{R SHINYTRY}\n#In order to make the shiny app load fast, I'm just saving the output. See BoostrapSaccades.Rmd for the actual analysis.\nbb<-readRDS(file=\"NPHFULLBIC.Rda\")\nsummaryforplot<-read.csv(\"NPHFULLplotsummary.csv\")\n\nneurons<-as.character(unique(bb$neuron))\n\ninputPanel(\n  selectizeInput(\"neuronchoice\", label = \"Select a Neuron:\",\n              choices = neurons)\n)\nrenderPlot({\n  nc<-input$neuronchoice\n  x<-filter(summaryforplot,neuron==nc)\n  qplot(R.Hor,R.Ver,color=meanfr,data=filter(x,s<0,dur>200))+geom_point(size=4)+ggtitle(\"Mean Firing Rate During Fixation\")\n})\n\nrenderPlot({\n  nc<-input$neuronchoice\n  x<-filter(bb,neuron==nc)\n  plot(x$b[[1]],main=nc)\n  #plot(x$bic[[1]],main=nc)\n})\n\nrenderPlot({\n  nc<-input$neuronchoice\n  x<-filter(bb,neuron==nc)\n  #plot(x$b[[1]],main=nc)\n  plot(x$bic[[1]],main=nc)\n})\n\n```\n\n",
+    "created" : 1448919874311.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "676989155",
+    "id" : "F07C1848",
+    "lastKnownWriteTime" : 1448920089,
+    "path" : "~/GitHub/NPH-Analysis/PlottingNPH/NPH Interactive/NPHInteractive.Rmd",
+    "project_path" : "NPH Interactive/NPHInteractive.Rmd",
+    "properties" : {
+    },
+    "relative_order" : 6,
+    "source_on_save" : false,
+    "type" : "r_markdown"
+}

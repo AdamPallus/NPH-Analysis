@@ -1,0 +1,77 @@
+---
+title: "NPH Interactive"
+author: "Adam"
+date: "November 30, 2015"
+output:
+  html_document:
+    self_contained: no
+runtime: shiny
+---
+
+#Introduction
+This is an analysis of cells believed to be recorded in the NPH of a normal monkey (Bee) and a monkey with exotropia (Patos). The NPH is thought to provide the horizontal integrator for the control of eye movements. Individual neurons in NPH are typically described as either burst-tonic or tonic cells, with activity related to either the position or position and velocity of the eyes. 
+
+#Analysis
+* Calclate the lead time for each neuron.
++ shift data from cell and eye coils to align based on lead time
+* Identify saccades.
+* Plot the firing rate during fixations
+* fit and evaluate a linear model: Firing Rate ~ eye position/velocity, horizontal/vertical, left/right (8 terms)
++ Evaluate using Relative Importance
++ Evaluate using BIC and adjusted R^2, using exhaustive search that finds the best model using 1-8 terms
+* Optionally, we can restrict our analysis to just disjunctive saccades. This can help to identify monocular cells, since the parameters during conjugate saccades are typically well correlated.
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+#library(knitr)
+#library(tidyr)
+#library(broom)
+#library(grid)
+library(relaimpo)
+library(leaps)
+#library(data.table)
+
+```
+
+
+```{R SHINYTRY}
+#In order to make the shiny app load fast, I'm just saving the output. See BoostrapSaccades.Rmd for the actual analysis.
+bb<-readRDS(file="NPHFULLBIC.Rda")
+summaryforplot<-read.csv("NPHFULLplotsummary.csv")
+
+neurons<-as.character(unique(bb$neuron))
+
+inputPanel(
+  selectizeInput("neuronchoice", label = "Select a Neuron:",
+              choices = neurons)
+)
+renderPlot({
+  nc<-input$neuronchoice
+  x<-filter(summaryforplot,neuron==nc)
+  qplot(R.Hor,R.Ver,color=meanfr,data=filter(x,s<0,dur>200))+geom_point(size=4)+ggtitle("Mean Firing Rate During Fixation")
+})
+
+renderPlot({
+  nc<-input$neuronchoice
+  x<-filter(bb,neuron==nc)
+  plot(x$b[[1]],main=nc)
+  #plot(x$bic[[1]],main=nc)
+})
+
+renderPlot({
+  nc<-input$neuronchoice
+  x<-filter(bb,neuron==nc)
+  #plot(x$b[[1]],main=nc)
+  plot(x$bic[[1]],main=nc)
+})
+
+```
+

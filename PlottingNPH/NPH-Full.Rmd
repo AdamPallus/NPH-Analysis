@@ -1,0 +1,205 @@
+---
+title: "NPH-Full"
+author: "Adam"
+date: "November 24, 2015"
+output: html_document
+---
+#Introduction
+This is an analysis of cells believed to be recorded in the NPH of a normal monkey (Bee) and a monkey with exotropia (Patos). The NPH is thought to provide the horizontal integrator for the control of eye movements. Individual neurons in NPH are typically described as either burst-tonic or tonic cells, with activity related to either the position or position and velocity of the eyes. 
+
+#Data Processing
+* Load .csv files from the appropriate directory. These .csv files were creating using matlab.
+* Calclate the lead time for each neuron.
++ shift data from cell and eye coils to align based on lead time
+* Identify saccades.
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(broom)
+library(grid)
+library(relaimpo)
+library(leaps)
+#library(data.table)
+library(stringr)
+```
+
+```{r helperfunctions}
+
+spikedensity<-function (rasters,sd=100) {
+  gsize<- sd*10
+  g<-dnorm(-gsize:gsize,mean=0,sd=sd)
+  sdf<-convolve(rasters,g,type="open")
+  sdf<-sdf[gsize:(length(sdf)-(gsize+1))]*1000
+  sdf
+}
+
+dynamiclead<-function(p,lags=seq(10,300,by=10)) {
+  
+  rsq<-NULL
+  for (i in 1:length(lags)) {
+    if (lags[i] > 0){
+      p$sdflag<-dplyr::lag(p$sdf,lags[i])
+    }
+    else{
+      p$sdflag<-dplyr::lead(p$sdf,lags[i]*-1)
+    }
+    
+    rsq[i]<- summary(lm(sdflag~rep+lep+repV+lepV,data=p))$r.squared
+  }
+  #return(rsq)
+  return(lags[rsq==max(rsq)])
+}
+
+findSaccades<-function(ev){
+  
+  i<-which(abs(ev)>10) #find all the times when speed > threshold
+  sacoff<-which(diff(i)>15) #minimum duration of an accepted saccade
+  sacon<-c(1,sacoff+1) #first saccade
+  sacoff<-c(sacoff,length(i)) #end of last saccade
+  saccade.onset<-i[sacon] #get actual times
+  saccade.offset<-i[sacoff] 
+  return(data.frame(saccade.onset,saccade.offset))
+}
+
+markSaccades<-function(ev){
+  #this function finds and marks saccades given a velocity input
+  stimes<-findSaccades(ev)
+  
+  nsaccades=nrow(stimes)
+  
+  #add 10ms buffer to saccade onset and offset
+  #extra code to make sure there is at least that much space in the data
+  buffer<- 15
+  if(stimes$saccade.onset[1]>buffer+1){
+  stimes$saccade.onset=stimes$saccade.onset-10
+  }else{
+    stimes$saccade.onset[2:nsaccades] = stimes$saccade.onset[2:nsaccades]-10
+    stimes$saccade.onset[1]=1
+  }
+  if (stimes$saccade.offset[nsaccades]+buffer<length(ev)){
+    stimes$saccade.offset=stimes$saccade.offset+buffer
+  }else{
+    stimes$saccade.offset[1:nsaccades-1]=stimes$saccade.offset[1:nsaccades-1]+buffer
+    stimes$saccade.offset[nsaccades]=length(ev)
+  }
+    
+  s<-1:length(ev)*0
+  
+  for (k in 1:nsaccades){
+    s[stimes$saccade.onset[k]:stimes$saccade.offset[k]]<-k
+    if(k>1){
+      s[stimes$saccade.offset[k-1]:stimes$saccade.onset[k]]<-(k*-1)
+    }
+  }
+  s[1:stimes$saccade.onset[1]]<- -1
+  s[stimes$saccade.offset[nrow(stimes)]:length(s)]<- (nrow(stimes)*-1)
+  return(s)
+}
+```
+
+```{r loadfiles,cache=TRUE}
+#load all the .csv files in the data folder, then add a column naming the neuron, 
+#using the file name as the default name, then put them all together in one long data frame
+
+#path<-"~/GitHub/NPH-Analysis/practicedata/"
+#path<-"~/GitHub/NPH-Analysis/data/"
+path<-"~/GitHub/NPH-Analysis/DataRaster/"
+files <- list.files(path=path,pattern='*.csv')
+# files<-files[grepl('Patos',files)] # just look at patos files
+# files<-files[grepl('Bee',files)] # just look at bee files
+t<-data.frame()
+nfiles<-length(files)
+#nfiles=2
+for (i in 1:nfiles) {
+  f<-files[i]
+  temp <- read.csv(paste(path,f,sep=''))
+  names<-str_match(f,"(^[a-zA-Z]+)-([0-9]+)")
+  temp$neuron<-names[1]
+  temp$monkey<-names[2]
+  temp$cellnum<-names[3]
+  temp$sdf<-spikedensity(temp$rasters)
+  leadtime<-dynamiclead(temp)
+  temp<-mutate(temp,sdflag=lag(sdf,leadtime),s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2),time=row_number())
+  
+  t <-rbind(t,temp)
+
+  }
+```
+
+```{r dosomething}
+
+t %>%
+  group_by(neuron,s) %>%
+  mutate(meanfr=mean(sdflag),
+            R.Hor=mean(rep),
+            R.Ver=mean(repV),
+            L.Hor=mean(lep),
+            L.Ver=mean(lepV),
+            nspikes=mean(rasters),
+            dur=n(),
+            nspk=sum(rasters)/dur*100,
+            R.H.Amp=rep[1]-rep[length(rep)],
+            L.H.Amp=lep[1]-lep[length(lep)],
+            R.V.Amp=repV[1]-repV[length(repV)],
+            L.V.Amp=lepV[1]-lepV[length(lepV)],
+            maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)))->
+  m
+
+#write.csv(m,"NPHFullData.csv")
+
+t %>%
+  group_by(neuron,s) %>%
+  summarize(meanfr=mean(sdflag),
+            R.Hor=mean(rep),
+            R.Ver=mean(repV),
+            L.Hor=mean(lep),
+            L.Ver=mean(lepV),
+            nspikes=mean(rasters),
+            dur=n(),
+            nspk=sum(rasters)/dur*100)->
+  summaryforplot
+
+```
+
+```{r colorplot,fig.height=40,fig.width=12}
+qplot(R.Hor,R.Ver,color=meanfr,data=filter(summaryforplot,s<0,dur>200))+facet_wrap(~neuron,ncol=2)+geom_point(size=4)
+```
+
+
+```{r BICcalc}
+#This function can either just calculate the relative importance or use bootstrapping to find a confidence interval for the relative importance. Bootstrapping obviously takes a long time. Also, it can either fit the model to all of the saccades, or just the disjunctive ones. 
+minAmp<-5
+m %>%
+  filter(maxamp>minAmp,sdflag>10,s>0) %>%
+  #filter(maxamp>minAmp & disjEither,sdflag>10) %>%
+  group_by(neuron) %>%
+#    do(b=boot.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.),b=1999),
+    do(b=calc.relimp(lm("sdflag~rep+rev+repV+revV+lep+lev+lepV+levV",.)),
+    bic=regsubsets(sdflag~rep+rev+repV+revV+lep+lev+lepV+levV,.)) ->
+  bb
+
+for (i in 1:nrow(bb)){
+#  b<-booteval.relimp(bb$b[[i]])
+  b<-bb$b[[i]]
+  plot(b, main=bb$neuron[i])
+  plot(bb$bic[[i]],main=bb$neuron[i])
+  plot(bb$bic[[i]],scale=c('adjr2'),main=bb$neuron[i])
+}
+```
+
+```{r dumpdata}
+#only needs to be run once. The plan is to take this analyzed data and use it to make a shiny app load quickly
+#saveRDS(bb,file='NPHFULLBIC.Rda')
+write.csv(summaryforplot,'NPHFULLplotsummary.csv')
+
+```
