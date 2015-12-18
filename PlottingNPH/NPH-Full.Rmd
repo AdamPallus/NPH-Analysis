@@ -113,7 +113,8 @@ markSaccades<-function(ev){
 
 #path<-"~/GitHub/NPH-Analysis/practicedata/"
 #path<-"~/GitHub/NPH-Analysis/data/"
-path<-"~/GitHub/NPH-Analysis/DataRaster/"
+# path<-"~/GitHub/NPH-Analysis/DataRaster/"
+path<-"~/GitHub/NPH-Analysis/testRaster/"
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
 # files<-files[grepl('Bee',files)] # just look at bee files

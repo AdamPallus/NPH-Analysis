@@ -1,0 +1,18 @@
+{
+    "contents" : "spikedensity<-function (rasters,sd=100) {\n  \n  gsize<- sd*10\n  \n  g<-dnorm(-gsize:gsize,mean=0,sd=sd)\n  sdf<-convolve(t$rasters,g,type=\"open\")\n  sdf<-sdf[gsize:(length(sdf)-(gsize+1))]*1000\n  sdf\n}",
+    "created" : 1450207735981.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3508720277",
+    "id" : "B361ABB7",
+    "lastKnownWriteTime" : 1448411995,
+    "path" : "~/GitHub/NPH-Analysis/PlottingNPH/spikedensityfunction.R",
+    "project_path" : "spikedensityfunction.R",
+    "properties" : {
+        "tempName" : "Untitled2"
+    },
+    "relative_order" : 6,
+    "source_on_save" : false,
+    "type" : "r_source"
+}
