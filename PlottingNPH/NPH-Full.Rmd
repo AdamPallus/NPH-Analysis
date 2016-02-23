@@ -111,9 +111,9 @@ markSaccades<-function(ev){
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
-# path<-"~/GitHub/NPH-Analysis/testdata/"
+path<-"~/GitHub/NPH-Analysis/testdata/"
 #path<-"~/GitHub/NPH-Analysis/data/"
-path<-"~/GitHub/NPH-Analysis/DataRaster/"
+# path<-"~/GitHub/NPH-Analysis/DataRaster/"
 #path<-"~/GitHub/NPH-Analysis/testRaster/"
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
@@ -128,7 +128,7 @@ for (i in 1:nfiles) {
   temp$neuron<-names[1]
   temp$monkey<-names[2]
   temp$cellnum<-names[3]
-  temp$sdf<-spikedensity(temp$rasters)
+  temp$sdf<-spikedensity(temp$rasters,sd=50)
   leadtime<-dynamiclead(temp)
   temp<-mutate(temp,sdflag=lag(sdf,leadtime),s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2),time=row_number())
   
@@ -148,7 +148,7 @@ t %>%
             L.Ver=mean(lepV),
             nspikes=sum(rasters),
             dur=n(),
-            nspk=sum(rasters)/dur*100,
+            mean.Spikes=sum(rasters)/dur*1000,
             R.H.Amp=rep[1]-rep[length(rep)],
             L.H.Amp=lep[1]-lep[length(lep)],
             R.V.Amp=repV[1]-repV[length(repV)],
@@ -167,7 +167,7 @@ t %>%
             L.Ver=mean(lepV),
             nspikes=sum(rasters),
             dur=n(),
-            nspk=sum(rasters)/dur*100)->
+            mean.Spikes=sum(rasters)/dur*1000)->
   summaryforplot
 
 

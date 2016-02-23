@@ -1,0 +1,18 @@
+{
+    "contents" : "\nmarkSaccades<-function(ev){\n  #this function finds and marks saccades given a velocity input\n  stimes<-findSaccades(ev)\n  \n  nsaccades=nrow(stimes)\n  \n  #add 10ms buffer to saccade onset and offset\n  #extra code to make sure there is at least that much space in the data\n  buffer<- 15\n  if(stimes$saccade.onset[1]>buffer+1){\n    stimes$saccade.onset=stimes$saccade.onset-buffer\n  }else{\n    stimes$saccade.onset[2:nsaccades] = stimes$saccade.onset[2:nsaccades]-buffer\n    stimes$saccade.onset[1]=1\n  }\n  if (stimes$saccade.offset[nsaccades]+buffer<length(ev)){\n    stimes$saccade.offset=stimes$saccade.offset+buffer\n  }else{\n    stimes$saccade.offset[1:nsaccades-1]=stimes$saccade.offset[1:nsaccades-1]+buffer\n    stimes$saccade.offset[nsaccades]=length(ev)\n  }\n  \n  s<-1:length(ev)*0\n  \n  for (k in 1:nsaccades){\n    s[stimes$saccade.onset[k]:stimes$saccade.offset[k]]<-k\n    if(k>1){\n      s[stimes$saccade.offset[k-1]:stimes$saccade.onset[k]]<-(k*-1)\n    }\n  }\n  s[1:stimes$saccade.onset[1]]<- -1\n  s[stimes$saccade.offset[nrow(stimes)]:length(s)]<- (nrow(stimes)*-1)-1\n  return(s)\n}",
+    "created" : 1455663770038.000,
+    "dirty" : true,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "2884869393",
+    "id" : "3C124F64",
+    "lastKnownWriteTime" : 7011605692497750387,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "tempName" : "Untitled2"
+    },
+    "relative_order" : 10,
+    "source_on_save" : false,
+    "type" : "r_source"
+}
