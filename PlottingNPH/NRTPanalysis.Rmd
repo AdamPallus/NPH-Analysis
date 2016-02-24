@@ -115,7 +115,7 @@ parabolicdiff <- function(pos,n=7){
 
 ```
 
-```{r loadfiles,cache=FALSE}
+```{r loadfiles,cache=TRUE}
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
@@ -134,11 +134,11 @@ for (i in 1:nfiles) {
   temp$neuron<-names[1]
   temp$monkey<-names[2]
   temp$cellnum<-names[3]
-  temp$sdf<-spikedensity(temp$rasters,sd=100)
+  temp$sdf<-spikedensity(temp$rasters,sd=20)
   leadtime<-dynamiclead(temp)
   temp<-mutate(temp,
                sdflag=lag(sdf,leadtime),
-               s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2),
+               s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,buffer=100),
                time=row_number(),
                verg.angle=rep-lep,
                verg.velocity=parabolicdiff(verg.angle,7),
@@ -213,44 +213,82 @@ qplot(mean.Verg.Angle,mean.Spikerate,data=summaryforplot,color=dur)+
   stat_smooth(method='lm')+
   facet_wrap(~neuron)+
   ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
-  
 
-# static.model<-lm(mean.Spikerate~mean.Verg.Angle,data=filter(summaryforplot,neuron=="Bee-02"))
-# 
-# summary(static.model)
-# 
-# quick.predict <- function(static.model,value) {
-#   return(static.model$coefficients[1]+static.model$coefficients[2]*value)
-# }
+```
+
+We plot the firing rate of each cell during saccades, including 100ms before and after the movement. Convergent saccades have an amplitude change of +3, divergent, -3 and version saccades are the rest. 
+
+```{r is.there.a.burst, fig.height=10}
+t%>%
+  group_by(neuron) %>%
+  #   mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,100),
+  #          isfixation=s<0,
+  #          s=abs(s),
+  #          sdf=spikedensity(temp$rasters,sd=20)) %>%
+  filter(isfixation == F) %>%
+  group_by(neuron,s) %>%
+  mutate(R.H.Amp=rep[n()]-rep[1],
+         L.H.Amp=lep[n()]-lep[1],
+         R.V.Amp=repV[n()]-repV[1],
+         L.V.Amp=lepV[n()]-lepV[1],
+         nspikes=sum(rasters),
+         maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
+         verg.amp=verg.angle[n()]-verg.angle[1],
+         maxfr=max(sdf),
+         counter=time-time[1])%>%
+  group_by(neuron) %>%
+  mutate(saccade.type='version',
+         saccade.type=replace(saccade.type,verg.amp>3,'convergence'),
+         saccade.type=replace(saccade.type,verg.amp< -3, 'divergence'))->
+  p
+
+
+g<- ggplot(aes(counter-100,sdf),data=p)
+g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
+  facet_wrap(~neuron,ncol=2)+
+  geom_vline(x=0)+
+  ggtitle('Average Spike Rate During Saccades')+
+  ylab('Spike Density Function')+
+  xlab('Time from Saccade Onset (ms)')
+
+
+
+```
+
+```{r saccade.amp, fig.height=12}
+
+qplot(R.H.Amp,maxfr,data=filter(p,abs(R.H.Amp)>3))+facet_wrap(~neuron,ncol=2)
+```
+
+```{r saccade.amp.vert, fig.height=12}
+
+qplot(R.V.Amp,maxfr,data=filter(p,abs(R.V.Amp)>3))+facet_wrap(~neuron,ncol=2)
+```
+
+```{r saccade.amp.3d, fig.height=12}
+p %>%
+  group_by(neuron) %>%
+  mutate(maxfr=maxfr/max(maxfr),
+         scalednspikes=nspikes/max(nspikes)) ->
+  pscaled
+
+qplot(R.H.Amp,R.V.Amp,color=nspikes,data=filter(pscaled,abs(R.H.Amp)>3 | abs(R.V.Amp>3)))+
+  facet_wrap(~neuron,ncol=2)+
+  geom_point(aes(alpha=0.3,size=4))
 ```
 
 ```{r change.rate.position}
-m %>%
-#  filter(isfixation=T) %>%
-  group_by(neuron,s) %>%
-  summarize(mean.verg=mean.Verg.Angle[1],
-            mean.Spikerate=mean.Spikerate[1],
-            maxfr=maxfr[n()],
-            maxamp=maxamp[n()],
-            dur=n()) %>%
-  filter(maxamp>3) %>%
-  arrange(s) %>%
-  mutate(verg.change=mean.verg-lag(mean.verg),
-         rate.change=mean.Spikerate-lag(mean.Spikerate)) ->
-  mva
+# m %>%
+# #  filter(isfixation=T) %>%
+#   group_by(neuron,s) %>%
+#   summarize(mean.verg=mean.Verg.Angle[1],
+#             mean.Spikerate=mean.Spikerate[1],
+#             maxfr=maxfr[n()],
+#             maxamp=maxamp[n()],
+#             dur=n()) %>%
+#   filter(maxamp>3) %>%
+#   arrange(s) %>%
+#   mutate(verg.change=mean.verg-lag(mean.verg),
+#          rate.change=mean.Spikerate-lag(mean.Spikerate)) ->
+#   mva
 ```
-
-For each period of fixation, compare the change in vergence and change in firing rate from the previous period of fixation. 
-
-```{r verg.change.vs.rage.change}
-
-qplot(verg.change,rate.change,data=mva)+facet_wrap(~neuron)
-```
-
-Plot the peak firing rate detected during the movement. The peak firing rate is calculated using the spike density function, not the interspike interval. This means the peak firing rate is dependent on the width of the gaussian used for the sdf kernel. 
-
-```{r peakfr}
-qplot(verg.change,maxfr,data=mva)+facet_wrap(~neuron)
-```
-
-Maybe plot some example fixations and saccades after this. Also, we are ready to look at more cells using this analysis. Just sort them, save as .csv and put in the folder listed above. We should also add some statistics to these plots. The example fixations may lead to ideas about how to assess the burst portion better than the simple maximum that we are using currently. Look at the velocity of the saccades too. The burst could be related to the burst. This brings us back to the vergence velocity problem. 

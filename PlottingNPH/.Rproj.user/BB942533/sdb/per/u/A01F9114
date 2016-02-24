@@ -1,0 +1,18 @@
+{
+    "contents" : "t%>%\n  mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,100),\n         isfixation=s<0,\n         s=abs(s),\n         sdf=spikedensity(temp$rasters,sd=20)) %>%\n  filter(isfixation == F) %>%\n  group_by(neuron,s) %>%\n  mutate(R.H.Amp=rep[n()]-rep[1],\n         L.H.Amp=lep[n()]-lep[1],\n         R.V.Amp=repV[n()]-repV[1],\n         L.V.Amp=lepV[n()]-lepV[1],\n         maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),\n         verg.amp=verg.angle[n()]-verg.angle[1],\n         maxfr=max(sdf),\n         counter=time-time[1],\n         saccade.type='version',\n         saccade.type=replace(saccade.type,verg.amp>3,'convergence'),\n         saccade.type=replace(saccade.type,verg.amp< -3, 'divergence'))->\n  p\n\n\ng<- ggplot(aes(counter,sdf),data=p)\ng+stat_smooth(method='auto',size=2,aes(color=saccade.type))\n\n\n\n\n\n\n\n\n# nsac <- 100\n# ggplot(aes(counter),data=filter(p,verg.amp>3,maxamp>5))+\n#   geom_point(aes(counter,rep),color='red')+\n#   geom_point(aes(counter,lep),color='blue')+\n#   geom_point(aes(counter,sdf/10))\n\n\n\n\n# \n# p %>%\n#   filter(verg.amp>3) %>%\n#   group_by(counter) %>%\n#   summarize(convergent=mean(sdf)) ->\n#   convergent\n# \n# \n# p %>%\n#   filter(verg.amp< -3) %>%\n#   group_by(counter) %>%\n#   summarize(divergent=mean(sdf)) ->\n#   divergent\n# \n# p %>%\n#   filter(verg.amp<3, verg.amp> -3) %>%\n#   group_by(counter) %>%\n#   summarize(version=mean(sdf)) ->\n#   version\n# \n# forplot <- left_join(convergent,divergent,by='counter')\n# forplot <- left_join(forplot,version,by='counter')\n# forplot <- gather(forplot,\"saccade.type\",\"peak.firing.rate\",2:4)\n# qplot(counter,peak.firing.rate,data=forplot,color=saccade.type)\n\n\n\n\n",
+    "created" : 1456266433394.000,
+    "dirty" : true,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "1388802563",
+    "id" : "A01F9114",
+    "lastKnownWriteTime" : 7011605692497750387,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "tempName" : "Untitled3"
+    },
+    "relative_order" : 6,
+    "source_on_save" : false,
+    "type" : "r_source"
+}
