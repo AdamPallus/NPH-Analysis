@@ -119,7 +119,7 @@ parabolicdiff <- function(pos,n=7){
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
-path<-"C:/Users/setup/Desktop/NRTP Vergence/"
+path<-"C:/Users/User/Desktop/NRTP/"
 
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
@@ -141,7 +141,7 @@ nfiles<-length(files)
  #this function puts all the files loaded together into one data.frame
 
 t<-data.frame()
-buffer<- 100  
+buffer<- 200  
 for (i in 1:nfiles) {
   f<- files[i]
   temp=loadedfiles[[i]]
@@ -275,7 +275,7 @@ t%>%
   p
 
 
-g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2)))
+g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<(80+buffer*2)))
 g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
   facet_wrap(~neuron,ncol=2)+
   geom_vline(x=0)+
@@ -288,97 +288,104 @@ g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
 ```
 
 ```{r peakvelRight,fig.height=12,fig.width=8}
-ggplot(filter(p,abs(peak.R.H)>50),aes(peak.R.H,maxfr))+geom_point(aes(color=saccade.type),size=4)+facet_wrap(~neuron,ncol=2)
+# ggplot(filter(p,abs(peak.R.H)>50),aes(peak.R.H,maxfr))+geom_point(aes(color=saccade.type),size=4)+facet_wrap(~neuron,ncol=2)
 ```
 
 ```{r peakvelLeft,fig.height=12,fig.width=8}
-ggplot(filter(p,abs(peak.L.H)>50),aes(peak.L.H,maxfr))+geom_point(aes(color=saccade.type),size=4)+facet_wrap(~neuron,ncol=2)
+# ggplot(filter(p,abs(peak.L.H)>50),aes(peak.L.H,maxfr))+geom_point(aes(color=saccade.type),size=4)+facet_wrap(~neuron,ncol=2)
 ```
 
 
 ```{r,fig.height=12}
-g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2),peak.R.H>0))
-g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
-  facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
-  ggtitle('RIGHTWARD Average Spike Rate During Saccades')+
-  ylab('Spike Density Function')+
-  xlab('RIGHTWARD Time from Saccade Onset (ms)')
+# g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<(80+buffer*2),peak.R.H>0))
+# g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('RIGHTWARD Average Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('RIGHTWARD Time from Saccade Onset (ms)')
 ```
 
 ```{r,fig.height=12}
-g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2),peak.R.H<0))
-g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
-  facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
-  ggtitle('LEFTWARD Average Spike Rate During Saccades')+
-  ylab('Spike Density Function')+
-  xlab('LEFTWARD Time from Saccade Onset (ms)')
+#  g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2),peak.R.H<0))
+# g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('LEFTWARD Average Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('LEFTWARD Time from Saccade Onset (ms)')
 ```
 
 ```{r,fig.height=12}
-g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2)))
-g+geom_point(method='auto',size=1,aes(color=saccade.type))+
-  facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
-  ggtitle('Spike Rate During Saccades')+
-  ylab('Spike Density Function')+
-  xlab('Time from Saccade Onset (ms)')
+# g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2)))
+# g+geom_point(method='auto',size=1,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('Time from Saccade Onset (ms)')
 ```
 
 ```{r,fig.height=12}
-g<- ggplot(aes(counter-100,sdf),data=filter(p,dur>(80+buffer*2)))
-g+geom_point(method='auto',size=1,aes(color=saccade.type))+
-  facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
-  ggtitle('SLOW SACCADES Spike Rate During Saccades')+
-  ylab('Spike Density Function')+
-  xlab('Time from Saccade Onset (ms)')
+# g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur>(80+buffer*2)))
+# g+geom_point(method='auto',size=1,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('SLOW SACCADES Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('Time from Saccade Onset (ms)')
 ```
 
 ```{r,fig.height=12}
-g<- ggplot(aes(counter-100,sdf),data=filter(p,dur>(80+buffer*2)))
-g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
-  facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
-  ggtitle('SLOW SACCADES Spike Rate During Saccades')+
-  ylab('Spike Density Function')+
-  xlab('Time from Saccade Onset (ms)')
+# g<- ggplot(aes(counter-100,sdf),data=filter(p,dur>(80+buffer*2)))
+# g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('SLOW SACCADES Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('Time from Saccade Onset (ms)')
 ```
 
 ```{r,fig.height=12}
-g<- ggplot(aes(verg.amp,peak.R.H),data=filter(p,dur<(80+buffer*2)))
-g+geom_point(method='auto',size=3,aes(color=maxfr))+
-  facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
-  ggtitle('Leftward Spike Rate During Saccades')+
-  ylab('Peak Right Eye Horizontal Velocity')+
-  xlab('Change in Vergence Angle')
+# g<- ggplot(aes(verg.amp,peak.R.H),data=filter(p,dur<(80+buffer*2)))
+# g+geom_point(method='auto',size=3,aes(color=maxfr))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('Leftward Spike Rate During Saccades')+
+#   ylab('Peak Right Eye Horizontal Velocity')+
+#   xlab('Change in Vergence Angle')
 ```
 
 
 ```{r,fig.height=12}
-g<- ggplot(aes(verg.amp,maxfr),data=filter(p,dur<(80+buffer*2)))
-g+geom_point(method='auto',size=3,aes(color=sqrt(R.H.Amp^2+R.V.Amp^2)))+
-  facet_wrap(~neuron,ncol=2)
+# g<- ggplot(aes(verg.amp,maxfr),data=filter(p,dur<(80+buffer*2)))
+# g+geom_point(method='auto',size=3,aes(color=sqrt(R.H.Amp^2+R.V.Amp^2)))+
+#   facet_wrap(~neuron,ncol=2)
 
 ```
 
 ```{r,fig.height=12}
-g<- ggplot(aes(verg.amp,sqrt(R.H.Amp^2+R.V.Amp^2)),data=p)
-g+geom_point(method='auto',size=3,aes(color=maxfr))+
-  facet_wrap(~neuron,ncol=2)
+# g<- ggplot(aes(verg.amp,sqrt(R.H.Amp^2+R.V.Amp^2)),data=p)
+# g+geom_point(method='auto',size=3,aes(color=maxfr))+
+#   facet_wrap(~neuron,ncol=2)
 
 ```
 
 ```{r,fig.height=12}
 p %>%
   group_by(neuron) %>%
-  summarize(spiketimes=counter[rasters>0]-buffer)->
+  mutate(spiketimes=counter-buffer,
+         spiketimes=replace(spiketimes,rasters<1,NA))->
   pplot
 
-qplot(spiketimes,data=pplot)+facet_wrap(~neuron,ncol=2)
+qplot(spiketimes,data=filter(pplot,dur<(80+buffer*2)))+facet_wrap(~neuron,ncol=2)
 ```
+
+```{r, fig.height=20,fig.width=10}
+# qplot(spiketimes,data=filter(pplot,dur<(200+buffer*2)),fill=saccade.type)+facet_grid(neuron~saccade.type)
+ggplot(filter(pplot,dur<(100+buffer*2)),aes(x=spiketimes,fill=saccade.type))+geom_density(alpha=0.2)+facet_wrap(~neuron,ncol=2)
+```
+
 
 ```{r saccade.amp, fig.height=12}
 
