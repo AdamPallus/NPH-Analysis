@@ -375,7 +375,9 @@ g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
 p %>%
   group_by(neuron) %>%
   mutate(spiketimes=counter-buffer,
-         spiketimes=replace(spiketimes,rasters<1,NA))->
+         spiketimes=replace(spiketimes,rasters<1,NA)) %>%
+  group_by(neuron,saccade.type)%>%
+  mutate(saccade.type.count=n())->
   pplot
 
 qplot(spiketimes,data=filter(pplot,dur<(80+buffer*2)))+facet_wrap(~neuron,ncol=2)
@@ -383,9 +385,14 @@ qplot(spiketimes,data=filter(pplot,dur<(80+buffer*2)))+facet_wrap(~neuron,ncol=2
 
 ```{r, fig.height=20,fig.width=10}
 # qplot(spiketimes,data=filter(pplot,dur<(200+buffer*2)),fill=saccade.type)+facet_grid(neuron~saccade.type)
-ggplot(filter(pplot,dur<(100+buffer*2)),aes(x=spiketimes,fill=saccade.type))+geom_density(alpha=0.2)+facet_wrap(~neuron,ncol=2)
+# ggplot(filter(pplot,dur<(100+buffer*2)),aes(x=spiketimes,fill=saccade.type))+geom_density(alpha=0.2)+facet_wrap(~neuron,ncol=2)
 ```
 
+```{r, fig.height=20,fig.width=10}
+bb<- 20
+
+ggplot(filter(pplot,dur<(100+buffer*2)),aes(spiketimes,10000*..density..,color=saccade.type))+geom_freqpoly(binwidth=bb)+facet_wrap(~neuron,ncol=2)
+```
 
 ```{r saccade.amp, fig.height=12}
 
