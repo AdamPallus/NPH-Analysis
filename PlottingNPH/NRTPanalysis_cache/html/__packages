@@ -4,3 +4,9 @@ ggplot2
 dplyr
 tidyr
 stringr
+MASS
+boot
+survey
+mitools
+relaimpo
+leaps

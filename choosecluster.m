@@ -1,11 +1,19 @@
 function choosecluster(~,~)
 h=evalin('base','handles');
-try
-    spikes=evalin('base','spikes');
-catch
-    errordlg('Save Spikes from Sort GUI','Saves Spikes First')
-    return
+b=evalin('base','b');
+
+if ~isfield(b,'spikes')
+    
+    try
+        spikes=evalin('base','spikes');
+    catch
+        errordlg('Save Spikes from Sort GUI','Saves Spikes First')
+        return
+    end
+else
+    spikes=b.spikes;
 end
+
 clusters=unique(spikes.assigns);
 clear xx
 for i =1:length(clusters)
@@ -32,8 +40,11 @@ if strcmp(doplot,'Yes')
     title(['Cluster: ',xx{choice},' #spikes: ',num2str(length(spiketimes))])
     a.Position=[35 672 1852 420];
     waitfor(a)
+    keep= questdlg('Keep Choice','Keep?');
+else
+    keep='Yes';
 end
-keep= questdlg('Keep Choice','Keep?');
+
 
 if strcmp(keep,'Yes')
     assignin('base','spiketimes',spiketimes)

@@ -26,8 +26,8 @@ library(knitr)
 library(tidyr)
 # library(broom)
 # library(grid)
-library(relaimpo)
-library(leaps)
+# library(relaimpo)
+# library(leaps)
 #library(data.table)
 library(stringr)
 ```
@@ -116,12 +116,11 @@ parabolicdiff <- function(pos,n=7){
 ```
 
 ```{r loadfiles,cache=TRUE}
-
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
 # path<-"C:/Users/User/Desktop/NRTP/"
-path<- "C:/Users/setup/Desktop/NRTP Vergence/"
+path<- "C:/Users/setup/Desktop/NRTP Vergence/dontplot/"
 
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
@@ -140,8 +139,8 @@ nfiles<-length(files)
 ```
 
 ```{r mergefiles,cache=TRUE}
- 
  #this function puts all the files loaded together into one data.frame
+
 t<-data.frame()
 buffer<- 200  
 for (i in 1:nfiles) {
@@ -169,6 +168,7 @@ for (i in 1:nfiles) {
 ```
 
 ```{r measureMovements,cache=TRUE}
+
 t %>%
   group_by(neuron,s,isfixation) %>%
   mutate(meanfr=mean(sdflag),
@@ -189,7 +189,6 @@ t %>%
          L.V.Amp=lepV[1]-lepV[length(lepV)],
          maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)))->
   m
-
 
 #write.csv(m,"NPHFullData.csv")
 
@@ -225,23 +224,18 @@ m %>%
             dur=dur[1]) ->
 summaryforplot
 
-ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=summaryforplot)+
-  geom_point(size=2,alpha=1/5)+
-  facet_wrap(~neuron)+
-  stat_smooth(method='lm')+
-  ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
 
-# qplot(mean.Verg.Angle,mean.Spikerate,data=summaryforplot)+
-#   geom_point()+
-#   stat_smooth(method='lm')+
-#   facet_wrap(~neuron)+
-#   ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
+qplot(mean.Verg.Angle,mean.Spikerate,data=summaryforplot,color=dur)+
+  geom_point(size=4)+
+  stat_smooth(method='lm')+
+  facet_wrap(~neuron)+
+  ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
 
 ```
 
 We plot the firing rate of each cell during saccades, including 100ms before and after the movement. Convergent saccades have an amplitude change of +3, divergent, -3 and version saccades are the rest. 
 
-```{r is.there.a.burst, fig.height=20,fig.width=13}
+```{r is.there.a.burst, fig.height=20,fig.width=13,warning=FALSE,message=FALSE}
 
 maxabs<- function(x){
   m1<-max(x,na.rm=T)
@@ -270,8 +264,6 @@ t%>%
          L.H.Amp=lep[n()]-lep[1],
          R.V.Amp=repV[n()]-repV[1],
          L.V.Amp=lepV[n()]-lepV[1],
-         r.angle=atan2(R.V.Amp,R.H.Amp)*180/pi,
-         r.amp=sqrt(R.H.Amp^2+R.V.Amp^2),
          nspikes=sum(rasters),
          vect.amp= (sqrt(R.H.Amp^2+R.V.Amp^2)+sqrt(L.H.Amp^2+L.V.Amp^2))/2,
          maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
@@ -287,8 +279,10 @@ t%>%
          saccade.type=replace(saccade.type,verg.amp < -2, 'divergence'))->
   p
 
+maxdur<- buffer*2 + 80
 
-g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<(80+buffer*2)))
+g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<maxdur))
+
 g+stat_smooth(method='auto',size=2)+
   facet_wrap(~neuron,ncol=2)+
   geom_vline(x=0)+
@@ -307,86 +301,168 @@ g+
   ylab('Spike Density Function')+
   xlab('Time from Saccade Onset (ms)')+
   theme(legend.position="top")
+
+
+
 ```
 
-```{r peak.verg.velocity,fig.height=10,fig.width=5,echo=F}
-qplot(peak.verg.velocity,maxfr,data=p,color=saccade.type)+
-  facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)+
-  theme(legend.position="top")
+```{r peak.verg.velocity,fig.height=10}
+# qplot(peak.verg.velocity,maxfr,data=p,color=verg.amp)+facet_wrap(~neuron,ncol=1)+geom_point(size=3,alpha=1/20)
 # qplot(max.verg.trans,maxfr,data=p,color=verg.amp)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
 ```
 
-##Model Fitting: Peak transient velocity or amplitude of vergence angle change?
-In this next section we attempt to distinguish between two factors that are correlated with the peak firing rates of the vergence-burster cells: the amplitude of the vergence angle change and the peak velocity of the vergence transient. It may be possible to distinguish these because there are vergence transients even during saccades without a significant change in vergence angle. The above plot demonstrates this. In some cells, the blue points are below the red points, and above the green ones. This means that for a given peak transient velocity, the cell will fire more if the vergence angle changes more. 
-
-### Model based on the positive transient
-```{r positive.trans only,echo=F}
-p %>%
-  # filter(peak.verg.velocity>0) %>%
-  group_by(neuron) %>%
-  # do(b=calc.relimp(lm(maxfr~verg.angle+peak.verg.velocity,data=.)),
-     # bic=regsubsets(maxfr~verg.angle+peak.verg.velocity,.)) ->
-    do(b=calc.relimp(lm(maxfr~verg.angle+max.verg.trans,data=.)),
-     bic=regsubsets(maxfr~verg.angle+max.verg.trans,.)) ->
-  bb
-r <- data.frame()
-for (i in 1:nrow(bb)){
-  b<- bb$b[[i]]$lmg
-  r<-rbind(r,b)
-}
-
-r$neuron<-bb$neuron
-names(r)<- c(names(bb$b[[1]]$lmg),'neuron')
-
-
-ggplot(aes(verg.angle,max.verg.trans),data=r)+
-  geom_point(size=4,aes(color=verg.angle>max.verg.trans))+
-  geom_text(aes(label=neuron),check_overlap=TRUE,hjust="inward")+
-  geom_abline(intercept=0,slope=1)+
-  # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-  ggtitle('Relative Importance')
-
-# qplot(verg.angle,peak.verg.velocity,data=r, color=neuron,size=4)
-# for (i in 1:nrow(bb)){
-# #  b<-booteval.relimp(bb$b[[i]])
-#   b<-bb$b[[i]]
-#   plot(b, main=bb$neuron[i])
-#   # plot(bb$bic[[i]],main=bb$neuron[i])
-#   # plot(bb$bic[[i]],scale=c('adjr2'),main=bb$neuron[i])
-# }
-# for (i in 1:nrow(bb)){
-# #  b<-booteval.relimp(bb$b[[i]])
-#   # b<-bb$b[[i]]
-#   # plot(b, main=bb$neuron[i])
-#   # plot(bb$bic[[i]],main=bb$neuron[i])
-#   plot(bb$bic[[i]],scale=c('adjr2'),main=bb$neuron[i])
-# }
+```{r minpeak.verg.velocity,fig.height=10}
+# qplot(peak.verg.velocity,maxfr,data=p,color=verg.amp)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
+# qplot(min.verg.trans,verg.amp,data=p,color=maxfr)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
 ```
 
-###Model based on the negative transient
-```{r negative.trans only,echo=F}
-p %>%
-  # filter(peak.verg.velocity>0) %>%
-  group_by(neuron) %>%
-  # do(b=calc.relimp(lm(maxfr~verg.angle+peak.verg.velocity,data=.)),
-     # bic=regsubsets(maxfr~verg.angle+peak.verg.velocity,.)) ->
-    do(b=calc.relimp(lm(maxfr~verg.angle+min.verg.trans,data=.)),
-     bic=regsubsets(maxfr~verg.angle+min.verg.trans,.)) ->
-  bb
-r <- data.frame()
-for (i in 1:nrow(bb)){
-  b<- bb$b[[i]]$lmg
-  r<-rbind(r,b)
-}
+```{r vect.amp.OR.verg.vel,fig.height=10}
+# qplot(peak.verg.velocity,maxfr,data=p,color=verg.amp)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
+# qplot(peak.verg.velocity,verg.amp,data=p,color=maxfr)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
+```
 
-r$neuron<-bb$neuron
-names(r)<- c(names(bb$b[[1]]$lmg),'neuron')
 
-ggplot(aes(verg.angle,min.verg.trans),data=r)+
-  geom_point(size=4,aes(color=verg.angle>min.verg.trans))+
-  geom_text(aes(label=neuron),check_overlap=TRUE,hjust="inward")+
-  geom_abline(intercept=0,slope=1)+
-  # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-  ggtitle('Relative Importance')
+```{r peakvelRight,fig.height=12,fig.width=8}
+# ggplot(filter(p,abs(peak.R.H)>50),aes(peak.R.H,maxfr))+geom_point(aes(color=saccade.type),size=4)+facet_wrap(~neuron,ncol=2)
+```
 
+```{r peakvelLeft,fig.height=12,fig.width=8}
+# ggplot(filter(p,abs(peak.L.H)>50),aes(peak.L.H,maxfr))+geom_point(aes(color=saccade.type),size=4)+facet_wrap(~neuron,ncol=2)
+```
+
+
+```{r,fig.height=12}
+# g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<(80+buffer*2),peak.R.H>0))
+# g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('RIGHTWARD Average Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('RIGHTWARD Time from Saccade Onset (ms)')
+```
+
+```{r,fig.height=12}
+#  g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2),peak.R.H<0))
+# g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('LEFTWARD Average Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('LEFTWARD Time from Saccade Onset (ms)')
+```
+
+```{r,fig.height=12}
+# g<- ggplot(aes(counter-100,sdf),data=filter(p,dur<(80+buffer*2)))
+# g+geom_point(method='auto',size=1,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('Time from Saccade Onset (ms)')
+```
+
+```{r,fig.height=12}
+# g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur>(80+buffer*2)))
+# g+geom_point(method='auto',size=1,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('SLOW SACCADES Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('Time from Saccade Onset (ms)')
+```
+
+```{r,fig.height=12}
+# g<- ggplot(aes(counter-100,sdf),data=filter(p,dur>(80+buffer*2)))
+# g+stat_smooth(method='auto',size=2,aes(color=saccade.type))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('SLOW SACCADES Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('Time from Saccade Onset (ms)')
+```
+
+```{r,fig.height=12}
+# g<- ggplot(aes(verg.amp,peak.R.H),data=filter(p,dur<(80+buffer*2)))
+# g+geom_point(method='auto',size=3,aes(color=maxfr))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('Leftward Spike Rate During Saccades')+
+#   ylab('Peak Right Eye Horizontal Velocity')+
+#   xlab('Change in Vergence Angle')
+```
+
+
+```{r,fig.height=12}
+# g<- ggplot(aes(verg.amp,maxfr),data=filter(p,dur<(80+buffer*2)))
+# g+geom_point(method='auto',size=3,aes(color=sqrt(R.H.Amp^2+R.V.Amp^2)))+
+#   facet_wrap(~neuron,ncol=2)
+
+```
+
+```{r,fig.height=12}
+# g<- ggplot(aes(verg.amp,sqrt(R.H.Amp^2+R.V.Amp^2)),data=p)
+# g+geom_point(method='auto',size=3,aes(color=maxfr))+
+#   facet_wrap(~neuron,ncol=2)
+
+```
+
+```{r,fig.height=12}
+# p %>%
+#   group_by(neuron) %>%
+#   mutate(spiketimes=counter-buffer,
+#          spiketimes=replace(spiketimes,rasters<1,NA)) %>%
+#   group_by(neuron,saccade.type)%>%
+#   mutate(saccade.type.count=n())->
+#   pplot
+# 
+# qplot(spiketimes,data=filter(pplot,dur<(80+buffer*2)))+facet_wrap(~neuron,ncol=2)
+```
+
+```{r, fig.height=20,fig.width=10}
+# qplot(spiketimes,data=filter(pplot,dur<(200+buffer*2)),fill=saccade.type)+facet_grid(neuron~saccade.type)
+# ggplot(filter(pplot,dur<(100+buffer*2)),aes(x=spiketimes,fill=saccade.type))+geom_density(alpha=0.2)+facet_wrap(~neuron,ncol=2)
+```
+
+```{r, fig.height=20,fig.width=10}
+# bb<- 20
+# 
+# ggplot(filter(pplot,dur<(100+buffer*2)),aes(spiketimes,saccade.type.count*..count..,color=saccade.type,size=2))+geom_freqpoly(binwidth=bb)+facet_wrap(~neuron,ncol=2)+geom_vline(x=0)
+```
+
+```{r saccade.amp, fig.height=12}
+
+# qplot(R.H.Amp,maxfr,data=filter(p,abs(R.H.Amp)>3))+facet_wrap(~neuron,ncol=2)
+```
+
+```{r saccade.amp.vert, fig.height=12}
+
+# qplot(R.V.Amp,maxfr,data=filter(p,abs(R.V.Amp)>3))+facet_wrap(~neuron,ncol=2)
+```
+
+```{r saccade.amp.3d, fig.height=12}
+# p %>%
+#   group_by(neuron) %>%
+#   mutate(maxfr=maxfr/max(maxfr),
+#          scalednspikes=nspikes/max(nspikes)) ->
+#   pscaled
+# 
+# qplot(R.H.Amp,R.V.Amp,color=nspikes,data=filter(pscaled,abs(R.H.Amp)>3 | abs(R.V.Amp>3)))+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_point(aes(alpha=0.3,size=4))
+```
+
+```{r change.rate.position}
+# m %>%
+# #  filter(isfixation=T) %>%
+#   group_by(neuron,s) %>%
+#   summarize(mean.verg=mean.Verg.Angle[1],
+#             mean.Spikerate=mean.Spikerate[1],
+#             maxfr=maxfr[n()],
+#             maxamp=maxamp[n()],
+#             dur=n()) %>%
+#   filter(maxamp>3) %>%
+#   arrange(s) %>%
+#   mutate(verg.change=mean.verg-lag(mean.verg),
+#          rate.change=mean.Spikerate-lag(mean.Spikerate)) ->
+#   mva
 ```

@@ -116,12 +116,11 @@ parabolicdiff <- function(pos,n=7){
 ```
 
 ```{r loadfiles,cache=TRUE}
-
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
 # path<-"C:/Users/User/Desktop/NRTP/"
-path<- "C:/Users/setup/Desktop/NRTP Vergence/"
+path<- "C:/Users/setup/Desktop/NRTP Vergence/testplot/"
 
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
@@ -140,7 +139,6 @@ nfiles<-length(files)
 ```
 
 ```{r mergefiles,cache=TRUE}
- 
  #this function puts all the files loaded together into one data.frame
 t<-data.frame()
 buffer<- 200  
@@ -169,6 +167,7 @@ for (i in 1:nfiles) {
 ```
 
 ```{r measureMovements,cache=TRUE}
+
 t %>%
   group_by(neuron,s,isfixation) %>%
   mutate(meanfr=mean(sdflag),

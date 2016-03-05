@@ -19,17 +19,30 @@ lepV=b.V_Eye2.values;%vertical right eye position
 thp=b.H_Targ.values; %horizontal target position
 tvp=b.V_Targ.values; %vertical target position
 
-if length(rep)>length(lep)
-    rep=rep(1:length(lep));
-    repV=repV(1:length(lep));
-elseif length(lep)<length(rep)
-    lep=lep(1:length(rep));
-    lepV=lepV(1:length(rep));
-end
-if length(sdf)>length(lep)
-    sdf=sdf(1:length(lep));
+trimlength=min(length(rep),length(lep));
+
+if length(rep) ~= length(lep)
+    
+    rep=rep(1:trimlength);
+    repV=repV(1:trimlength);
+    thp=thp(1:trimlength);
+    tvp=tvp(1:trimlength);
+    lep=lep(1:trimlength);
+    lepV=lepV(1:trimlength);
 end
 
+if length(sdf)> trimlength
+    sdf=sdf(1:trimlength);
+end
+
+if length(tvp)>trimlength
+    thp=thp(1:trimlength);
+    tvp=tvp(1:trimlength);
+end
+
+if length(rasters) > trimlength
+    rasters=rasters(1:trimlength);
+end
 
     
 rev=parabolicdiff(smooth(rep,15),5);%horizontal right eye velocity
@@ -49,7 +62,7 @@ levV=parabolicdiff(smooth(lepV,15),5);%vertical right eye velocity
 %     'variablenames',{'sdf','rep','rev','repV','revV'...
 %     'lep','lev','lepV','levV','thp','tvp'});
 
-t=table(rasters',rep,rev,repV,revV,...
+t=table(rasters,rep,rev,repV,revV,...
     lep,lev,lepV,levV,thp,tvp,...
     'variablenames',{'rasters','rep','rev','repV','revV'...
     'lep','lev','lepV','levV','thp','tvp'});
@@ -64,3 +77,4 @@ rasters=zeros([1,length(b.H_Eye.values)]);
 rasters(floor(b.spiketimes/50))=1;
 gaus=fspecial('gaussian',[1 stdsize*10],stdsize)*1000;
 sdf=conv(rasters,gaus,'same')';
+rasters=rasters';
