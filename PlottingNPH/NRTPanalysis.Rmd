@@ -116,7 +116,6 @@ parabolicdiff <- function(pos,n=7){
 ```
 
 ```{r loadfiles,cache=TRUE}
-
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
@@ -140,7 +139,6 @@ nfiles<-length(files)
 ```
 
 ```{r mergefiles,cache=TRUE}
- 
  #this function puts all the files loaded together into one data.frame
 t<-data.frame()
 buffer<- 200  
@@ -169,6 +167,7 @@ for (i in 1:nfiles) {
 ```
 
 ```{r measureMovements,cache=TRUE}
+
 t %>%
   group_by(neuron,s,isfixation) %>%
   mutate(meanfr=mean(sdflag),
@@ -289,12 +288,12 @@ t%>%
 
 
 g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<(80+buffer*2)))
-g+stat_smooth(method='auto',size=2)+
-  facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
-  ggtitle('Average Spike Rate During Saccades')+
-  ylab('Spike Density Function')+
-  xlab('Time from Saccade Onset (ms)')
+# g+stat_smooth(method='auto',size=2)+
+#   facet_wrap(~neuron,ncol=2)+
+#   geom_vline(x=0)+
+#   ggtitle('Average Spike Rate During Saccades')+
+#   ylab('Spike Density Function')+
+#   xlab('Time from Saccade Onset (ms)')
 ```
 
 ```{r verg.change,fig.height=20,fig.width=13}
@@ -309,7 +308,7 @@ g+
   theme(legend.position="top")
 ```
 
-```{r peak.verg.velocity,fig.height=10,fig.width=5,echo=F}
+```{r peak.verg.velocity,fig.height=20,fig.width=13,echo=F}
 qplot(peak.verg.velocity,maxfr,data=p,color=saccade.type)+
   facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)+
   theme(legend.position="top")
@@ -330,21 +329,31 @@ p %>%
      bic=regsubsets(maxfr~verg.angle+max.verg.trans,.)) ->
   bb
 r <- data.frame()
+r2 <- NULL
 for (i in 1:nrow(bb)){
   b<- bb$b[[i]]$lmg
   r<-rbind(r,b)
+  
+  r2<- c(r2,bb$b[[i]]$R2)
+  
 }
 
 r$neuron<-bb$neuron
-names(r)<- c(names(bb$b[[1]]$lmg),'neuron')
+r$R2<- r2
+
+names(r)<- c(names(bb$b[[1]]$lmg),'neuron','R2')
 
 
 ggplot(aes(verg.angle,max.verg.trans),data=r)+
-  geom_point(size=4,aes(color=verg.angle>max.verg.trans))+
+  geom_point(size=4,aes(color=R2,shape=verg.angle>max.verg.trans))+
+  # geom_point(size=4,aes(color=R2))+
+  scale_color_gradient(low='blue',high='red')+
+  # geom_point(size=4,aes(color=verg.angle>max.verg.trans))+
   geom_text(aes(label=neuron),check_overlap=TRUE,hjust="inward")+
   geom_abline(intercept=0,slope=1)+
   # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
   ggtitle('Relative Importance')
+
 
 # qplot(verg.angle,peak.verg.velocity,data=r, color=neuron,size=4)
 # for (i in 1:nrow(bb)){
@@ -363,30 +372,4 @@ ggplot(aes(verg.angle,max.verg.trans),data=r)+
 # }
 ```
 
-###Model based on the negative transient
-```{r negative.trans only,echo=F}
-p %>%
-  # filter(peak.verg.velocity>0) %>%
-  group_by(neuron) %>%
-  # do(b=calc.relimp(lm(maxfr~verg.angle+peak.verg.velocity,data=.)),
-     # bic=regsubsets(maxfr~verg.angle+peak.verg.velocity,.)) ->
-    do(b=calc.relimp(lm(maxfr~verg.angle+min.verg.trans,data=.)),
-     bic=regsubsets(maxfr~verg.angle+min.verg.trans,.)) ->
-  bb
-r <- data.frame()
-for (i in 1:nrow(bb)){
-  b<- bb$b[[i]]$lmg
-  r<-rbind(r,b)
-}
 
-r$neuron<-bb$neuron
-names(r)<- c(names(bb$b[[1]]$lmg),'neuron')
-
-ggplot(aes(verg.angle,min.verg.trans),data=r)+
-  geom_point(size=4,aes(color=verg.angle>min.verg.trans))+
-  geom_text(aes(label=neuron),check_overlap=TRUE,hjust="inward")+
-  geom_abline(intercept=0,slope=1)+
-  # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-  ggtitle('Relative Importance')
-
-```
