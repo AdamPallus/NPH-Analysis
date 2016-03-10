@@ -15,7 +15,7 @@ This is an analysis of the activity of individual neurons in the NRTP of monkeys
 
 ```{r echo=FALSE} 
 library(knitr)
-opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE)
+opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=TRUE)
 ```
 
 ```{r,message=FALSE}
@@ -74,24 +74,16 @@ markSaccades<-function(ev,buffer=15,threshold=40){
   #this function finds and marks saccades given a velocity input
   stimes<-findSaccades(ev,threshold)
   
-  nsaccades=nrow(stimes)
+  #remove saccades without enough data at the end of the file, based on buffer size
+  toolong<- stimes$saccade.offset> length(ev)-buffer
+  tooshort<- stimes$saccade.onset<buffer+1
+  stimes<- filter(stimes, !tooshort, !toolong)
   
-  #add 10ms buffer to saccade onset and offset
-  #extra code to make sure there is at least that much space in the data
+  nsaccades=nrow(stimes)
 
-  if(stimes$saccade.onset[1]>buffer+1){
   stimes$saccade.onset=stimes$saccade.onset-buffer
-  }else{
-    stimes$saccade.onset[2:nsaccades] = stimes$saccade.onset[2:nsaccades]-buffer
-    stimes$saccade.onset[1]=1
-  }
-  if (stimes$saccade.offset[nsaccades]+buffer<length(ev)){
-    stimes$saccade.offset=stimes$saccade.offset+buffer
-  }else{
-    stimes$saccade.offset[1:nsaccades-1]=stimes$saccade.offset[1:nsaccades-1]+buffer
-    stimes$saccade.offset[nsaccades]=length(ev)
-  }
-    
+  stimes$saccade.offset=stimes$saccade.offset+buffer
+  
   s<-1:length(ev)*0
   
   for (k in 1:nsaccades){
@@ -115,7 +107,7 @@ parabolicdiff <- function(pos,n=7){
 
 ```
 
-```{r loadfiles,cache=TRUE}
+```{r loadfiles}
 #load all the .csv files in the data folder, then add a column naming the neuron, 
 #using the file name as the default name, then put them all together in one long data frame
 
@@ -138,8 +130,8 @@ nfiles<-length(files)
  
 ```
 
-```{r mergefiles,cache=TRUE}
- #this function puts all the files loaded together into one data.frame
+```{r mergefiles}
+#this function puts all the files loaded together into one data.frame
 t<-data.frame()
 buffer<- 200  
 for (i in 1:nfiles) {
@@ -151,9 +143,9 @@ for (i in 1:nfiles) {
   temp$monkey<-names[2]
   temp$cellnum<-names[3]
   temp$sdf<-spikedensity(temp$rasters,sd=10)
-  leadtime<-dynamiclead(temp)
+  # leadtime<-dynamiclead(temp)
   temp<-mutate(temp,
-               sdflag=lag(sdf,leadtime),
+               # sdflag=lag(sdf,leadtime),
                s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,buffer=buffer,threshold=10),
                time=row_number(),
                verg.angle=rep-lep,
@@ -166,12 +158,11 @@ for (i in 1:nfiles) {
   }
 ```
 
-```{r measureMovements,cache=TRUE}
-
+```{r measureMovements}
 t %>%
   group_by(neuron,s,isfixation) %>%
-  mutate(meanfr=mean(sdflag),
-         maxfr=max(sdflag),
+  mutate(meanfr=mean(sdf),
+         maxfr=max(sdf),
          R.Hor=mean(rep),
          R.Ver=mean(repV),
          L.Hor=mean(lep),
@@ -240,8 +231,7 @@ ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=summaryforplot)+
 
 We plot the firing rate of each cell during saccades, including 100ms before and after the movement. Convergent saccades have an amplitude change of +3, divergent, -3 and version saccades are the rest. 
 
-```{r is.there.a.burst, fig.height=20,fig.width=13}
-
+```{r is.there.a.burst, fig.height=28,fig.width=13}
 maxabs<- function(x){
   m1<-max(x,na.rm=T)
   m2<-min(x,na.rm=T)
@@ -296,19 +286,19 @@ g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<(80+buffer*2)))
 #   xlab('Time from Saccade Onset (ms)')
 ```
 
-```{r verg.change,fig.height=20,fig.width=13}
+```{r verg.change,fig.height=28,fig.width=13}
 g+
   # geom_point(alpha=1/30,aes(color=saccade.type))+
   stat_smooth(method='auto',size=2,aes(color=saccade.type))+
   facet_wrap(~neuron,ncol=2)+
-  geom_vline(x=0)+
+  geom_vline(xintercept=0)+
   ggtitle('Average Spike Rate During Saccades')+
   ylab('Spike Density Function')+
   xlab('Time from Saccade Onset (ms)')+
   theme(legend.position="top")
 ```
 
-```{r peak.verg.velocity,fig.height=20,fig.width=13,echo=F}
+```{r peak.verg.velocity,fig.height=28,fig.width=13,echo=F}
 qplot(peak.verg.velocity,maxfr,data=p,color=saccade.type)+
   facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)+
   theme(legend.position="top")
@@ -322,7 +312,7 @@ In this next section we attempt to distinguish between two factors that are corr
 ```{r positive.trans only,echo=F}
 p %>%
   # filter(peak.verg.velocity>0) %>%
-  group_by(neuron) %>%
+  group_by(neuron,cellnum) %>%
   # do(b=calc.relimp(lm(maxfr~verg.angle+peak.verg.velocity,data=.)),
      # bic=regsubsets(maxfr~verg.angle+peak.verg.velocity,.)) ->
     do(b=calc.relimp(lm(maxfr~verg.angle+max.verg.trans,data=.)),
@@ -339,19 +329,26 @@ for (i in 1:nrow(bb)){
 }
 
 r$neuron<-bb$neuron
+r$cellnum<- bb$cellnum
 r$R2<- r2
 
-names(r)<- c(names(bb$b[[1]]$lmg),'neuron','R2')
+names(r)<- c(names(bb$b[[1]]$lmg),'neuron','cellnum','R2')
 
+r<- mutate(r, SOA=as.numeric(cellnum)>100)
+```
+
+```{r plot.positive.trans.fit,fig.height=10,fig.width=10}
 
 ggplot(aes(verg.angle,max.verg.trans),data=r)+
-  geom_point(size=4,aes(color=R2,shape=verg.angle>max.verg.trans))+
+  # geom_point(size=4,aes(color=R2,shape=verg.angle>max.verg.trans))+
+  geom_point(size=4,aes(color=R2,shape=SOA))+
   # geom_point(size=4,aes(color=R2))+
   scale_color_gradient(low='blue',high='red')+
   # geom_point(size=4,aes(color=verg.angle>max.verg.trans))+
-  geom_text(aes(label=neuron),check_overlap=TRUE,hjust="inward")+
+  geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
   geom_abline(intercept=0,slope=1)+
   # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
+  theme(legend.position="top")+
   ggtitle('Relative Importance')
 
 
@@ -371,5 +368,3 @@ ggplot(aes(verg.angle,max.verg.trans),data=r)+
 #   plot(bb$bic[[i]],scale=c('adjr2'),main=bb$neuron[i])
 # }
 ```
-
-
