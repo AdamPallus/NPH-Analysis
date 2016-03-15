@@ -4,6 +4,8 @@ try
 b.spiketimes= evalin('base','spiketimes');
 end
 savespikes=questdlg('Save Spiketimes?','Save?');
+savelocation=questdlg('Save .csv to same folder?','Save?');
+
 if strcmp(savespikes,'Yes')
     b.spikes=evalin('base','spikes');
     save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
@@ -67,10 +69,16 @@ t=table(rasters,rep,rev,repV,revV,...
     'variablenames',{'rasters','rep','rev','repV','revV'...
     'lep','lev','lepV','levV','thp','tvp'});
 
-[filename, filepath]=uiputfile('*.csv','Save Table','~/data');
-display([filepath filename])
-% assignin('base','t',t)
-writetable(t,[filepath filename])
+
+defaultname=[b.filepath, b.filename(1:end-4), '.csv'];
+if strcmp(savelocation,'Yes')
+    writetable(t,defaultname)
+else
+    [filename, filepath]=uiputfile('*.csv','Save Table','~/data');
+    display([filepath filename])
+    % assignin('base','t',t)
+    writetable(t,[filepath filename])
+end
 
 function [sdf, rasters]=makesdf(b, stdsize)
 rasters=zeros([1,length(b.H_Eye.values)]);

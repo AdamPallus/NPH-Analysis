@@ -107,114 +107,74 @@ parabolicdiff <- function(pos,n=7){
 
 ```
 
-```{r loadfiles}
-#load all the .csv files in the data folder, then add a column naming the neuron, 
-#using the file name as the default name, then put them all together in one long data frame
-
-# path<-"C:/Users/User/Desktop/NRTP/"
-path<- "C:/Users/setup/Desktop/NRTP Vergence/"
-
-files <- list.files(path=path,pattern='*.csv')
-# files<-files[grepl('Patos',files)] # just look at patos files
-# files<-files[grepl('Bee',files)] # just look at bee files
-
-nfiles<-length(files)
- # nfiles=1
- 
- loadedfiles <- list()
- for (i in 1:nfiles){
-   f<- files[i]
-   loadedfiles[[i]]<- read.csv(paste(path,f,sep=''))
- }
- 
- 
-```
-
 ```{r mergefiles}
 #this function puts all the files loaded together into one data.frame
-t<-data.frame()
-buffer<- 200  
-for (i in 1:nfiles) {
-  f<- files[i]
-  temp=loadedfiles[[i]]
-  
-  names<-str_match(f,"(^[a-zA-Z]+)-([0-9]+)")
-  temp$neuron<-names[1]
-  temp$monkey<-names[2]
-  temp$cellnum<-names[3]
-  temp$sdf<-spikedensity(temp$rasters,sd=10)
-  # leadtime<-dynamiclead(temp)
-  temp<-mutate(temp,
-               # sdflag=lag(sdf,leadtime),
-               s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,buffer=buffer,threshold=10),
-               time=row_number(),
-               verg.angle=rep-lep,
-               verg.velocity=parabolicdiff(verg.angle,7),
-               isfixation=s<0,
-               s=abs(s))
-  
-  t <-rbind(t,temp)
- write.csv(t,'allfiles-t.csv')
-  }
+# t<-data.frame()
+ buffer<- 200  
+# for (i in 1:nfiles) {
+#   f<- files[i]
+#   temp=loadedfiles[[i]]
+#   
+#   names<-str_match(f,"(^[a-zA-Z]+)-([0-9]+)")
+#   temp$neuron<-names[1]
+#   temp$monkey<-names[2]
+#   temp$cellnum<-names[3]
+#   temp$sdf<-spikedensity(temp$rasters,sd=10)
+#   # leadtime<-dynamiclead(temp)
+#   temp<-mutate(temp,
+#                # sdflag=lag(sdf,leadtime),
+#                s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,buffer=buffer,threshold=10),
+#                time=row_number(),
+#                verg.angle=rep-lep,
+#                verg.velocity=parabolicdiff(verg.angle,7),
+#                isfixation=s<0,
+#                s=abs(s))
+#   
+#   t <-rbind(t,temp)
+#  write.csv(t,'allfiles-t.csv')
+
+  # } 
+
+# t<-read.csv('allfiles-t.csv')
 ```
 
 ```{r measureMovements}
-t %>%
-  group_by(neuron,s,isfixation) %>%
-  mutate(meanfr=mean(sdf),
-         maxfr=max(sdf),
-         R.Hor=mean(rep),
-         R.Ver=mean(repV),
-         L.Hor=mean(lep),
-         L.Ver=mean(lepV),
-         mean.Verg.Angle=mean(verg.angle),
-         mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle<0, NA),
-         max.Verg.Vel = max(verg.velocity),
-         max.Verg.Ang = max(verg.angle),
-         nspikes=sum(rasters),
-         dur=n(),
-         mean.Spikerate=sum(rasters)/dur*1000,
-         R.H.Amp=rep[1]-rep[length(rep)],
-         L.H.Amp=lep[1]-lep[length(lep)],
-         R.V.Amp=repV[1]-repV[length(repV)],
-         L.V.Amp=lepV[1]-lepV[length(lepV)],
-         maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)))->
-  m
-write.csv(m,'allfiles-m.csv')
-
-#write.csv(m,"NPHFullData.csv")
-
-# 
-# 
 # t %>%
-#   group_by(neuron,s) %>%
-#   summarize(meanfr=mean(sdflag),
-#             R.Hor=mean(rep),
-#             R.Ver=mean(repV),
-#             L.Hor=mean(lep),
-#             L.Ver=mean(lepV),
-#             nspikes=sum(rasters),
-#             
-#             dur=n(),
-#             nspk=sum(rasters)/dur*1000)->
-#   summaryforplot
-# 
-# 
-# m %>%
-#   filter(isfixation=F,dur>150) %>%
-#   group_by(neuron,s) %>%
-#   mutate(counter=time-time[1]) ->
-# mm
+#   group_by(neuron,s,isfixation) %>%
+#   mutate(meanfr=mean(sdf),
+#          maxfr=max(sdf),
+#          R.Hor=mean(rep),
+#          R.Ver=mean(repV),
+#          L.Hor=mean(lep),
+#          L.Ver=mean(lepV),
+#          mean.Verg.Angle=mean(verg.angle),
+#          mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle<0, NA),
+#          max.Verg.Vel = max(verg.velocity),
+#          max.Verg.Ang = max(verg.angle),
+#          nspikes=sum(rasters),
+#          dur=n(),
+#          mean.Spikerate=sum(rasters)/dur*1000,
+#          R.H.Amp=rep[1]-rep[length(rep)],
+#          L.H.Amp=lep[1]-lep[length(lep)],
+#          R.V.Amp=repV[1]-repV[length(repV)],
+#          L.V.Amp=lepV[1]-lepV[length(lepV)],
+#          maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)))->
+#   m
+
 
 ```
 
 ```{r verg.fixations,fig.height=10}
-m %>%
-  filter(isfixation=T,dur>200) %>%
-  summarize(mean.Spikerate=mean.Spikerate[1],
-            mean.Verg.Angle=mean.Verg.Angle[1],
-            dur=dur[1]) ->
-summaryforplot
+# m %>%
+#   filter(isfixation=T,dur>200) %>%
+#   summarize(mean.Spikerate=mean.Spikerate[1],
+#             mean.Verg.Angle=mean.Verg.Angle[1],
+#             dur=dur[1]) ->
+# summaryforplot
+# 
+# write.csv(summaryforplot,'allfiles-summaryforplot.csv')
+
+summaryforplot<- read.csv('allfiles-summaryforplot.csv')
 
 ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=summaryforplot)+
   geom_point(size=2,alpha=1/5)+
@@ -233,51 +193,53 @@ ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=summaryforplot)+
 We plot the firing rate of each cell during saccades, including 100ms before and after the movement. Convergent saccades have an amplitude change of +3, divergent, -3 and version saccades are the rest. 
 
 ```{r is.there.a.burst, fig.height=28,fig.width=13}
-maxabs<- function(x){
-  m1<-max(x,na.rm=T)
-  m2<-min(x,na.rm=T)
-  if (abs(m1)>abs(m2)) {
-    return(m1)
-  } else{
-    return(m2)
-  }
-  
-}
-t%>%
-  group_by(neuron) %>%
-  #   mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,100),
-  #          isfixation=s<0,
-  #          s=abs(s),
-  #          sdf=spikedensity(temp$rasters,sd=20)) %>%
-  filter(isfixation == F) %>%
-  group_by(neuron,s) %>%
-  mutate(dur=n(),
-         peak.R.H= maxabs(rev),
-         peak.R.V= maxabs(revV),
-         peak.L.H= maxabs(lev),
-         peak.L.V= maxabs(levV),
-         R.H.Amp=rep[n()]-rep[1],
-         L.H.Amp=lep[n()]-lep[1],
-         R.V.Amp=repV[n()]-repV[1],
-         L.V.Amp=lepV[n()]-lepV[1],
-         r.angle=atan2(R.V.Amp,R.H.Amp)*180/pi,
-         r.amp=sqrt(R.H.Amp^2+R.V.Amp^2),
-         nspikes=sum(rasters),
-         vect.amp= (sqrt(R.H.Amp^2+R.V.Amp^2)+sqrt(L.H.Amp^2+L.V.Amp^2))/2,
-         maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
-         verg.amp=verg.angle[n()]-verg.angle[1],
-         peak.verg.velocity= maxabs(verg.velocity),
-         min.verg.trans = min(verg.velocity),
-         max.verg.trans = max(verg.velocity),
-         maxfr=max(sdf),
-         counter=time-time[1])%>%
-  group_by(neuron) %>%
-  mutate(saccade.type='version',
-         saccade.type=replace(saccade.type, verg.amp > 2,'convergence'),
-         saccade.type=replace(saccade.type, verg.amp < -2, 'divergence'))->
-  p
+# maxabs<- function(x){
+#   m1<-max(x,na.rm=T)
+#   m2<-min(x,na.rm=T)
+#   if (abs(m1)>abs(m2)) {
+#     return(m1)
+#   } else{
+#     return(m2)
+#   }
+#   
+# }
+# t%>%
+#   group_by(neuron) %>%
+#   #   mutate(s=markSaccades((sqrt(rev^2)+sqrt(revV^2))/2,100),
+#   #          isfixation=s<0,
+#   #          s=abs(s),
+#   #          sdf=spikedensity(temp$rasters,sd=20)) %>%
+#   filter(isfixation == F) %>%
+#   group_by(neuron,s) %>%
+#   mutate(dur=n(),
+#          peak.R.H= maxabs(rev),
+#          peak.R.V= maxabs(revV),
+#          peak.L.H= maxabs(lev),
+#          peak.L.V= maxabs(levV),
+#          R.H.Amp=rep[n()]-rep[1],
+#          L.H.Amp=lep[n()]-lep[1],
+#          R.V.Amp=repV[n()]-repV[1],
+#          L.V.Amp=lepV[n()]-lepV[1],
+#          r.angle=atan2(R.V.Amp,R.H.Amp)*180/pi,
+#          r.amp=sqrt(R.H.Amp^2+R.V.Amp^2),
+#          nspikes=sum(rasters),
+#          vect.amp= (sqrt(R.H.Amp^2+R.V.Amp^2)+sqrt(L.H.Amp^2+L.V.Amp^2))/2,
+#          maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
+#          verg.amp=verg.angle[n()]-verg.angle[1],
+#          peak.verg.velocity= maxabs(verg.velocity),
+#          min.verg.trans = min(verg.velocity),
+#          max.verg.trans = max(verg.velocity),
+#          maxfr=max(sdf),
+#          counter=time-time[1])%>%
+#   group_by(neuron) %>%
+#   mutate(saccade.type='version',
+#          saccade.type=replace(saccade.type, verg.amp > 2,'convergence'),
+#          saccade.type=replace(saccade.type, verg.amp < -2, 'divergence'))->
+#   p
+# 
+# write.csv(p,'allfiles-p.csv')
 
-write.csv(p,'allfiles-p.csv')
+p<- read.csv('allfiles-p.csv')
 
 g<- ggplot(aes(counter-buffer,sdf),data=filter(p,dur<(80+buffer*2)))
 # g+stat_smooth(method='auto',size=2)+
@@ -301,10 +263,10 @@ g+
 ```
 
 ```{r peak.verg.velocity,fig.height=28,fig.width=13,echo=F}
-qplot(peak.verg.velocity,maxfr,data=p,color=saccade.type)+
-  facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)+
-  theme(legend.position="top")
-# qplot(max.verg.trans,maxfr,data=p,color=verg.amp)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
+# qplot(peak.verg.velocity,maxfr,data=p,color=saccade.type)+
+#   facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)+
+#   theme(legend.position="top")
+# # qplot(max.verg.trans,maxfr,data=p,color=verg.amp)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
 ```
 
 ##Model Fitting: Peak transient velocity or amplitude of vergence angle change?
