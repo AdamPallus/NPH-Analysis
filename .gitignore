@@ -45,6 +45,7 @@ Temporary Items
 # data files
 *.csv
 .RData
+*.RDS
 *.rdb
 *.rda
 
