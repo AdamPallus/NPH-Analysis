@@ -10,14 +10,25 @@ if strcmp(savespikes,'Yes')
     b.spikes=evalin('base','spikes');
     save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
 end
-
+eso= strcmp(questdlg('Is this data from an Esotrope?','ESO?'),'Yes');
 %create spike density function
 [sdf, rasters]=makesdf(b,20);
-rep=b.H_Eye.values;%horizontal right eye position
-lep=b.H_Eye2.values;%horizontal right eye position
-repV=b.V_Eye.values;%vertical right eye position
-lepV=b.V_Eye2.values;%vertical right eye position
 
+%Determine which channel is the right eye:
+verg=b.H_Eye2.values-b.H_Eye.values;
+if mean(verg) > 0  && ~eso %Probably Eye2 is RIGHT
+    rep=b.H_Eye.values;%horizontal right eye position
+    lep=b.H_Eye2.values;%horizontal right eye position
+    repV=b.V_Eye.values;%vertical right eye position
+    lepV=b.V_Eye2.values;%vertical right eye position
+else
+    lep=b.H_Eye.values;%horizontal right eye position
+    rep=b.H_Eye2.values;%horizontal right eye position
+    lepV=b.V_Eye.values;%vertical right eye position
+    repV=b.V_Eye2.values;%vertical right eye position
+end  
+
+%this needs to be updated because there should be two target locations
 thp=b.H_Targ.values; %horizontal target position
 tvp=b.V_Targ.values; %vertical target position
 
@@ -69,8 +80,13 @@ t=table(rasters,rep,rev,repV,revV,...
     'variablenames',{'rasters','rep','rev','repV','revV'...
     'lep','lev','lepV','levV','thp','tvp'});
 
+if eso
+    defaultname=[b.filepath, b.filename(1:end-4),'-ESO','.csv'];
+else
+    defaultname=[b.filepath, b.filename(1:end-4), '.csv'];
+end
 
-defaultname=[b.filepath, b.filename(1:end-4), '.csv'];
+ww= waitbar(0,'SAVING...');
 if strcmp(savelocation,'Yes')
     writetable(t,defaultname)
 else
@@ -79,6 +95,7 @@ else
     % assignin('base','t',t)
     writetable(t,[filepath filename])
 end
+close(ww)
 
 function [sdf, rasters]=makesdf(b, stdsize)
 rasters=zeros([1,length(b.H_Eye.values)]);
