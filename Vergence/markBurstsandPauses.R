@@ -1,8 +1,8 @@
-markBurstsandPauses<- function(t,bufferlength=250, plimit=0.01,p0=0.2){
+markBurstsandPauses<- function(t,bufferlength=250, plimit=0.01,p0=0.2,pausethresh=0.95,burstthresh=0.05){
 
   
-  library(dplyr)
-  library(ggplot2)
+  require(dplyr)
+  require(ggplot2)
   
   source('~/GitHub/NPH-Analysis/Vergence/joinsaccades.R')
   source('~/GitHub/NPH-Analysis/Vergence/Adamhelperfunctions.R')
@@ -17,15 +17,17 @@ markBurstsandPauses<- function(t,bufferlength=250, plimit=0.01,p0=0.2){
   # t<- filter(t,neuron=='Bee-204')
   
   spiketimes<- t$time[t$rasters==1]
+  TimeShift<- first(spiketimes)
   isi<- spiketimes[-1]-spiketimes[-(length(spiketimes)-1)]
   spiketimes<-spiketimes[-1]
   
   p<- data.frame(spiketimes=spiketimes,isi=isi)
-  bp<- f.BPsummary(list(p),Pthresh=0.05,p0=p0)
+  bp<- f.BPsummary(list(p),Pthresh=plimit,p0=p0,thresh1=qnorm(pausethresh),thresh0=qnorm(burstthresh))
   
   bp$burst[[1]] %>%
     group_by(clusid) %>%
-    summarise(start=min(start),end=max(end),
+    summarise(start=min(start)+TimeShift,
+              end=max(end)+TimeShift,
               duration=end-start,
               p=first(adjP),
               ymin=0,
@@ -34,13 +36,14 @@ markBurstsandPauses<- function(t,bufferlength=250, plimit=0.01,p0=0.2){
   
   bp$pause[[1]] %>%
     group_by(clusid) %>%
-    summarise(start=min(start),
-              end=max(end),
+    summarise(start=min(start)+TimeShift,
+              end=max(end)+TimeShift,
               duration=end-start,
               p=first(adjP),
               ymin=0,
               ymax=20) ->
     pauses
+  # warning(paste('number of pauses: ',length(unique(pauses$clusid))))
   
   t%>%
     # filter(as.numeric(cellnum)>200) %>%

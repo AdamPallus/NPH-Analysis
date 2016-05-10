@@ -101,7 +101,7 @@ gs<-ggplot(gplot) +
   ylab('Degrees')+
   expand_limits(y=-300)+
   geom_line(aes(counter,sdf-500,group=sacnum),color='orange',size=0.5,alpha=1/5)
-  # ylab('')
+# ylab('')
 
 
 
@@ -114,7 +114,7 @@ p %>%  group_by(neuron) %>%
   group_by(neuron,convergent) %>%
   arrange(dur) %>%
   group_by(sacnum) %>%
-
+  
   gs<-ggplot(gplot) + 
   theme_bw()+
   xlab('Time from Saccade Onset (ms)')+
@@ -140,3 +140,4 @@ p %>%  group_by(neuron) %>%
   ylab('Degrees')+
   expand_limits(y=-300)+
   # geom_line(aes(counter,sdf-500,group=sacnum),color='orange',size=0.5,alpha=1/5)
+  

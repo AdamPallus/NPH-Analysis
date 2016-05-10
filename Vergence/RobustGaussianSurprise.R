@@ -33,6 +33,7 @@ f.runEcen<-function(x,k=41,p=.2,pc=.05)
   n <- length(x)
   k <- max(k,length(x)*p)
   k <- as.integer(k)
+  warning(paste('n is: ',n))
   res=rep(NA,n)
   
   if (k < 0) 
