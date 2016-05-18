@@ -1,39 +1,71 @@
 #Lots of little blocks to analyze bursts and pauses and plot
 
-source('~/GitHub/NPH-Analysis/Vergence/markBurstsandPauses.R')
+
+source('markBurstsandPauses.R')
 library(dplyr)
 library(ggplot2)
 library(manipulate)
 library(tidyr)
-t<- readRDS('NRTPt.RDS')
-t$cellnum<- as.numeric(t$cellnum)
+t<-readRDS('SOA-NRTP.RDS')
+# t$cellnum<- as.numeric(t$cellnum)
 
-tt<- filter(t,cellnum %in% c(1, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18,19))
+# tt<- filter(t,cellnum %in% c(1, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18,19))
+
+# tt<- filter(t, neuron=='Bee-01')
+
+tt<- filter(t, neuron %in% c('Bee-04','Bee-15','Bee-34','Bee-35'))
 
 pmin<- 0.2
-bufferlength<- 250
+bufferlength<- 400
 tt %>% group_by(neuron) %>%
+  mutate(time=row_number()) %>%
   do(markBurstsandPauses(.,bufferlength=bufferlength, plimit=0.01, p0=0.05,pausethresh=0.995,burstthresh=0.05)) ->
   d
 
 d %>%
-  filter(!is.na(sacnum)) %>%
-  group_by(sacnum) %>%
-  mutate(pause.at.saccade=pauses[counter==20],
-         p.pause.at.saccade=p.pause[counter==20],#use 20ms after saccade onset as the official pause
+  dplyr::filter(!is.na(sacnum)) %>%
+  group_by(neuron,sacnum) %>% 
+  mutate(pause.at.saccade=pauses[bufferlength+20],
+         p.pause.at.saccade=p.pause[bufferlength+20],#use 20ms after saccade onset as the official pause
          pause.during.saccade=!is.na(pause.at.saccade),
          pause.dur=sum(pauses==pause.at.saccade,na.rm=T),
-         pre.sac.nspk=sum(rasters[counter< -100]),
-         post.sac.nspk=sum(rasters[counter> 100]),
+         # pre.sac.nspk=sum(rasters[counter< -100]),
+         # post.sac.nspk=sum(rasters[counter> 100]),
          enhance.conv.dur=sum(verg.velocity>30),
          enhance.dive.dur=sum(verg.velocity< -30)) %>%
   ungroup() %>%
   filter(abs(verg.amp)>2,
          # pause.during.saccade==T) %>%
-         verg.amp<10000) %>% #cheater code that shouldn't filter anything. switch with above line
-  arrange(enhance.conv.dur) %>%
-  mutate(splot=dense_rank(desc(enhance.conv.dur*1000))) ->
+         verg.amp<10000) ->
   dp
+
+#this next block will create a variable "sacnum" that goes from 1:numsaccades ordered by variable of choice
+dp %>%
+  group_by(neuron, sacnum) %>%
+  summarise(enhance.conv.dur=first(enhance.conv.dur)) %>%
+  dplyr::arrange(desc(enhance.conv.dur)) %>%
+  mutate(splot=row_number())->
+  ds
+
+dp<- left_join(dp,ds,by=c('neuron','sacnum'))
+
+
+
+manipulate(
+  ggplot(filter(dp,splot==currentsaccade))+
+    geom_line(aes(counter,verg.angle,group=sacnum),color='darkgreen')+
+    geom_point(aes(counter,10*showrasters),shape='|',size=4)+
+    geom_vline(aes(xintercept=counter*(pauses*0+1)),alpha=1/10,
+               data=filter(dp,splot==currentsaccade,pauses==pause.at.saccade))+
+    geom_vline(aes(xintercept=counter*(bursts*0+1)),alpha=1/10,color='red')+
+    geom_text(aes(y=8,x=0,label=paste('Pause Duration:',first(pause.dur))))+
+    # geom_text(aes(y=7,x=0,label=paste('pre.nspk:',first(pre.sac.nspk))))+
+    # geom_text(aes(y=6,x=0,label=paste('post.nspk:',first(post.sac.nspk))))+
+    geom_text(aes(y=5,x=0,label=paste('p.burst:',min(p.burst,na.rm=T))))+
+    geom_line(aes(counter,verg.velocity/10,group=sacnum),color='maroon')+
+    facet_wrap(~neuron),
+  currentsaccade=slider(1,max(dp$splot,na.rm=T))
+)
 
 # manipulate(
 #   ggplot(filter(dp,splot==currentsaccade))+
@@ -54,21 +86,6 @@ d %>%
 # )
 
 
-manipulate(
-  ggplot(filter(dp,splot==currentsaccade))+
-    geom_line(aes(counter,verg.angle,group=sacnum),color='darkgreen')+
-    geom_point(aes(counter,10*showrasters),shape='|',size=4)+
-    geom_vline(aes(xintercept=counter*(pauses*0+1)),alpha=1/10,
-               data=filter(dp,splot==currentsaccade,pauses==pause.at.saccade))+
-    geom_vline(aes(xintercept=counter*(bursts*0+1)),alpha=1/10,color='red')+
-    geom_text(aes(y=8,x=0,label=paste('Pause Duration:',first(pause.dur))))+
-    geom_text(aes(y=7,x=0,label=paste('pre.nspk:',first(pre.sac.nspk))))+
-    geom_text(aes(y=6,x=0,label=paste('post.nspk:',first(post.sac.nspk))))+
-    geom_text(aes(y=5,x=0,label=paste('p.burst:',min(p.burst,na.rm=T))))+
-    geom_line(aes(counter,verg.velocity/10,group=sacnum),color='maroon')+
-    facet_wrap(~neuron),
-  currentsaccade=slider(1,max(dp$splot,na.rm=T))
-)
 
 
 

@@ -4,7 +4,7 @@ markBurstsandPauses<- function(t,bufferlength=250, plimit=0.01,p0=0.2,pausethres
   require(dplyr)
   require(ggplot2)
   
-  source('~/GitHub/NPH-Analysis/Vergence/joinsaccades.R')
+  source('~/GitHub/NPH-Analysis/Vergence/joinsaccadesuniform.R')
   source('~/GitHub/NPH-Analysis/Vergence/Adamhelperfunctions.R')
   source('~/GitHub/NPH-Analysis/Vergence/RobustGaussianSurprise.R')
   expanddemo<- function(stimes){
@@ -15,7 +15,6 @@ markBurstsandPauses<- function(t,bufferlength=250, plimit=0.01,p0=0.2,pausethres
   
   # t<- readRDS('NRTPt.RDS')
   # t<- filter(t,neuron=='Bee-204')
-  
   spiketimes<- t$time[t$rasters==1]
   TimeShift<- first(spiketimes)
   isi<- spiketimes[-1]-spiketimes[-(length(spiketimes)-1)]
@@ -48,7 +47,7 @@ markBurstsandPauses<- function(t,bufferlength=250, plimit=0.01,p0=0.2,pausethres
   t%>%
     # filter(as.numeric(cellnum)>200) %>%
     group_by(neuron) %>%
-    do(joinsaccades(.,buffer=bufferlength,threshold=20))->
+    do(joinsaccadesuniform(.,buffer=bufferlength,threshold=20))->
     d
   
   pauses %>%

@@ -315,28 +315,72 @@ In this next section we attempt to distinguish between two factors that are corr
 
 ### Model based on the positive transient
 ```{r positive.trans only,echo=F}
-summaryforplot %>%
-  # filter(peak.verg.velocity>0) %>%
+# message('We are now attempting to use the stupid calc.relimpo')
+# summaryforplot %>%
+#   # filter(peak.verg.velocity>0) %>%
+#   group_by(neuron) %>%
+#   # do(b=calc.relimp(lm(maxfr~verg.amp+peak.verg.velocity,data=.)),
+#      # bic=regsubsets(maxfr~verg.amp+peak.verg.velocity,.)) ->
+#     do(b=calc.relimp(lm(maxfr~max.verg.angle+max.verg.velocity,data=.))) ->
+#   bb
+# r <- data.frame()
+# r2 <- NULL
+# for (i in 1:nrow(bb)){
+#   b<- bb$b[[i]]$lmg
+#   r<-rbind(r,b)
+# 
+#   r2<- c(r2,bb$b[[i]]$R2)
+# 
+# }
+# 
+# r$neuron<-bb$neuron
+# # r$cellnum<- bb$cellnum
+# r$R2<- r2
+# 
+# names(r)<- c(names(bb$b[[1]]$lmg),'neuron','R2')
+# 
+# r %>%
+#   separate(neuron, c('monkey','cellnum'),remove=FALSE) %>%
+#   mutate(celltype=as.factor(as.numeric(cellnum)>100))->
+#   r
+# levels(r$celltype)<- c("NRTP","SOA")
+# 
+# 
+# # r.old<-readRDS('NRTPr.RDS')
+# # r<- rbind(r.old,r)
+# if (nfiles > 0){
+#   r.old<- readRDS('NRTPr.RDS')
+#   rsave<- rbind(r.old,r)
+# saveRDS(rsave,'NRTPr-new.RDS')
+# }
+# 
+# # write.csv(r,"allfiles-r.csv")
+# # rmark<-read.csv('marksoacells.csv')
+# # r<- rbind(r,rmark[,-1])
+```
+
+```{r positive.relimp}
+summaryforplot %>% 
   group_by(neuron) %>%
-  # do(b=calc.relimp(lm(maxfr~verg.amp+peak.verg.velocity,data=.)),
-     # bic=regsubsets(maxfr~verg.amp+peak.verg.velocity,.)) ->
-    do(b=calc.relimp(lm(maxfr~max.verg.angle+max.verg.velocity,data=.))) ->
-  bb
-r <- data.frame()
+  do(m=lm(maxfr~max.verg.angle+max.verg.velocity,data=.)) -> 
+  mm
+
+r<- data.frame()
 r2 <- NULL
-for (i in 1:nrow(bb)){
-  b<- bb$b[[i]]$lmg
+
+for (i in 1:nrow(mm)){
+  message('Trying...')
+  bb<- relaimpo::calc.relimp(mm$m[[i]])
+  b<- bb$lmg
   r<-rbind(r,b)
-  
-  r2<- c(r2,bb$b[[i]]$R2)
+  r2<- c(r2,bb$R2)
   
 }
 
-r$neuron<-bb$neuron
-# r$cellnum<- bb$cellnum
+r$neuron<-mm$neuron
 r$R2<- r2
 
-names(r)<- c(names(bb$b[[1]]$lmg),'neuron','R2')
+names(r)<- c(names(b),'neuron','R2')
 
 r %>%
   separate(neuron, c('monkey','cellnum'),remove=FALSE) %>%
@@ -344,31 +388,19 @@ r %>%
   r
 levels(r$celltype)<- c("NRTP","SOA")
 
-
-# r.old<-readRDS('NRTPr.RDS')
-# r<- rbind(r.old,r)
-if (nfiles > 0){
-  r.old<- readRDS('NRTPr.RDS')
-  rsave<- rbind(r.old,r)
-saveRDS(rsave,'NRTPr-new.RDS')
-}
-
-# write.csv(r,"allfiles-r.csv")
-# rmark<-read.csv('marksoacells.csv')
-# r<- rbind(r,rmark[,-1])
 ```
 
 ```{r plot.positive.trans.fit,fig.height=10,fig.width=10}
 
-ggplot(aes(max.verg.angle,max.verg.velocity),data=r)+
-  # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
-  geom_point(size=4,aes(shape=monkey,color=celltype))+
-  # geom_point(size=4,aes(color=R2))+
-  # scale_color_gradient(low='blue',high='red')+
-  # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
-  geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
-  geom_abline(intercept=0,slope=1)+
-  # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-  theme(legend.position="top")+
-  ggtitle('Relative Importance')
+ ggplot(aes(max.verg.angle,max.verg.velocity),data=r)+
+   # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
+   geom_point(size=4,aes(shape=monkey,color=celltype))+
+   # geom_point(size=4,aes(color=R2))+
+   # scale_color_gradient(low='blue',high='red')+
+   # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
+   geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
+   geom_abline(intercept=0,slope=1)+
+   # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
+   theme(legend.position="top")+
+   ggtitle('Relative Importance')
 ```
