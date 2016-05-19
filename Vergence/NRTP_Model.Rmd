@@ -1,0 +1,144 @@
+---
+title: "Modeling NRTP"
+author: "Adam"
+date: "May 19, 2016"
+output: pdf_document
+---
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
+```
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(xtable)
+# library(tidyr)
+# library(broom)
+# library(grid)
+# library(relaimpo)
+# library(leaps)
+# library(data.table)
+# library(stringr)
+# source('joinsaccadesuniform.R')
+source('Adamhelperfunctions.R')
+t<-readRDS('SOA-NRTP.RDS')
+t<- filter(t,neuron=='Bee-06')
+```
+
+
+
+```{r}
+t %>%
+  mutate(time=row_number(),
+         sdf=spikedensity(rasters,sd=20),
+        verg.velocity=parabolicdiff(verg.angle,14),
+         transient.type='none',
+         transient.type=replace(transient.type, verg.velocity > 15,'convergence'),
+         transient.type=replace(transient.type, verg.velocity < -15, 'divergence'))->
+  t
+
+m<- lm(sdf~verg.angle+verg.velocity:transient.type,data=t)
+
+mc<- lm(sdf~verg.angle+verg.velocity,data=t)
+
+t<- mutate(t,e=predict(m,newdata=t),
+           ec=predict(mc,newdata=t))
+
+r<- summary(m)$r.squared
+rc<- summary(mc)$r.squared
+
+```
+
+#Modeling NRTP firing rate
+In this document, we calculate a simple linear model to predict the firing rate of neurons in NRTP.
+
+##Procedure
+
+* Calculate spike density function by convolving rasters with a guassian with sigma=20ms
+
+* Calculate vergence velocity
+
+* Mark periods of convergent and divergent enhancement (when vergence angle changes faster than 15 deg/s)
+
+* Model firing rate using this model: FR ~ verg.angle+verg.velocity:transient:type 
+    + Transient.type can be either convergence, divergence or none (non-saccadic vergence velocity)
+    + The colon operator indicates an interaction, so the model will fit three separate parameters for vergence velocity
+
+We show the parameters for this fit for the cell "Bee-15"
+
+```{r show_parameters, results='asis'}
+xtable(summary(m))
+xtable(mc)
+```
+
+The model with interactions gives a $R^2$ of `r r` while the model without considering enhancement has an $R^2$ of `r rc`.
+
+
+```{r plotmodel, fig.height=8}
+window<- 12500
+ggplot(filter(t,time>window,time<window+1000))+
+             geom_line(aes(time,sdf))+
+             geom_line(aes(time,ec),color='orange')+
+             geom_line(aes(time,e),color='purple',alpha=1)+
+             geom_line(aes(time,verg.velocity),color='pink')+
+           # geom_line(aes(time,rep*10),color='red')+
+           # geom_line(aes(time,lep*10),color='blue'),
+           geom_line(aes(time,verg.angle*10),color='darkgreen')
+
+window<- 22000
+ggplot(filter(t,time>window,time<window+2000))+
+             geom_line(aes(time,sdf))+
+             geom_line(aes(time,ec),color='orange')+
+             geom_line(aes(time,e),color='purple',alpha=1)+
+             geom_line(aes(time,verg.velocity),color='pink')+
+           # geom_line(aes(time,rep*10),color='red')+
+           # geom_line(aes(time,lep*10),color='blue'),
+           geom_line(aes(time,verg.angle*10),color='darkgreen')
+window<- 74000
+ggplot(filter(t,time>window,time<window+5000))+
+             geom_line(aes(time,sdf))+
+             geom_line(aes(time,ec),color='orange')+
+             geom_line(aes(time,e),color='purple',alpha=1)+
+             geom_line(aes(time,verg.velocity),color='pink')+
+           # geom_line(aes(time,rep*10),color='red')+
+           # geom_line(aes(time,lep*10),color='blue'),
+           geom_line(aes(time,verg.angle*10),color='darkgreen')
+
+window<- 26000
+ggplot(filter(t,time>window,time<window+1000))+
+             geom_line(aes(time,sdf))+
+             geom_line(aes(time,ec),color='orange')+
+             geom_line(aes(time,e),color='purple',alpha=1)+
+             geom_line(aes(time,verg.velocity),color='pink')+
+           # geom_line(aes(time,rep*10),color='red')+
+           # geom_line(aes(time,lep*10),color='blue'),
+           geom_line(aes(time,verg.angle*10),color='darkgreen')
+window<- 44000
+ggplot(filter(t,time>window,time<window+5000))+
+             geom_line(aes(time,sdf))+
+             geom_line(aes(time,ec),color='orange')+
+             geom_line(aes(time,e),color='purple',alpha=1)+
+             geom_line(aes(time,verg.velocity),color='pink')+
+           # geom_line(aes(time,rep*10),color='red')+
+           # geom_line(aes(time,lep*10),color='blue'),
+           geom_line(aes(time,verg.angle*10),color='darkgreen')
+
+```
+
+<!-- Here we demonstrate the model, shown in purple.  -->
+<!-- Black is the spike density function.  -->
+<!-- Pink is the vergence velocity. -->
+<!-- Orange is the model that does not consider transients to be different. -->
+
+<!-- \newpage -->
+
+<!-- The coefficients for all cells: -->
+<!-- ```{r coefficients,results='asis'} -->
+<!-- z<- readRDS('TransientModel.RDS') -->
+<!-- kable(z) -->
+
+<!-- ``` -->
