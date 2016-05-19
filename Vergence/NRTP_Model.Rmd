@@ -16,17 +16,20 @@ library(ggplot2)
 library(dplyr)
 library(knitr)
 library(xtable)
-# library(tidyr)
+library(tidyr)
 # library(broom)
 # library(grid)
 # library(relaimpo)
 # library(leaps)
 # library(data.table)
 # library(stringr)
-# source('joinsaccadesuniform.R')
+source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 t<-readRDS('SOA-NRTP.RDS')
-t<- filter(t,neuron=='Bee-06')
+#####
+cellchoice<- 'Bee-15'
+######
+t<- filter(t,neuron==cellchoice)
 ```
 
 
@@ -68,7 +71,7 @@ In this document, we calculate a simple linear model to predict the firing rate 
     + Transient.type can be either convergence, divergence or none (non-saccadic vergence velocity)
     + The colon operator indicates an interaction, so the model will fit three separate parameters for vergence velocity
 
-We show the parameters for this fit for the cell "Bee-15"
+We show the parameters for this fit for the cell `r cellchoice`
 
 ```{r show_parameters, results='asis'}
 xtable(summary(m))
@@ -142,3 +145,27 @@ ggplot(filter(t,time>window,time<window+5000))+
 <!-- kable(z) -->
 
 <!-- ``` -->
+
+```{r peak.fr,fig.height=8}
+bufferlength<- 200
+saccade.length<- 150
+
+t<-joinsaccadesuniform(t,buffer=200,threshold=20,saccade.length=saccade.length)
+  
+t %>%
+  group_by(neuron,sacnum) %>%
+  summarize(peak.verg.velocity=maxabs(verg.velocity),
+            Actual=max(sdf),
+            Transients=max(e),
+            VelocityOnly=max(ec)) %>%
+  gather("Model","peakfr",4:6)->
+  summaryforplot
+
+ggplot(summaryforplot)+
+  geom_point(aes(peak.verg.velocity,peakfr,color=Model),alpha=1/3,size=2)+
+  theme(legend.position="top")+
+  scale_color_manual(values=c('black','purple','orange'))
+
+
+  
+```
