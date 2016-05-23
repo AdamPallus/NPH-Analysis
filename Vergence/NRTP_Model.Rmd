@@ -27,7 +27,7 @@ source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 t<-readRDS('SOA-NRTP.RDS')
 #####
-cellchoice<- 'Bee-15'
+cellchoice<- 'Bee-04'
 ######
 t<- filter(t,neuron==cellchoice)
 ```
@@ -101,15 +101,15 @@ ggplot(filter(t,time>window,time<window+2000))+
            # geom_line(aes(time,rep*10),color='red')+
            # geom_line(aes(time,lep*10),color='blue'),
            geom_line(aes(time,verg.angle*10),color='darkgreen')
-window<- 74000
-ggplot(filter(t,time>window,time<window+5000))+
-             geom_line(aes(time,sdf))+
-             geom_line(aes(time,ec),color='orange')+
-             geom_line(aes(time,e),color='purple',alpha=1)+
-             geom_line(aes(time,verg.velocity),color='pink')+
-           # geom_line(aes(time,rep*10),color='red')+
-           # geom_line(aes(time,lep*10),color='blue'),
-           geom_line(aes(time,verg.angle*10),color='darkgreen')
+# window<- 74000
+# ggplot(filter(t,time>window,time<window+5000))+
+#              geom_line(aes(time,sdf))+
+#              geom_line(aes(time,ec),color='orange')+
+#              geom_line(aes(time,e),color='purple',alpha=1)+
+#              geom_line(aes(time,verg.velocity),color='pink')+
+#            # geom_line(aes(time,rep*10),color='red')+
+#            # geom_line(aes(time,lep*10),color='blue'),
+#            geom_line(aes(time,verg.angle*10),color='darkgreen')
 
 window<- 26000
 ggplot(filter(t,time>window,time<window+1000))+
@@ -132,19 +132,7 @@ ggplot(filter(t,time>window,time<window+5000))+
 
 ```
 
-<!-- Here we demonstrate the model, shown in purple.  -->
-<!-- Black is the spike density function.  -->
-<!-- Pink is the vergence velocity. -->
-<!-- Orange is the model that does not consider transients to be different. -->
 
-<!-- \newpage -->
-
-<!-- The coefficients for all cells: -->
-<!-- ```{r coefficients,results='asis'} -->
-<!-- z<- readRDS('TransientModel.RDS') -->
-<!-- kable(z) -->
-
-<!-- ``` -->
 
 ```{r peak.fr,fig.height=8}
 bufferlength<- 200
@@ -167,5 +155,20 @@ ggplot(summaryforplot)+
   scale_color_manual(values=c('black','purple','orange'))
 
 
+
   
+```
+
+Here we demonstrate the model, shown in purple.
+Black is the spike density function.
+Pink is the vergence velocity.
+Orange is the model that does not consider transients to be different.
+
+\newpage
+
+The coefficients for all cells:
+```{r coefficients,results='asis'}
+z<- readRDS('TransientModel.RDS')
+kable(z)
+
 ```

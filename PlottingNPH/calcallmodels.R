@@ -15,26 +15,48 @@ library(xtable)
 source('Adamhelperfunctions.R')
 t<-readRDS('SOA-NRTP.RDS')
 
-t<- filter(t,monkey=='Bee',cellnum<100)
+z<- filter(t,monkey=='Bee',cellnum %in% c(6,15,205))
+
+dynamicleadverg<-function(p,lags=seq(0,150,by=5)) {
+  
+  rsq<-NULL
+  bias<- NULL
+  verg.angle<-NULL
+  conv.trans<-NULL
+  dive.trans<- NULL
+  verg.velocity<- NULL
+  for (i in 1:length(lags)) {
+    if (lags[i] > 0){
+      p$sdflag<-dplyr::lag(p$sdf,lags[i])
+    }
+    else{
+      p$sdflag<-dplyr::lead(p$sdf,lags[i]*-1)
+    }
+    m<- lm(sdflag~verg.angle+verg.velocity:transient.type,data=p)
+    r<- summary(m)$coefficients
+    rsq[i]<- summary(m)$r.squared
+    bias[i]<- r[1]
+    verg.angle[i]<- r[2]
+    conv.trans[i]=r[3]
+    dive.trans[i]=r[4]
+    verg.velocity[i]=r[5]
+    
+  }
+  x<- data.frame(lag=lags,bias=bias,verg.angle=verg.angle,conv.trans=conv.trans,dive.trans=dive.trans,
+                 verg.velocity=verg.velocity,r2=rsq)
+  # return(x)
+  return(filter(x,r2==max(r2)))
+}
 
 
-t %>%
+t %>% 
   group_by(neuron) %>%
   mutate(time=row_number(),
-         # sdf=spikedensity(rasters,sd=20),
-         # verg.velocity=parabolicdiff(verg.angle,14),
          transient.type='none',
          transient.type=replace(transient.type, verg.velocity > 15,'convergence'),
          transient.type=replace(transient.type, verg.velocity < -15, 'divergence')) %>%
+  do(dynamicleadverg(p=.)) ->
+p
 
-  do(r=summary(lm(sdf~verg.angle+verg.velocity:transient.type,data=.))$coefficients,
-     m=summary(lm(sdf~verg.angle+verg.velocity:transient.type,data=.)),
-     c=summary(lm(sdf~verg.angle+verg.velocity,data=.))) %>%
-  mutate(bias=r[1],verg.angle=r[2],
-         conv.trans=r[3],dive.trans=r[4],
-         verg.velocity=r[5],
-         r2=m$r.squared,
-         r2control=c$r.squared,
-         improvement=r2-r2control) %>%
-  select(-r,-m,-c)->
-  z
+
+

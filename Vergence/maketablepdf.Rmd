@@ -1,0 +1,65 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(ggplot2)
+library(xtable)
+```
+
+To create this table, we fit the model:
+
+$$FiringRate = VergenceAngle+VergenceVelocity:EnhancementType$$
+
+The ":" indicates an interaction between vergence velocity and enhancement type, which is the spike in vergence velocity observed during saccades with vergence. The interaction enables the model to fit three separate parameters for the relationship between firing rate and vergence velocity, depending on whether there is a convergent enhancement, divergent enhancement, or no enhancement. This may be less important for some cells, which would be indicated by similar model parameters for each type. 
+
+```{r coefficients,results='asis'}
+p<- readRDS('TransientModel.RDS')
+
+p %>%
+  select(neuron,celltype,lag,bias,verg.angle,conv.trans,dive.trans,verg.velocity,r2) %>%
+  arrange(desc(r2)) %>%
+  rename('$R^{2}$'=r2)->
+  p
+
+kable(p,digits=c(0,0,0,2,2,2,2,2,2))
+
+```
+
+```{r lagboxplot}
+
+ggplot(aes(celltype,lag),data=p)+geom_boxplot()+geom_jitter(aes(color=celltype))
+
+```
+
+```{r lagAOV,results='asis'}
+a<- aov(lag~celltype,data=p)
+xtable(summary(a))
+```
+
+```{r conv.trans.boxplot}
+
+ggplot(aes(celltype,conv.trans),data=p)+geom_boxplot()+geom_jitter(aes(color=celltype))
+
+```
+
+```{r conv.trans.AOV,results='asis'}
+a<- aov(conv.trans~celltype,data=p)
+xtable(summary(a))
+```
+
+
+```{r conv.trans.boxplot}
+
+ggplot(aes(celltype,conv.trans),data=p)+geom_boxplot()+geom_jitter(aes(color=celltype))
+
+```
+
+```{r conv.trans.AOV,results='asis'}
+a<- aov(conv.trans~celltype,data=p)
+xtable(summary(a))
+```
