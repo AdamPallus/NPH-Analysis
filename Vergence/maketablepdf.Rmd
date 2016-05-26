@@ -18,7 +18,7 @@ $$FiringRate = VergenceAngle+VergenceVelocity:EnhancementType$$
 The ":" indicates an interaction between vergence velocity and enhancement type, which is the spike in vergence velocity observed during saccades with vergence. The interaction enables the model to fit three separate parameters for the relationship between firing rate and vergence velocity, depending on whether there is a convergent enhancement, divergent enhancement, or no enhancement. This may be less important for some cells, which would be indicated by similar model parameters for each type. 
 
 ```{r coefficients,results='asis'}
-p<- readRDS('TransientModel.RDS')
+p<- readRDS('TransientModel20ms.RDS')
 
 p %>%
   select(neuron,celltype,lag,bias,verg.angle,conv.trans,dive.trans,verg.velocity,r2) %>%
@@ -53,13 +53,3 @@ xtable(summary(a))
 ```
 
 
-```{r conv.trans.boxplot}
-
-ggplot(aes(celltype,conv.trans),data=p)+geom_boxplot()+geom_jitter(aes(color=celltype))
-
-```
-
-```{r conv.trans.AOV,results='asis'}
-a<- aov(conv.trans~celltype,data=p)
-xtable(summary(a))
-```

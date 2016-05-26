@@ -19,6 +19,7 @@ z<- filter(t,monkey=='Bee',cellnum %in% c(6,15,205))
 
 dynamicleadverg<-function(p,lags=seq(0,150,by=5)) {
   
+  p<- mutate(p,sdf=spikedensity(rasters=rasters,sd=20))
   rsq<-NULL
   bias<- NULL
   verg.angle<-NULL

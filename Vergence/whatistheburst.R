@@ -17,9 +17,23 @@ z<- filter(t,neuron=='Bee-25')
 #            expectedFR= predict(m,newdat=z))
 
 z<- mutate(z,time=row_number(),
+           sdf=spikedensity(rasters,sd=30),
+           verg.velocity=parabolicdiff(verg.angle,20),
            transient.type='none',
        transient.type=replace(transient.type, verg.velocity > 15,'convergence'),
-       transient.type=replace(transient.type, verg.velocity < -15, 'divergence'))
+       transient.type=replace(transient.type, verg.velocity < -15, 'divergence'),
+       verg.velocity.fixed=replace(verg.velocity, transient.type=='divergence',verg.velocity*-1))
+
+
+#split verg.velocity into positive and negative
+z %>%
+  mutate(verg.velocity.positive=replace(verg.velocity,verg.velocity<0,0),
+         verg.velocity.negative=replace(verg.velocity,verg.velocity>0,0),
+         verg.velocity.negative=abs(verg.velocity.negative),
+         is.transient.positive=abs(verg.velocity.positive)>15,
+         is.transient.negative=abs(verg.velocity.negative)>15) ->
+  z
+
 
 
 # z$expectedFR<- replace(z$expectedFR,z$expectedFR<0,0)
@@ -30,6 +44,7 @@ z<- mutate(z,time=row_number(),
 
 
 rnum<- c(0, 5, 10,15, 20,25, 30, 35, 40,45, 50, 55, 60)
+rnum<- seq(0,250,by=5)
 m1<- rnum
 m2<- rnum
 count<- 0
@@ -50,30 +65,41 @@ qplot(shift,test,data=lagtest,geom='text',label=shift)
 bestlag<- lagtest$shift[lagtest$test==max(lagtest$test)]
 z<- mutate(z,sdflead=lag(sdf,bestlag))
 
-z<- mutate(z, sdflead=lag(sdf,10))
+# z<- mutate(z, sdflead=lag(sdf,150))
 mcontrol<- lm(sdflead~verg.angle+verg.velocity,data=z)
-mtest<- lm(sdflead~verg.angle+verg.velocity:transient.type,data=z)
+# mtest<- lm(sdflead~verg.angle+verg.velocity:transient.type,data=z)
+mtest<- lm(sdflead~verg.angle+verg.velocity.positive:is.transient.positive+verg.velocity.negative,data=z)
+
+# z<- mutate(z, verg.vel.smooth=as.numeric(smooth(verg.velocity,kind='3RS3R')))
+# mtest<- lm(sdflead~verg.angle+verg.vel.smooth:transient.type,data=z)
 
 
 z<- mutate(z,econtrol=predict(mcontrol,newdata=z),
-           etest=predict(mtest,newdata=z))
+           etest=predict(mtest,newdata=z),
+           verg.angle.shifted=lag(verg.angle,bestlag),
+           showrasters=replace(rasters,rasters<1,NA))
 
 
 
 maxtime<-nrow(z)
+windowsize<- 1000
 
-
-manipulate(ggplot(filter(z,time>window,time<window+5000))+
+manipulate(ggplot(filter(z,time>window,time<window+windowsize))+
              geom_area(aes(time,sdflead))+
-             # geom_line(aes(time,elog),color='orange')+
+             geom_line(aes(time,econtrol),color='orange')+
              geom_area(aes(time,etest),fill='purple',alpha=.5)+
              geom_hline(yintercept=-115)+
              geom_hline(yintercept=-85)+
-             geom_line(aes(time,verg.velocity-100),color='pink'),#+
+             
+             geom_line(aes(time,verg.velocity-100),color='red')+
+             # geom_line(aes(time,verg.vel.smooth-100),color='black')+
+             
+             geom_point(aes(time,showrasters+200),shape='|',size=2)+
+             
            # geom_line(aes(time,rep*10),color='red')+
            # geom_line(aes(time,lep*10),color='blue'),
-           # geom_line(aes(time,verg.angle*10),color='darkgreen'),
-           window=slider(0,maxtime-5000,step=5000)
+           geom_line(aes(time,verg.angle.shifted*3.3),color='darkgreen',size=1.5),
+           window=slider(0,maxtime-windowsize,step=windowsize)
 )
 
 
