@@ -22,7 +22,7 @@ p<- readRDS('TransientModel20ms.RDS')
 
 p %>%
   select(neuron,celltype,lag,bias,verg.angle,conv.trans,dive.trans,verg.velocity,r2) %>%
-  arrange(desc(r2)) %>%
+  arrange(desc(conv.trans)) %>%
   rename('$R^{2}$'=r2)->
   p
 
