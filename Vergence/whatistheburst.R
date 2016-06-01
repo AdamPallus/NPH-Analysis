@@ -8,9 +8,10 @@ source('Adamhelperfunctions.R')
 library(dplyr)
 library(ggplot2)
 library(manipulate)
+source('markEnhancement.R')
 
 t<-readRDS('SOA-NRTP.RDS')
-z<- filter(t,neuron=='Bee-06')
+z<- filter(t,neuron=='Bee-113')
 # m<- mm$m[[1]] #from above summary: model based on static FR ~ verg.angle
 
 # z<- mutate(z,time=row_number(),
@@ -26,7 +27,7 @@ z<- filter(t,neuron=='Bee-06')
 
 z %>%
   mutate(time=row_number(),
-         sdf=spikedensity(rasters,sd=30),
+         sdf=spikedensity(rasters,sd=25),
          verg.velocity=parabolicdiff(verg.angle,30),
          # verg.accel=parabolicdiff(verg.velocity,20),
          verg.direction=verg.angle>0) ->
@@ -89,7 +90,7 @@ bestlag<- lagtest$shift[lagtest$test==max(lagtest$test)]
 z<- mutate(z,sdflead=lag(sdf,bestlag))
 
 # z<- mutate(z, sdflead=lag(sdf,150))
-mcontrol<- lm(sdflead~verg.angle+verg.velocity,data=z)
+mcontrol<- lm(sdflead~verg.angle,data=z)
 # mtest<- lm(sdflead~verg.angle+verg.velocity:transient.type,data=z)
 # mtest<- lm(sdflead~verg.angle+verg.velocity.positive:is.transient.positive+verg.velocity.negative,data=z)
 
@@ -118,7 +119,7 @@ z <-mutate(z,predict.spikes1=rbinom(length(etest.prob),1,etest.prob),
 
 r.squared=cor(z$sdflead[200:nrow(z)],z$etest[200:nrow(z)])
 
-print(paste('R-Squared is:',round(r.squared,3)))
+print(paste('R-Squared is:',round(r.squared^2,3)))
 
 maxtime<-nrow(z)
 windowsize<- 5000
@@ -126,6 +127,7 @@ windowsize<- 5000
 manipulate(ggplot(filter(z,time>window,time<window+windowsize))+
              geom_area(aes(time,sdflead))+
              # geom_line(aes(time,econtrol),color='orange')+
+             # geom_area(aes(time,econtrol),fill='orange',alpha=.5)+
              geom_area(aes(time,etest),fill='purple',alpha=.5)+
              geom_hline(yintercept=-115)+
              geom_hline(yintercept=-85)+
@@ -135,9 +137,9 @@ manipulate(ggplot(filter(z,time>window,time<window+windowsize))+
              # geom_line(aes(time,verg.vel.smooth-100),color='black')+
              
              geom_point(aes(time,showrasters+200),shape='|',size=2)+
-             geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='magenta')+
-             geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='magenta')+
-             geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='magenta')+
+             geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='purple')+
+             geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='purple')+
+             geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='purple')+
              
              geom_point(aes(time,enhancenum*0-50,color=transient.type))+
              

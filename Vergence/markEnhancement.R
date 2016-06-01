@@ -1,4 +1,4 @@
-markEnhancement<- function(v, treshold1=15,threshold2=8){
+markEnhancement<- function(v, threshold1=15,threshold2=8){
   require(dplyr)
   
   mindur<-50
@@ -11,9 +11,7 @@ markEnhancement<- function(v, treshold1=15,threshold2=8){
   
   stimes<- data.frame(event.onset,event.offset)
   nsaccades=nrow(stimes)
-  
-  
-  
+
   jsac<- function(stimes){
     summary(stimes)
     #input should be an array of length 2: c(onsettime,offsettime, saccade.number,saccade.dur)
@@ -31,10 +29,10 @@ markEnhancement<- function(v, treshold1=15,threshold2=8){
   
   x<- do.call('rbind',apply(stimes,1,jsac))
   
-  vv<- data.frame(v=v)
-  vv<- mutate(vv, time=row_number())
+  v<- data.frame(v=v)
+  v<- mutate(v, time=row_number())
   
-  xx<- left_join(vv,x,by='time')
+  xx<- left_join(v,x,by='time')
   
   xx %>%
     group_by(enhancenum) %>%
