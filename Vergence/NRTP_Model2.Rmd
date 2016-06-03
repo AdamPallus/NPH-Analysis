@@ -13,7 +13,7 @@ library(knitr)
 opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
 ```
 
-```{r,message=FALSE}
+```{r loaddata, message=FALSE}
 
 library(ggplot2)
 library(dplyr)
@@ -31,18 +31,24 @@ source('Adamhelperfunctions.R')
 source('markEnhancement.R')
 z<-readRDS('SOA-NRTP.RDS')
 #####
-cellchoice<- 'Ozette-106'
+cellchoice<- 'Bee-113'
 ######
 z<- dplyr::filter(z,neuron==cellchoice)
 head(z)
 ```
 
 
-```{r}
+```{r setupdata}
+z<- mutate(z,time=row_number())
+
+if (nrow(z)>200000){
+  message(paste('number of rows: ',nrow(z)))
+  message('Only using first 200,000')
+  z<- filter(z,time<200000)
+}
 
 z %>%
-  mutate(time=row_number(),
-         sdf=spikedensity(rasters,sd=25),
+  mutate(sdf=spikedensity(rasters,sd=30),
          verg.velocity=parabolicdiff(verg.angle,30),
          # verg.accel=parabolicdiff(verg.velocity,20),
          verg.direction=verg.angle>0) ->
@@ -70,12 +76,20 @@ rnum<- seq(0,250,by=5)
 m1<- rnum
 m2<- rnum
 count<- 0
+isconvergent<- cor(z$verg.angle,z$sdf)>0
+if(!isconvergent){message('divergent cell!')}
+
 for (i in rnum) {
   count<- count+1
   z<- mutate(z,sdflead=lag(sdf,i))
   mcontrol<- lm(sdflead~verg.angle+verg.velocity,data=z)
   # mtest<- lm(sdflead~verg.angle+verg.velocity:transient.type,data=z)
-  mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='divergence'))
+  
+  if (isconvergent){
+    mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='divergence'))
+  }else{
+    mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='convergence'))
+  }
   m1[count]=summary(mcontrol)$r.squared
   m2[count]=summary(mtest)$r.squared
 }
@@ -90,7 +104,11 @@ z<- mutate(z,sdflead=lag(sdf,bestlag))
 ```{r fitmodel}
 
 mcontrol<- lm(sdflead~verg.angle,data=z)
-mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='divergence'))
+if(isconvergent){
+  mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='divergence'))
+}else{
+  mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='convergence'))
+}
 
 z<- mutate(z,econtrol=predict(mcontrol,newdata=z),
            etest=predict(mtest,newdata=z),
@@ -138,90 +156,12 @@ xtable(summary(mtest))
 
 The model with interactions gives a $R^2$ of `r r.squared`. 
 
-```{r plotmodel}
-maxtime<-nrow(z)
-windowsize<- 5000
-window<- 5000
-
-ggplot(filter(z,time>window,time<window+windowsize))+
-  geom_area(aes(time,sdflead))+
-  # geom_line(aes(time,econtrol),color='orange')+
-  # geom_area(aes(time,econtrol),fill='orange',alpha=.5)+
-  geom_area(aes(time,etest),fill='purple',alpha=.5)+
-  geom_hline(yintercept=-115)+
-  geom_hline(yintercept=-85)+
-  
-  geom_line(aes(time,verg.velocity-100),color='red')+
-  geom_point(aes(time,verg.velocity-100,color=transient.type),size=1,data=filter(z, time>window,time<window+windowsize,enhancenum>0))+
-  # geom_line(aes(time,verg.vel.smooth-100),color='black')+
-  
-  geom_point(aes(time,showrasters+200),shape='|',size=2)+
-  geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='purple')+
-  geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='purple')+
-  geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='purple')+
-  
-  # geom_point(aes(time,enhancenum*0-50,color=transient.type))+
-  
-  # geom_line(aes(time,rep*10),color='red')+
-  # geom_line(aes(time,lep*10),color='blue'),
-  geom_line(aes(time,verg.angle.shifted*5),color='darkgreen',size=1.5)+
-  theme(legend.position='top')
-
-window<- 25000
-ggplot(filter(z,time>window,time<window+windowsize))+
-  geom_area(aes(time,sdflead))+
-  # geom_line(aes(time,econtrol),color='orange')+
-  # geom_area(aes(time,econtrol),fill='orange',alpha=.5)+
-  geom_area(aes(time,etest),fill='purple',alpha=.5)+
-  geom_hline(yintercept=-115)+
-  geom_hline(yintercept=-85)+
-  
-  geom_line(aes(time,verg.velocity-100),color='red')+
-  geom_point(aes(time,verg.velocity-100,color=transient.type),size=1,data=filter(z, time>window,time<window+windowsize,enhancenum>0))+
-  # geom_line(aes(time,verg.vel.smooth-100),color='black')+
-  
-  geom_point(aes(time,showrasters+200),shape='|',size=2)+
-  geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='purple')+
-  geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='purple')+
-  geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='purple')+
-  
-  # geom_point(aes(time,enhancenum*0-50,color=transient.type))+
-  
-  # geom_line(aes(time,rep*10),color='red')+
-  # geom_line(aes(time,lep*10),color='blue'),
-  geom_line(aes(time,verg.angle.shifted*5),color='darkgreen',size=1.5)+
-  theme(legend.position='top')
-
-window<- 45000
-ggplot(filter(z,time>window,time<window+windowsize))+
-  geom_area(aes(time,sdflead))+
-  # geom_line(aes(time,econtrol),color='orange')+
-  # geom_area(aes(time,econtrol),fill='orange',alpha=.5)+
-  geom_area(aes(time,etest),fill='purple',alpha=.5)+
-  geom_hline(yintercept=-115)+
-  geom_hline(yintercept=-85)+
-  
-  geom_line(aes(time,verg.velocity-100),color='red')+
-  geom_point(aes(time,verg.velocity-100,color=transient.type),size=1,data=filter(z, time>window,time<window+windowsize,enhancenum>0))+
-  # geom_line(aes(time,verg.vel.smooth-100),color='black')+
-  
-  geom_point(aes(time,showrasters+200),shape='|',size=2)+
-  geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='purple')+
-  geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='purple')+
-  geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='purple')+
-  
-  # geom_point(aes(time,enhancenum*0-50,color=transient.type))+
-  
-  # geom_line(aes(time,rep*10),color='red')+
-  # geom_line(aes(time,lep*10),color='blue'),
-  geom_line(aes(time,verg.angle.shifted*5),color='darkgreen',size=1.5)+
-  theme(legend.position='top')
-
-```
-
 ```{r plotloop}
 windowsize<- 5000
-for (window in seq(0,100000,by=5000)){
+maxtime<-nrow(z)
+maxplot<- round(maxtime/windowsize)*windowsize
+
+for (window in seq(0,maxplot,by=windowsize)){
   print(
     ggplot(filter(z,time>window,time<window+windowsize))+
       geom_area(aes(time,sdflead))+
@@ -245,7 +185,7 @@ for (window in seq(0,100000,by=5000)){
       # geom_line(aes(time,rep*10),color='red')+
       # geom_line(aes(time,lep*10),color='blue'),
       geom_line(aes(time,verg.angle.shifted*5),color='darkgreen',size=1.5)+
-      theme(legend.position='top')
+      theme(legend.position='bottom')
   )
 }
 
