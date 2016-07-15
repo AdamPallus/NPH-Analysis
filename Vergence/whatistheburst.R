@@ -11,7 +11,7 @@ library(manipulate)
 source('markEnhancement.R')
 
 t<-readRDS('SOA-NRTP.RDS')
-z<- filter(t,neuron=='Bee-113')
+z<- filter(t,neuron=='Bee-06')
 # m<- mm$m[[1]] #from above summary: model based on static FR ~ verg.angle
 
 # z<- mutate(z,time=row_number(),
@@ -28,7 +28,7 @@ z<- filter(t,neuron=='Bee-113')
 z %>%
   mutate(time=row_number(),
          sdf=spikedensity(rasters,sd=25),
-         verg.velocity=parabolicdiff(verg.angle,30),
+         verg.velocity=parabolicdiff(verg.angle,25),
          # verg.accel=parabolicdiff(verg.velocity,20),
          verg.direction=verg.angle>0) ->
   z
@@ -90,22 +90,37 @@ bestlag<- lagtest$shift[lagtest$test==max(lagtest$test)]
 z<- mutate(z,sdflead=lag(sdf,bestlag))
 
 # z<- mutate(z, sdflead=lag(sdf,150))
-mcontrol<- lm(sdflead~verg.angle,data=z)
+mcontrol<- lm(sdflead~verg.angle+verg.velocity,data=filter(z,transient.type=='none'))
 # mtest<- lm(sdflead~verg.angle+verg.velocity:transient.type,data=z)
 # mtest<- lm(sdflead~verg.angle+verg.velocity.positive:is.transient.positive+verg.velocity.negative,data=z)
 
 # z<- mutate(z, verg.vel.smooth=as.numeric(smooth(verg.velocity,kind='3RS3R')))
 # mtest<- lm(sdflead~verg.angle+verg.vel.smooth:transient.type,data=z)
 # mtest<-lm(sdflead~verg.angle+verg.velocity:transient.type,data=z)
+
 mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='divergence'))
+
 # mtest<-lm(sdflead~verg.angle+verg.velocity:transient.type,data=filter(z,!transient.type=='divergence'))
 
 # zz<- mutate(z,transient.type=replace(transient.type,transient.type=='divergence','none'))
+
+mvel<-lm(verg.velocity~sdflead+verg.angle-1,
+         data=filter(z,
+                     # transient.type=='none',
+                     abs(verg.velocity)>4),
+         sdflead>10)
+
 z<- mutate(z,econtrol=predict(mcontrol,newdata=z),
            etest=predict(mtest,newdata=z),
            etest=replace(etest,etest<0,0),
+           evel=predict(mvel,newdata=z),
            verg.angle.shifted=lag(verg.angle,bestlag),
            showrasters=replace(rasters,rasters<1,NA))
+
+
+mtest<- lm(sdflead~verg.angle+evel,
+           data=filter(z,!transient.type=='divergence'))
+
 
 etest.prob<- z$etest/1000
 
@@ -118,7 +133,7 @@ z <-mutate(z,predict.spikes1=rbinom(length(etest.prob),1,etest.prob),
            predict.spikes3=replace(predict.spikes3,predict.spikes3<1,NA))
 
 r.squared=cor(z$sdflead[200:nrow(z)],z$etest[200:nrow(z)])
-
+r.squared=cor(z$sdflead[200:nrow(z)],z$econtrol[200:nrow(z)])
 print(paste('R-Squared is:',round(r.squared^2,3)))
 
 maxtime<-nrow(z)
@@ -126,22 +141,25 @@ windowsize<- 5000
 
 manipulate(ggplot(filter(z,time>window,time<window+windowsize))+
              geom_area(aes(time,sdflead))+
-             # geom_line(aes(time,econtrol),color='orange')+
+             geom_line(aes(time,evel-150),color='orange')+
+             geom_line(aes(time,verg.velocity-evel-200),color='maroon')+
              # geom_area(aes(time,econtrol),fill='orange',alpha=.5)+
              geom_area(aes(time,etest),fill='purple',alpha=.5)+
              geom_hline(yintercept=-115)+
              geom_hline(yintercept=-85)+
              
              geom_line(aes(time,verg.velocity-100),color='red')+
-             geom_point(aes(time,verg.velocity-100),color='red',size=3,data=filter(z, time>window,time<window+windowsize,enhancenum>0))+
+             # geom_point(aes(time,verg.velocity-100),color='red',size=3,
+             # data=filter(z, time>window,time<window+windowsize,enhancenum>0))+
              # geom_line(aes(time,verg.vel.smooth-100),color='black')+
-             
+             geom_point(aes(time,verg.velocity-100,color=transient.type),size=1,
+                        data=filter(z, time>window,time<window+windowsize,enhancenum>0))+
              geom_point(aes(time,showrasters+200),shape='|',size=2)+
-             geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='purple')+
-             geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='purple')+
-             geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='purple')+
+             # geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='purple')+
+             # geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='purple')+
+             # geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='purple')+
              
-             geom_point(aes(time,enhancenum*0-50,color=transient.type))+
+             # geom_point(aes(time,enhancenum*0-50,color=transient.type))+
              
            # geom_line(aes(time,rep*10),color='red')+
            # geom_line(aes(time,lep*10),color='blue'),

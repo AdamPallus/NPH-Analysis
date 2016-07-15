@@ -29,9 +29,10 @@ library(tidyr)
 source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 source('markEnhancement.R')
+# z<-readRDS('SOA-NRTP.RDS')
 z<-readRDS('SOA-NRTP.RDS')
 #####
-cellchoice<- 'Bee-113'
+cellchoice<- 'Ozette-121'
 ######
 z<- dplyr::filter(z,neuron==cellchoice)
 head(z)

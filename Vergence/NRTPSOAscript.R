@@ -1,6 +1,5 @@
 
 library(ggplot2)
-library(dplyr)
 library(knitr)
 library(tidyr)
 # library(broom)
@@ -9,6 +8,7 @@ library(relaimpo)
 library(leaps)
 #library(data.table)
 library(stringr)
+library(dplyr)
 source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 
@@ -34,7 +34,7 @@ if (nfiles>0){
   message(c('New Files: ',files))
   loadedfiles <- lapply(paste(path,files,sep=''),read.csv)
   t<-data.frame()
-  
+  # t.old<-NULL
   for (i in 1:nfiles) {
     f<- files[i]
     message(paste('Loading:',f))
@@ -45,6 +45,7 @@ if (nfiles>0){
     temp$cellnum<-as.numeric(names[3])
     temp$sdf<-spikedensity(temp$rasters,sd=10)
     # leadtime<-dynamiclead(temp)
+    message(paste('ms of data:',nrow(temp)))
     mutate(temp,
            # sdflag=lag(sdf,leadtime),
            conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2),
@@ -58,16 +59,16 @@ if (nfiles>0){
     t <-rbind(t,temp)
   }
   t<- dplyr::select(t, -thp,-tvp,-time)
-  t<- rbind(t.old,t)
-  saveRDS(rbind(t),'SOA-NRTP-new.RDS')
-  t.old<- NULL
+  # t<- rbind(t.old,t)
+  saveRDS(rbind(t.old,t),'SOA-NRTP-new.RDS')
+  # t.old<- NULL
 }else{
   message('********NO NEW CELLS********')
   t<-t.old
   t.old<-NULL
 }
-t<- filter(t, monkey %in% c('Bee','Ozette'))
-# t<- filter(t, monkey %in% c('Ozette'))
+# t<- filter(t, monkey %in% c('Bee','Ozette'))
+t<- filter(t, monkey %in% c('Ozette'))
 
 
 t$celltype<- as.factor(as.numeric(t$cellnum)>100)
@@ -123,12 +124,12 @@ ggsave('RatePosition.pdf',plot=gp, height=28, width=13)
 #   facet_wrap(~neuron)+
 #   ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
 
-bufferlength<- 200
+bufferlength<- 400
 saccade.length<- 150
 t%>%
   group_by(neuron) %>%
   mutate(time=row_number()) %>%
-  do(joinsaccadesuniform(.,buffer=200,threshold=20,saccade.length=saccade.length))->
+  do(joinsaccadesuniform(.,buffer=bufferlength,threshold=20,saccade.length=saccade.length))->
   # do(joinsaccades(.,buffer=bufferlength,threshold=20))->
   t
 
@@ -239,7 +240,8 @@ if (sample.saccades) {
     g
 }
 
-gp<- ggplot(filter(g,celltype=='NRTP')) + 
+# gp<- ggplot(filter(g,celltype=='NRTP')) + 
+gp<- ggplot(g) + 
   theme_bw()+ #Removes gray background 
   xlab('Time from Saccade Onset (ms)')+
   geom_histogram(aes(spiketimes,100*..ncount..),alpha=1,binwidth=10,fill='black',color='black')+
@@ -264,75 +266,76 @@ gp<- ggplot(filter(g,celltype=='NRTP')) +
   scale_y_continuous(breaks=c(-300,-250,-200,-150),labels=c(0,5,10,15))+ #re-labels so verg.angle is accurate
   ylab('Degrees')+
   expand_limits(y=c(-300))
-ggsave('TestRasters.pdf',height=40,width=8,plot=gp)
 
+ggsave('TestRasters.pdf',height=30,width=8,plot=gp)
 
-###################
-#Plot and model peak vergence velocity vs vergence position
-###################
-t %>%
-  group_by(neuron,sacnum) %>%
-  summarize(peak.verg.velocity=first(peak.verg.velocity),
-            maxfr=first(maxfr),
-            verg.amp=first(verg.amp),
-            max.verg.angle=first(max.verg.angle),
-            max.verg.velocity=first(max.verg.velocity)) %>%
-  filter(abs(peak.verg.velocity)<1500)->
-  summaryforplot
-# t<- NULL
-gp<- ggplot(summaryforplot)+geom_point(aes(peak.verg.velocity,maxfr),alpha=1/3,size=1)+
-  facet_wrap(~neuron,ncol=3,scales='free')+
-  geom_hline(yintercept=200,size=1, alpha=0.5,color='orange')+
-  theme(legend.position="top",
-        axis.text=element_text(size=8),
-        # panel.margin=unit(2,'lines'),
-        strip.text=element_text(size=8),
-        axis.title.x=element_text(size=8))
-
-
-ggsave('peakvelocity.pdf',plot=gp, height=40, width=10)
-
-summaryforplot %>% 
-  group_by(neuron) %>%
-  do(m=lm(maxfr~max.verg.angle+max.verg.velocity,data=.)) -> 
-  mm
-
-saveRDS(mm,'crashmm.RDS')
-
-r<- data.frame()
-r2 <- NULL
-
-for (i in 1:nrow(mm)){
-  # message('Trying...')
-  bb<- relaimpo::calc.relimp(mm$m[[i]])
-  b<- bb$lmg
-  r<-rbind(r,b)
-  r2<- c(r2,bb$R2)
-  
-}
-
-r$neuron<-mm$neuron
-r$R2<- r2
-
-names(r)<- c(names(b),'neuron','R2')
-
-r %>%
-  separate(neuron, c('monkey','cellnum'),remove=FALSE) %>%
-  mutate(celltype=as.factor(as.numeric(cellnum)>100))->
-  r
-levels(r$celltype)<- c("NRTP","SOA")
-
-gp<- ggplot(aes(max.verg.angle,max.verg.velocity),data=r)+
-  # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
-  geom_point(size=4,aes(shape=monkey,color=celltype))+
-  # geom_point(size=4,aes(color=R2))+
-  # scale_color_gradient(low='blue',high='red')+
-  # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
-  geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
-  geom_abline(intercept=0,slope=1)+
-  # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-  theme(legend.position="top")+
-  ggtitle('Relative Importance')
-
-ggsave('RelativeImportance.pdf',plot=gp,height=10,width=10)
-
+# 
+# ###################
+# #Plot and model peak vergence velocity vs vergence position
+# ###################
+# t %>%
+#   group_by(neuron,sacnum) %>%
+#   summarize(peak.verg.velocity=first(peak.verg.velocity),
+#             maxfr=first(maxfr),
+#             verg.amp=first(verg.amp),
+#             max.verg.angle=first(max.verg.angle),
+#             max.verg.velocity=first(max.verg.velocity)) %>%
+#   filter(abs(peak.verg.velocity)<1500)->
+#   summaryforplot
+# # t<- NULL
+# gp<- ggplot(summaryforplot)+geom_point(aes(peak.verg.velocity,maxfr),alpha=1/3,size=1)+
+#   facet_wrap(~neuron,ncol=3,scales='free')+
+#   geom_hline(yintercept=200,size=1, alpha=0.5,color='orange')+
+#   theme(legend.position="top",
+#         axis.text=element_text(size=8),
+#         # panel.margin=unit(2,'lines'),
+#         strip.text=element_text(size=8),
+#         axis.title.x=element_text(size=8))
+# 
+# 
+# ggsave('peakvelocity.pdf',plot=gp, height=40, width=10)
+# 
+# summaryforplot %>% 
+#   group_by(neuron) %>%
+#   do(m=lm(maxfr~max.verg.angle+max.verg.velocity,data=.)) -> 
+#   mm
+# 
+# saveRDS(mm,'crashmm.RDS')
+# 
+# r<- data.frame()
+# r2 <- NULL
+# 
+# for (i in 1:nrow(mm)){
+#   # message('Trying...')
+#   bb<- relaimpo::calc.relimp(mm$m[[i]])
+#   b<- bb$lmg
+#   r<-rbind(r,b)
+#   r2<- c(r2,bb$R2)
+#   
+# }
+# 
+# r$neuron<-mm$neuron
+# r$R2<- r2
+# 
+# names(r)<- c(names(b),'neuron','R2')
+# 
+# r %>%
+#   separate(neuron, c('monkey','cellnum'),remove=FALSE) %>%
+#   mutate(celltype=as.factor(as.numeric(cellnum)>100))->
+#   r
+# levels(r$celltype)<- c("NRTP","SOA")
+# 
+# gp<- ggplot(aes(max.verg.angle,max.verg.velocity),data=r)+
+#   # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
+#   geom_point(size=4,aes(shape=monkey,color=celltype))+
+#   # geom_point(size=4,aes(color=R2))+
+#   # scale_color_gradient(low='blue',high='red')+
+#   # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
+#   geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
+#   geom_abline(intercept=0,slope=1)+
+#   # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
+#   theme(legend.position="top")+
+#   ggtitle('Relative Importance')
+# 
+# ggsave('RelativeImportance.pdf',plot=gp,height=10,width=10)
+# 

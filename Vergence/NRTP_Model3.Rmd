@@ -1,0 +1,272 @@
+---
+title: "Modeling NRTP 3"
+author: "Adam"
+date: "June 22, 2016"
+output: 
+  pdf_document: 
+    fig_height: 7
+    fig_width: 8
+---
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
+```
+
+```{r loaddata, message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(xtable)
+library(tidyr)
+# library(broom)
+# library(grid)
+# library(relaimpo)
+# library(leaps)
+# library(data.table)
+# library(stringr)
+source('joinsaccadesuniform.R')
+source('Adamhelperfunctions.R')
+source('markEnhancement.R')
+# z<-readRDS('SOA-NRTP.RDS')
+# z<-readRDS('SOA-NRTP.RDS')
+# z<- readRDS('NRTP-TransientsRemoved.RDS')
+# z<- readRDS('SOA-TransientsRemoved.RDS')
+z<- readRDS('SOA-Pausers-TransientsRemoved.RDS')
+
+s<- readRDS('transientstemplate.RDS')
+
+
+#####
+cellchoice<- 'Bee-218'
+######
+z<- dplyr::filter(z,neuron==cellchoice)
+# head(z)
+qplot(counter2,mean.transient,data=s)+facet_wrap(~monkey)
+
+```
+
+
+```{r setupdata}
+
+z$time=z$time-first(z$time)
+z %>%
+  group_by(time) %>%
+  summarize_each(funs(first)) %>%
+  ungroup() ->
+  z
+
+xx<- markEnhancement(z$real.verg.velocity)
+
+
+xx %>%
+  rename(real.enhancenum=enhancenum,
+         real.verg.velocity=v) %>%
+  select(-real.verg.velocity) ->
+  xx
+
+z<- left_join(z,xx,by='time')
+
+z %>%
+  mutate(real.verg.enhance=!is.na(real.enhancenum),
+           real.transient.type='none',
+           real.verg.direction=real.verg.velocity>0)->
+  z
+
+i<- z$real.verg.enhance & !z$real.verg.direction
+z$real.transient.type[i]<- 'divergence'
+i<- z$real.verg.enhance & z$real.verg.direction
+z$real.transient.type[i]<- 'convergence'
+
+
+
+xx<- markEnhancement(z$verg.velocity)
+
+
+xx <- select(xx,-v)
+  
+
+z<- left_join(z,xx,by='time')
+
+z %>%
+  mutate(verg.enhance=!is.na(enhancenum),
+           transient.type='none',
+           verg.direction=verg.velocity>0)->
+  z
+
+i<- z$verg.enhance & !z$verg.direction
+z$transient.type[i]<- 'divergence'
+i<- z$verg.enhance & z$verg.direction
+z$transient.type[i]<- 'convergence'
+
+z<- mutate(z, sdfsmooth=spikedensity(rasters,sd=20))
+
+z<- mutate(z,is.convergent.trans=transient.type=='convergence',
+           is.real.convergent.trans=real.transient.type=='convergence')
+
+```
+
+```{r findlag}
+rnum<- seq(0,250,by=5)
+m1<- rnum
+m2<- rnum
+m3<- rnum
+m4<- rnum
+count<- 0
+isconvergent<- cor(z$verg.angle,z$sdf)>0
+if(!isconvergent){message('divergent cell!')}
+
+for (i in rnum) {
+  count<- count+1
+  z<- mutate(z,sdflead=lag(sdfsmooth,i))
+  mcontrol<- lm(sdflead~verg.angle+verg.velocity,data=z)
+  # mtest<- lm(sdflead~verg.angle+verg.velocity:transient.type,data=z)
+  mcontrol2<-lm(sdflead~verg.angle+real.verg.velocity,data=z)
+  if (isconvergent){
+    mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,
+               data=filter(z,!transient.type=='divergence'))
+    mtransient<- lm(sdflead~verg.angle+real.verg.velocity:is.real.convergent.trans,
+                    data=filter(z,!real.transient.type=='divergence'))
+  }else{
+    mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,
+               data=filter(z,!transient.type=='convergence'))
+    mtransient<- lm(sdflead~verg.angle+real.verg.velocity:is.real.convergent.trans,
+                    data=filter(z,!real.transient.type=='convergence'))
+  }
+  m1[count]=summary(mcontrol)$r.squared
+  m2[count]=summary(mtest)$r.squared
+  m3[count]=summary(mtransient)$r.squared
+  m4[count]=summary(mcontrol2)$r.squared
+}
+
+lagtest<-data.frame(shift=rnum, control=m1, test=m2,transient=m3,control2=m4)
+
+# qplot(shift,control,data=lagtest,geom='text',label=shift)+ggtitle('control')
+# qplot(shift,test,data=lagtest,geom='text',label=shift)+ggtitle('piecewise')
+# qplot(shift,control2,data=lagtest,geom='text',label=shift)+ggtitle('transients removed')
+# qplot(shift,transient,data=lagtest,geom='text',label=shift)+ggtitle('piecewise, transients removed')
+
+bestlag<- lagtest$shift[lagtest$test==max(lagtest$test)]
+z<- mutate(z,sdflead=lag(sdfsmooth,bestlag))
+bestlag<- lagtest$shift[lagtest$transient==max(lagtest$transient)]
+z<- mutate(z,sdflead.transient=lag(sdfsmooth,bestlag))
+
+```
+
+
+```{r fitmodel}
+
+mcontrol<- lm(sdflead~verg.angle+verg.velocity,data=z)
+mcontrol2<- lm(sdflead.transient~verg.angle+real.verg.velocity,data=z)
+if(isconvergent){
+  mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='divergence'))
+  mtemplate<- lm(sdflead~verg.angle+real.verg.velocity:is.real.convergent.trans,
+                    data=filter(z,!real.transient.type=='divergence'))
+}else{
+  mtest<- lm(sdflead~verg.angle+verg.velocity:is.convergent.trans,data=filter(z,!transient.type=='convergence'))
+  mtemplate<- lm(sdflead~verg.angle+real.verg.velocity:is.real.convergent.trans,
+                    data=filter(z,!real.transient.type=='convergence'))
+}
+
+z<- mutate(z,econtrol=predict(mcontrol,newdata=z),
+           econtrol=replace(econtrol,econtrol<0,0),
+           etemplate=predict(mtemplate,newdata=z),
+           etemplate=replace(etemplate,etemplate<0,0),
+           etest=predict(mtest,newdata=z),
+           etest=replace(etest,etest<0,0),
+           verg.angle.shifted=lag(verg.angle,bestlag),
+           showrasters=replace(rasters,rasters<1,NA))
+
+etest.prob<- z$etest/1000
+
+z <-mutate(z,predict.spikes1=rbinom(length(etest.prob),1,etest.prob),
+           predict.spikes1=replace(predict.spikes1,predict.spikes1<1,NA),
+           predict.spikes2=rbinom(length(etest.prob),1,etest.prob),
+           predict.spikes2=replace(predict.spikes2,predict.spikes2<1,NA),
+           predict.spikes3=rbinom(length(etest.prob),1,etest.prob),
+           predict.spikes3=replace(predict.spikes3,predict.spikes3<1,NA))
+
+purple=cor(z$sdflead[200:nrow(z)],z$etest[200:nrow(z)])^2
+orange=cor(z$sdflead[200:nrow(z)],z$etemplate[200:nrow(z)])^2
+
+```
+
+\newpage
+
+
+#Modeling NRTP firing rate
+In this document, we calculate a simple linear model to predict the firing rate of neurons in NRTP.
+
+##Procedure
+
+* Calculate spike density function by convolving rasters with a guassian with sigma=20ms
+
+* Calculate vergence velocity
+
+* Mark periods of convergent and divergent enhancement (when vergence angle changes faster than 15 deg/s)
+
+* Model firing rate using this model: FR ~ verg.angle+verg.velocity:transient.type 
+    + Transient.type can be either convergence, divergence or none (non-saccadic vergence velocity)
+    + The colon operator indicates an interaction, so the model will fit three separate parameters for vergence velocity
+
+We show the parameters for this fit for the cell `r cellchoice`
+
+```{r show_parameters, results='asis'}
+xtable(summary(mtest))
+xtable(summary(mtemplate))
+# xtable(mc)
+```
+
+The model with interactions (purple) gives a $R^2$ of `r purple`. 
+
+The model with interactions and transients removed(orange) gives a $R^2$ of `r orange`. 
+
+```{r plotloop}
+
+
+z %>%
+  group_by(time) %>%
+  summarize_each(funs(first))->
+  z
+windowsize<- 5000
+maxtime<-nrow(z)
+maxplot<- round(maxtime/windowsize)*windowsize
+
+# if (maxplot>200000){maxplot=200000}
+
+# maxplot=15000
+
+for (window in seq(0,maxplot,by=windowsize)){
+  print(
+    ggplot(filter(z,time>window,time<window+windowsize))+
+      geom_area(aes(time,sdflead))+
+      # geom_line(aes(time,econtrol),color='orange')+
+      # geom_area(aes(time,econtrol),fill='orange',alpha=.5)+
+      geom_area(aes(time,etest),fill='purple',alpha=.5)+
+      geom_area(aes(time,etemplate),fill='orange',alpha=0.5)+
+      #       geom_line(aes(time,etest),color='purple',alpha=0.7,size=1)+
+      # geom_line(aes(time,etemplate),color='orange',alpha=0.7,size=1)+
+      # geom_hline(yintercept=-115)+
+      # geom_hline(yintercept=-85)+
+      
+      geom_line(aes(time,verg.velocity-100),color='red')+
+      geom_point(aes(time,verg.velocity-100,color=transient.type),size=1,data=filter(z, time>window,time<window+windowsize,enhancenum>0))+
+      geom_line(aes(time,real.verg.velocity-200),color='maroon')+
+      # geom_line(aes(time,verg.vel.smooth-100),color='black')+
+      
+      geom_point(aes(time,showrasters+200),shape='|',size=2)+
+      # geom_point(aes(time,predict.spikes1+220),shape='|',size=2,color='purple')+
+      # geom_point(aes(time,predict.spikes2+225),shape='|',size=2,color='purple')+
+      # geom_point(aes(time,predict.spikes3+230),shape='|',size=2,color='purple')+
+      
+      # geom_point(aes(time,enhancenum*0-50,color=transient.type))+
+      
+      # geom_line(aes(time,rep*10),color='red')+
+      # geom_line(aes(time,lep*10),color='blue'),
+      geom_line(aes(time,verg.angle.shifted*5),color='darkgreen',size=1.5)+
+      theme(legend.position='bottom')
+  )
+}
+
+```

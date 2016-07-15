@@ -5,17 +5,21 @@ b.spiketimes= evalin('base','spiketimes');
 end
 savespikes=questdlg('Save Spiketimes?','Save?');
 savelocation=questdlg('Save .csv to same folder?','Save?');
+eso= strcmp(questdlg('Is this data from an Esotrope?','ESO?'),'Yes');
 
 if strcmp(savespikes,'Yes')
     b.spikes=evalin('base','spikes');
     save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
 end
-eso= strcmp(questdlg('Is this data from an Esotrope?','ESO?'),'Yes');
 %create spike density function
 [sdf, rasters]=makesdf(b,20);
 
 %Determine which channel is the right eye:
-verg=b.H_Eye2.values-b.H_Eye.values;
+try
+    verg=b.H_Eye2.values-b.H_Eye.values;
+catch
+    verg=mean(b.H_Eye2.values)-mean(b.H_Eye.values);
+end
 if mean(verg) > 0  && ~eso %Probably Eye2 is RIGHT
     rep=b.H_Eye.values;%horizontal right eye position
     lep=b.H_Eye2.values;%horizontal right eye position
@@ -99,7 +103,7 @@ close(ww)
 
 function [sdf, rasters]=makesdf(b, stdsize)
 rasters=zeros([1,length(b.H_Eye.values)]);
-rasters(floor(b.spiketimes/50))=1;
+rasters(floor(b.spiketimes/50)+1)=1;
 gaus=fspecial('gaussian',[1 stdsize*10],stdsize)*1000;
 sdf=conv(rasters,gaus,'same')';
 rasters=rasters';

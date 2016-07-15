@@ -29,8 +29,9 @@ markEnhancement<- function(v, threshold1=15,threshold2=8){
   
   x<- do.call('rbind',apply(stimes,1,jsac))
   
-  v<- data.frame(v=v)
-  v<- mutate(v, time=row_number())
+  
+    v<- data.frame(v=v)
+    v<- mutate(v, time=row_number())
   
   xx<- left_join(v,x,by='time')
   
@@ -41,8 +42,8 @@ markEnhancement<- function(v, threshold1=15,threshold2=8){
     xm
   
   xx %>%
-    filter(enhancenum %in% xm$enhancenum) %>%
-    select(time,enhancenum) ->
+    filter(enhancenum %in% unique(xm$enhancenum)) %>%
+    dplyr::select(time,v,enhancenum) ->
     g
   
   
