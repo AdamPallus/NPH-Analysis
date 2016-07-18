@@ -9,21 +9,32 @@ library(dplyr)
 source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 source('markEnhancement.R')
-t<-readRDS('SOA.RDS')
-# z<- filter(t,neuron=='Bee-113')
+t<-readRDS('SOA-NRTP.RDS')
+z<- filter(t,neuron=='Bee-25')
 
-z<-filter(t,cellnum>200,cellnum<204,monkey=='Bee')
+# z<-filter(t,cellnum>200,cellnum<204,monkey=='Bee')
 t<-NULL
 z<- mutate(z,time=row_number())
 
 
+# z %>%
+#   mutate(g=floor(time/200000)) %>%
+#   group_by(g) %>%
+#   mutate(verg.velocity=parabolicdiff(verg.angle,20)) ->
+#   z
+
 z %>%
   mutate(g=floor(time/200000)) %>%
   group_by(g) %>%
-  mutate(verg.velocity=parabolicdiff(verg.angle,20)) ->
+  mutate(rev=parabolicdiff(rep,20),
+         lev=parabolicdiff(lep,20),
+         revV=parabolicdiff(repV,20),
+         levV=parabolicdiff(lepV,20),
+         conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2),
+         verg.velocity=lev-rev) ->
   z
 
-
+z<- ungroup(z)
 
 zz<-markEnhancement(v=z$verg.velocity,threshold2=12)
 zz<- dplyr::select(zz,time,enhancenum)
@@ -107,51 +118,51 @@ z %>%
          verg150=verg.change[bufferlength+150])->
   z
 
-verg.thresh<- 2
+verg.thresh<- 2.5
 z$saccade.type<- 'saccade.only'
 z$saccade.type[z$verg150< -verg.thresh]= 'diverging'
 z$saccade.type[z$verg150> verg.thresh]= 'converging'
 z$saccade.type<-as.factor(z$saccade.type)
 
-z %>%
-  filter(counter<250,counter>0) %>%
-  group_by(sacnum) %>%
-  mutate(c.trans.dur=sum(transient.type=='convergence'),
-         d.trans.dur=sum(transient.type=='divergence'),
-         enhance.start=first(counter[verg.enhance])) %>%
-  summarise_each(funs(first))->
-  zz
-
-zz<- filter(zz,verg.amp<20,verg.amp> -20)
-
-qplot(d.trans.dur,c.trans.dur,data=zz)
-qplot(r.amp,c.trans.dur,data=zz)
-
-qplot(verg.amp,c.trans.dur,data=zz)
-
-qplot(c.trans.dur, max.verg.trans,data=zz)+facet_wrap(~saccade.type)+coord_cartesian(xlim=c(0,300))
-
-
-qplot(min.verg.trans,d.trans.dur,color=max.verg.angle,data=zz)
-
-z %>%
-  group_by(enhancenum) %>%
-  summarize(enhance.dur=n())->
-  sss
-
-
-maxtime<-max(z$time,na.rm=T)
-windowsize<- 1000
-
-manipulate(ggplot(filter(z,time>window,time<window+windowsize))+
-             geom_line(aes(time,verg.velocity),color='purple')+
-             geom_point(aes(time,enhancenum*0-50))+
-             geom_hline(yintercept = c(-2,2))+
-             geom_line(aes(time,verg.angle*5),color='darkgreen')+
-             coord_cartesian(ylim=c(-100,100))+
-             geom_line(aes(time,verg.accel/10)),
-           window=slider(0,maxtime-windowsize,step=windowsize)
-)
+# z %>%
+#   filter(counter<250,counter>0) %>%
+#   group_by(sacnum) %>%
+#   mutate(c.trans.dur=sum(transient.type=='convergence'),
+#          d.trans.dur=sum(transient.type=='divergence'),
+#          enhance.start=first(counter[verg.enhance])) %>%
+#   summarise_each(funs(first))->
+#   zz
+# 
+# zz<- filter(zz,verg.amp<20,verg.amp> -20)
+# 
+# qplot(d.trans.dur,c.trans.dur,data=zz)
+# qplot(r.amp,c.trans.dur,data=zz)
+# 
+# qplot(verg.amp,c.trans.dur,data=zz)
+# 
+# qplot(c.trans.dur, max.verg.trans,data=zz)+facet_wrap(~saccade.type)+coord_cartesian(xlim=c(0,300))
+# 
+# 
+# qplot(min.verg.trans,d.trans.dur,color=max.verg.angle,data=zz)
+# 
+# z %>%
+#   group_by(enhancenum) %>%
+#   summarize(enhance.dur=n())->
+#   sss
+# 
+# 
+# maxtime<-max(z$time,na.rm=T)
+# windowsize<- 1000
+# 
+# manipulate(ggplot(filter(z,time>window,time<window+windowsize))+
+#              geom_line(aes(time,verg.velocity),color='purple')+
+#              geom_point(aes(time,enhancenum*0-50))+
+#              geom_hline(yintercept = c(-2,2))+
+#              geom_line(aes(time,verg.angle*5),color='darkgreen')+
+#              coord_cartesian(ylim=c(-100,100))+
+#              geom_line(aes(time,verg.accel/10)),
+#            window=slider(0,maxtime-windowsize,step=windowsize)
+# )
 
 
 # z %>%
@@ -187,78 +198,141 @@ z<- left_join(z,xxx,by='sacnum')
 # )
 
 
+# 
 
-p<- filter(z,saccade.type!='saccade.only')
+
+s<- readRDS('transientstemplate.RDS')
+m<- readRDS('vergenceTransientModel.RDS')
+s<- filter(s,monkey=='Bee')
+s$counter=s$counter2+10
+
+zb<-z
+
+z<- left_join(z,s,by=c('monkey','counter'))
+z %>%
+  group_by(sacnum) %>%
+  summarize_each(funs(first))->
+  sz
+sz <- mutate(sz,rightward=abs(r.angle)<90)
+sz<-mutate(sz,predicted.min.trans=predict(m,newdata=sz))
+
+sz<- dplyr::select(sz, sacnum,predicted.min.trans)
+
+
+z<- left_join(z,sz,by='sacnum')
+z %>% 
+  group_by(sacnum) %>%
+  mutate(sdflag=lag(sdf,25),
+         real.verg.velocity=verg.velocity-norm.transient*abs(predicted.min.trans)) %>%
+  ungroup()-> 
+  z
+
+z<- mutate(z,showrasters=replace(rasters,rasters==0,NA))
+
+# p<- filter(z,saccade.type=='saccade.only')
+p<- filter(z, r.amp>4,saccade.dur<100,abs(verg.amp)>3)
 
 goodsacs<- unique(p$sacnum)
 
 nsac=length(goodsacs)
 manipulate(ggplot(filter(z,sacnum==goodsacs[sac]))+
              geom_line(aes(counter,verg.velocity),color='purple')+
-             geom_line(aes(counter,conj.velocity/10),color='pink')+
-             geom_point(aes(counter,enhancenum*0-50))+
-             geom_point(aes(counter,verg.velocity,color=transient.type),size=1,
-                        data=filter(z, sacnum==goodsacs[sac],enhancenum>0))+
+             geom_line(aes(counter,conj.velocity),color='brown')+
+             # geom_point(aes(counter,enhancenum*0-50))+
+             # geom_point(aes(counter,verg.velocity,color=transient.type),size=1,
+                        # data=filter(z, sacnum==goodsacs[sac],enhancenum>0))+
              geom_hline(yintercept = c(-2,2))+
              geom_line(aes(counter,verg.angle*5),color='darkgreen')+
              geom_vline(aes(xintercept = verg.onset))+
-             coord_cartesian(ylim=c(-100,100)),
+             geom_line(aes(counter,real.verg.velocity),color='magenta')+
+             geom_hline(yintercept=c(-12,12))+
+             geom_point(aes(counter,showrasters+100),shape='|',size=3)+
+             coord_cartesian(ylim=c(-100,200)),
            sac=slider(1,nsac,step=1)
 )
 
-z %>%
-  group_by(sacnum) %>%
-  summarize_each(funs(first))->
-  sz
-sz<- filter(sz,abs(verg.amp)<20,abs(peak.verg.velocity)<1000)
+z<- mutate(z,sdflag=lag(sdf,5))
+z<- filter(z,peak.verg.velocity<800)
 
-ggplot(sz)+geom_point(aes(verg.lead,peak.verg.velocity,color=saccade.type),alpha=0.4)
-qplot(verg.lead,peak.verg.velocity,data=sz,color=saccade.type)
-qplot(verg.onset,max.verg.trans,data=sz,color=saccade.type)
+ggplot(p)+
+  geom_point(aes(verg.velocity,sdflag),alpha=1/20)+
+  geom_point(aes(real.verg.velocity,sdflag),alpha=1/30,color='magenta')+
+  facet_wrap(~neuron)+
+  coord_cartesian(xlim=c(-100,100))
 
-ggplot(sz)+geom_point(aes(verg.onset,max.verg.trans),color='red')+
-  geom_point(aes(verg.onset,min.verg.trans),color='blue')+
-  geom_point(aes(verg.onset,peak.verg.velocity),alpha=0.6,shape='x',size=4)
 
-ggplot(sz)+geom_point(aes(verg.onset,abs(min.verg.trans)-abs(max.verg.trans)))
-
-p<- filter(z,saccade.type=='saccade.only')
-
-z %>% 
-  group_by(sacnum) %>%
-  mutate(isdivergence.trans=transient.type=='divergence',
-    transient.onset=first(counter[isdivergence.trans])) ->
-  z
+mm<- lm(sdflag~verg.angle,data=z)
+z<- ungroup(z)
+z<- mutate(z,static.fr=predict(mm,newdata=z),
+           replace(static.fr,static.fr<0,0))
 
 ggplot(z)+
-  geom_line(aes(counter,verg.velocity,group=sacnum))
+# ggplot(filter(z,r.amp>7,saccade.dur<100,verg.amp>4))+
+  geom_point(aes(verg.velocity,sdflag-static.fr),alpha=1/20)+
+  geom_point(aes(real.verg.velocity,sdflag-static.fr),alpha=1/20,color='magenta')+
+  coord_cartesian(xlim=c(-25,200),ylim=c(0,300))
 
-z %>% group_by(sacnum) %>%
-  mutate(counter2=counter-transient.onset) ->
-  z
 
-z %>%
-  ungroup() %>%
-  group_by(monkey,counter2) %>%
-  summarize(mean.transient=mean(verg.velocity,na.rm=T)) %>%
-  group_by(monkey) %>%
-  mutate(norm.transient=mean.transient/abs(min(mean.transient)))->
-  s
-
-z<- left_join(z,s,by='counter2')
-
-goodsacs<- unique(z$sacnum)
-nsac=length(goodsacs)
-manipulate(ggplot(filter(z,sacnum==goodsacs[sac]))+
-             geom_line(aes(counter2,verg.velocity),color='purple')+
-             geom_line(aes(counter2,norm.transient*abs(predicted.min.trans)),color='pink')+
-             geom_line(aes(counter2,verg.velocity-norm.transient*abs(predicted.min.trans)-100),color='darkred')+
-             geom_point(aes(counter2,enhancenum*0-50))+
-             geom_point(aes(counter2,verg.velocity,color=transient.type),size=1,
-                        data=filter(z, sacnum==goodsacs[sac],enhancenum>0))+
-             geom_hline(yintercept = c(-2,2))+
-             geom_line(aes(counter2,verg.angle*5),color='darkgreen')+
-             geom_vline(aes(xintercept = verg.onset))+
-             coord_cartesian(ylim=c(-200,100)),
-           sac=slider(1,nsac,step=1)
-)
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# z %>%
+#   group_by(sacnum) %>%
+#   summarize_each(funs(first))->
+#   sz
+# sz<- filter(sz,abs(verg.amp)<20,abs(peak.verg.velocity)<1000)
+# 
+# ggplot(sz)+geom_point(aes(verg.lead,peak.verg.velocity,color=saccade.type),alpha=0.4)
+# qplot(verg.lead,peak.verg.velocity,data=sz,color=saccade.type)
+# qplot(verg.onset,max.verg.trans,data=sz,color=saccade.type)
+# 
+# ggplot(sz)+geom_point(aes(verg.onset,max.verg.trans),color='red')+
+#   geom_point(aes(verg.onset,min.verg.trans),color='blue')+
+#   geom_point(aes(verg.onset,peak.verg.velocity),alpha=0.6,shape='x',size=4)
+# 
+# ggplot(sz)+geom_point(aes(verg.onset,abs(min.verg.trans)-abs(max.verg.trans)))
+# 
+# p<- filter(z,saccade.type=='saccade.only')
+# 
+# z %>% 
+#   group_by(sacnum) %>%
+#   mutate(isdivergence.trans=transient.type=='divergence',
+#     transient.onset=first(counter[isdivergence.trans])) ->
+#   z
+# 
+# ggplot(z)+
+#   geom_line(aes(counter,verg.velocity,group=sacnum))
+# 
+# z %>% group_by(sacnum) %>%
+#   mutate(counter2=counter-transient.onset) ->
+#   z
+# 
+# z %>%
+#   ungroup() %>%
+#   group_by(monkey,counter2) %>%
+#   summarize(mean.transient=mean(verg.velocity,na.rm=T)) %>%
+#   group_by(monkey) %>%
+#   mutate(norm.transient=mean.transient/abs(min(mean.transient)))->
+#   s
+# 
+# z<- left_join(z,s,by='counter2')
+# 
+# goodsacs<- unique(z$sacnum)
+# nsac=length(goodsacs)
+# manipulate(ggplot(filter(z,sacnum==goodsacs[sac]))+
+#              geom_line(aes(counter2,verg.velocity),color='purple')+
+#              geom_line(aes(counter2,norm.transient*abs(predicted.min.trans)),color='pink')+
+#              geom_line(aes(counter2,verg.velocity-norm.transient*abs(predicted.min.trans)-100),color='darkred')+
+#              geom_point(aes(counter2,enhancenum*0-50))+
+#              geom_point(aes(counter2,verg.velocity,color=transient.type),size=1,
+#                         data=filter(z, sacnum==goodsacs[sac],enhancenum>0))+
+#              geom_hline(yintercept = c(-2,2))+
+#              geom_line(aes(counter2,verg.angle*5),color='darkgreen')+
+#              geom_vline(aes(xintercept = verg.onset))+
+#              coord_cartesian(ylim=c(-200,100)),
+#            sac=slider(1,nsac,step=1)
+# )
