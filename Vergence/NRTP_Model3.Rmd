@@ -39,7 +39,7 @@ s<- readRDS('transientstemplate.RDS')
 
 
 #####
-cellchoice<- 'Bee-218'
+cellchoice<- 'Ozette-122'
 ######
 z<- dplyr::filter(z,neuron==cellchoice)
 # head(z)

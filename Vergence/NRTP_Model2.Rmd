@@ -32,7 +32,7 @@ source('markEnhancement.R')
 # z<-readRDS('SOA-NRTP.RDS')
 z<-readRDS('SOA-NRTP.RDS')
 #####
-cellchoice<- 'Ozette-121'
+cellchoice<- 'Ozette-122'
 ######
 z<- dplyr::filter(z,neuron==cellchoice)
 head(z)

@@ -10,7 +10,7 @@ source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 source('markEnhancement.R')
 t<-readRDS('SOA-NRTP.RDS')
-z<- filter(t,neuron=='Bee-25')
+z<- filter(t,neuron=='Ozette-122')
 
 # z<-filter(t,cellnum>200,cellnum<204,monkey=='Bee')
 t<-NULL
@@ -203,6 +203,7 @@ z<- left_join(z,xxx,by='sacnum')
 
 s<- readRDS('transientstemplate.RDS')
 m<- readRDS('vergenceTransientModel.RDS')
+# m<- readRDS('biggermodelfortransients.RDS')
 s<- filter(s,monkey=='Bee')
 s$counter=s$counter2+10
 
@@ -213,7 +214,11 @@ z %>%
   group_by(sacnum) %>%
   summarize_each(funs(first))->
   sz
-sz <- mutate(sz,rightward=abs(r.angle)<90)
+sz <- mutate(sz,rightward=abs(r.angle)<90,
+             initial.verg.angle=verg.angle)
+
+# m<-lm(min.verg.trans~peak.conj.velocity:verg.angle+verg.amp,data=sz)
+
 sz<-mutate(sz,predicted.min.trans=predict(m,newdata=sz))
 
 sz<- dplyr::select(sz, sacnum,predicted.min.trans)
@@ -245,13 +250,13 @@ manipulate(ggplot(filter(z,sacnum==goodsacs[sac]))+
              geom_line(aes(counter,verg.angle*5),color='darkgreen')+
              geom_vline(aes(xintercept = verg.onset))+
              geom_line(aes(counter,real.verg.velocity),color='magenta')+
-             geom_hline(yintercept=c(-12,12))+
+             # geom_hline(yintercept=c(-12,12))+
              geom_point(aes(counter,showrasters+100),shape='|',size=3)+
              coord_cartesian(ylim=c(-100,200)),
            sac=slider(1,nsac,step=1)
 )
 
-z<- mutate(z,sdflag=lag(sdf,5))
+z<- mutate(z,sdflag=lag(sdf,40))
 z<- filter(z,peak.verg.velocity<800)
 
 ggplot(p)+
@@ -267,11 +272,22 @@ z<- mutate(z,static.fr=predict(mm,newdata=z),
            replace(static.fr,static.fr<0,0))
 
 ggplot(z)+
-# ggplot(filter(z,r.amp>7,saccade.dur<100,verg.amp>4))+
+# ggplot(filter(z,r.amp>4,saccade.dur<150,verg.amp>4))+
   geom_point(aes(verg.velocity,sdflag-static.fr),alpha=1/20)+
-  geom_point(aes(real.verg.velocity,sdflag-static.fr),alpha=1/20,color='magenta')+
-  coord_cartesian(xlim=c(-25,200),ylim=c(0,300))
+  # geom_point(aes(real.verg.velocity,sdflag-static.fr),alpha=1/20,color='magenta')+
+  stat_smooth(aes(verg.velocity,sdflag-static.fr),method='lm',data=filter(z,verg.velocity>15))+
+  stat_smooth(aes(verg.velocity,sdflag-static.fr),method='lm',data=filter(z,verg.velocity< -15))+
+  stat_smooth(aes(verg.velocity,sdflag-static.fr),method='lm',data=filter(z,abs(verg.velocity)<15,verg.velocity>0))
+  # coord_cartesian(xlim=c(-25,200),ylim=c(0,300))
 
+ggplot(z)+
+  # ggplot(filter(z,r.amp>4,saccade.dur<150,verg.amp>4))+
+  # geom_point(aes(verg.velocity,sdflag-static.fr),alpha=1/20)+
+  geom_point(aes(real.verg.velocity,sdflag-static.fr),alpha=1/20,color='magenta')+
+  stat_smooth(aes(real.verg.velocity,sdflag-static.fr),method='lm',data=filter(z,real.verg.velocity>15))+
+  stat_smooth(aes(real.verg.velocity,sdflag-static.fr),method='lm',data=filter(z,real.verg.velocity< -15))+
+  stat_smooth(aes(real.verg.velocity,sdflag-static.fr),method='lm',data=filter(z,abs(real.verg.velocity)<15,real.verg.velocity>0))
+# coord_cartesian(xlim=c(-25,200),ylim=c(0,300))
 
 # 
 # 

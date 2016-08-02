@@ -10,16 +10,29 @@ z<- readRDS('SOA.RDS')
 d<- filter(z,neuron %in% c('Bee-101','Bee-107','Bee-112','Bee-202','Bee-205','Bee-211','Bee-215','Bee-218'))
 # z<- filter(z,cellnum==101,monkey=='Bee') # just use some of the data for this test
 
+d<- filter(z,monkey=='Bee')
 
 d<- mutate(d,time=row_number())
 
 message('Smoothing Velocity...')
 #smooth out vergence velocity traces
+# d %>%
+#   mutate(g=floor(time/200000)) %>%
+#   group_by(g) %>%
+#   mutate(verg.velocity=parabolicdiff(verg.angle,20)) ->
+#   d
+
 d %>%
   mutate(g=floor(time/200000)) %>%
   group_by(g) %>%
-  mutate(verg.velocity=parabolicdiff(verg.angle,20)) ->
+  mutate(rev=parabolicdiff(rep,20),
+         lev=parabolicdiff(lep,20),
+         revV=parabolicdiff(repV,20),
+         levV=parabolicdiff(lepV,20),
+         conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2),
+         verg.velocity=lev-rev) ->
   d
+
 
 
 z <- calculateTransient(d)
@@ -28,6 +41,7 @@ s<- readRDS('transientstemplate.RDS')
 s<- filter(s,monkey=='Bee')
 
 z<- left_join(z,s,by=c('monkey','counter2'))
+z<- mutate(z,initial.verg.angle=first(verg.angle))
 
 z %>%
   group_by(sacnum) %>%
@@ -37,6 +51,8 @@ sz <- mutate(sz,rightward=abs(r.angle)<90)
 
 # m<-lm(min.verg.trans~peak.conj.velocity:rightward:monkey,data=sz)
 m<-lm(min.verg.trans~peak.conj.velocity:rightward,data=sz)
+m<-lm(min.verg.trans~peak.conj.velocity:verg.angle+verg.amp,data=sz)
+
 
 sz<-mutate(sz,predicted.min.trans=predict(m,newdata=sz))
 
