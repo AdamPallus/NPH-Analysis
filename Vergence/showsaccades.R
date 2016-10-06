@@ -2,18 +2,22 @@
 library(dplyr)
 library(ggplot2)
 
-source('~/GitHub/Vergence/joinsaccades.R')
-source('~/GitHub/Vergence/Adamhelperfunctions.R')
+source('joinsaccades.R')
+source('joinsaccadesuniform.R')
+source('Adamhelperfunctions.R')
 
 t<- readRDS('NRTPt.RDS')
 
 
-bufferlength<- 200
+bufferlength<- 400
 t%>%
-  # filter(as.numeric(cellnum)>200) %>%
-  filter(as.numeric(cellnum) %in% c(202,205,215, 218)) %>%
   group_by(neuron) %>%
-  do(joinsaccades(.,buffer=bufferlength,threshold=20))->
+  mutate(time=row_number()) %>%
+  # filter(as.numeric(cellnum)>200) %>%
+  # filter(as.numeric(cellnum) %in% c(202,205,215, 218)) %>%
+  # filter(neuron %in% c('Bee-101','Bee-211','Ozette-110','Ozette-117')) %>%
+  group_by(neuron) %>%
+  do(joinsaccadesuniform(.,buffer=bufferlength,threshold=20,saccade.length=150))->
   d
 
 d %>%
@@ -54,10 +58,10 @@ levels(p$convergent)<- c('Divergent','Convergent')
 
 
 p %>%  group_by(neuron) %>%
-  filter(dur>(bufferlength*2+50),
+  filter(#dur>(bufferlength*2+50),
          abs(verg.amp)>2,
-         dur>500,
-         dur<650,
+         #dur>500,
+         #dur<650,
          min.verg.angle> -5) %>%
   group_by(neuron,convergent) %>%
   mutate(nsaccades=length(unique(sacnum)),
@@ -92,15 +96,15 @@ gs<-ggplot(gplot) +
   geom_line(aes(counter,repV-100,group=sacnum),color='red',size=0.5,alpha=1/10)+
   geom_line(aes(counter,lepV-100,group=sacnum),color='blue',size=0.5,alpha=1/10)+
   geom_line(aes(counter,verg.angle*10-300,group=sacnum),color='darkgreen',size=0.5,alpha=1/5)+
-  coord_cartesian(xlim=c(-200,300),expand=FALSE)+
+  coord_cartesian(xlim=c(-400,400),expand=FALSE)+
   theme(axis.text=element_text(size=16),
-        panel.margin=unit(3,'lines'),
+        panel.margin=unit(2,'lines'),
         strip.text=element_text(size=16),
         axis.title.x=element_text(size=16))+
   scale_y_continuous(breaks=c(-300,-250,-200,-150),labels=c(0,5,10,15))+
   ylab('Degrees')+
-  expand_limits(y=-300)+
-  geom_line(aes(counter,sdf-500,group=sacnum),color='orange',size=0.5,alpha=1/5)
+  expand_limits(y=-300)#+
+  # geom_line(aes(counter,sdf-500,group=sacnum),color='orange',size=0.5,alpha=1/5)
 # ylab('')
 
 
@@ -138,6 +142,6 @@ p %>%  group_by(neuron) %>%
         axis.title.x=element_text(size=16))+
   scale_y_continuous(breaks=c(-300,-250,-200,-150),labels=c(0,5,10,15))+
   ylab('Degrees')+
-  expand_limits(y=-300)+
+  expand_limits(y=-300)
   # geom_line(aes(counter,sdf-500,group=sacnum),color='orange',size=0.5,alpha=1/5)
   
