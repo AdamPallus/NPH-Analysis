@@ -42,7 +42,8 @@ library(data.table)
 
 #path<-"~/GitHub/NPH-Analysis/practicedata/"
 #path<-"~/GitHub/NPH-Analysis/data/"
-path<-"~/GitHub/NPH-Analysis/testdata/"
+# path<-"~/GitHub/NPH-Analysis/testdata/"
+path<- "C:/Users/setup/Desktop/NRTP Vergence/"
 files <- list.files(path=path,pattern='*.csv')
 # files<-files[grepl('Patos',files)] # just look at patos files
 # files<-files[grepl('Bee',files)] # just look at bee files

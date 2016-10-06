@@ -118,6 +118,13 @@ gp<- ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=summaryforplot)+
 
 ggsave('RatePosition.pdf',plot=gp, height=28, width=13)
 
+summaryforplot %>%
+  group_by(neuron) %>%
+  do(intercept = lm(mean.Spikerate~mean.Verg.Angle,data=.)$coefficients[[1]],
+     slope=lm(mean.Spikerate~mean.Verg.Angle,data=.)$coefficients[[2]],
+     r.squared=summary(lm(mean.Spikerate~mean.Verg.Angle,data=.))$r.squared)->
+  mm
+
 # qplot(mean.Verg.Angle,mean.Spikerate,data=summaryforplot)+
 #   geom_point()+
 #   stat_smooth(method='lm')+
