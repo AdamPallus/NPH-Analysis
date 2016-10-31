@@ -117,31 +117,34 @@ zz %>%
          prepV=repV-first(conj.position.v)) %>%
   filter(r.amp>3)->
   zz
-goodsacs<- unique(zz$sacnum)     
+
+p<- filter(zz,verg.amp>3)
+goodsacs<- unique(p$sacnum)     
 nsac=length(goodsacs)
 
-windowsize<-1000
+
 manipulate(ggplot(filter(zz,sacnum==goodsacs[sac]))+
-             # geom_area(aes(time,sdf),alpha=1/10)+
-             geom_line(aes(counter,(lev-rev)-100),color='darkblue',alpha=1)+
-             geom_line(aes(counter,(lev-rev)),color='green',alpha=1)+
-             geom_line(aes(counter,enhance.velocity-100),size=2,color='darkblue')+
-             geom_line(aes(counter,(lep-rep)*5-100),color='darkgreen')+
-             geom_line(aes(counter,lev-lag(rev,4)),color='red',linetype=2)+
-             geom_line(aes(counter,lag(lev,4)-rev),color='blue',linetype=2)+
-             geom_line(aes(counter,lev-lag(rev,3)),color='red',linetype=3)+
-             geom_line(aes(counter,lag(lev,3)-rev),color='blue',linetype=3)+
-             geom_line(aes(counter,lev-lag(rev,2)),color='red',linetype=4)+
-             geom_line(aes(counter,lag(lev,2)-rev),color='blue',linetype=4)+
-             geom_line(aes(counter,lev-lag(rev,1)),color='red',linetype=5)+
-             geom_line(aes(counter,lag(lev,1)-rev),color='blue',linetype=5)+
-             geom_line(aes(counter,lev-lag(rev,6)),color='red',linetype=6)+
-             geom_line(aes(counter,lag(lev,6)-rev),color='blue',linetype=6)+
-           geom_line(aes(counter,lev-lag(rev,9)),color='red',linetype=9)+
-             geom_line(aes(counter,lag(lev,9)-rev),color='blue',linetype=9)+
-             geom_point(aes(plep*10+200,100+plepV*10),color='blue',alpha=1/2)+
-             geom_point(aes(prep*10+200,100+prepV*10),color='red',alpha=1/2)+
-             geom_point(aes(200,100),size=3)
+             geom_area(aes(counter,sdf),alpha=1/10)+
+             geom_point(aes(counter,showrasters+100),shape='|')+
+             geom_line(aes(counter,(lev-rev)-50),color='darkblue',alpha=1)+
+             # geom_line(aes(counter,(lev-rev)),color='green',alpha=1)+
+             # geom_line(aes(counter,enhance.velocity-100),size=2,color='darkblue')+
+             geom_line(aes(counter,(lep-rep)*5-50),color='darkgreen')
+             # geom_line(aes(counter,lev-lag(rev,4)),color='red',linetype=2)+
+             # geom_line(aes(counter,lag(lev,4)-rev),color='blue',linetype=2)+
+             # geom_line(aes(counter,lev-lag(rev,3)),color='red',linetype=3)+
+             # geom_line(aes(counter,lag(lev,3)-rev),color='blue',linetype=3)+
+             # geom_line(aes(counter,lev-lag(rev,2)),color='red',linetype=4)+
+             # geom_line(aes(counter,lag(lev,2)-rev),color='blue',linetype=4)+
+             # geom_line(aes(counter,lev-lag(rev,1)),color='red',linetype=5)+
+             # geom_line(aes(counter,lag(lev,1)-rev),color='blue',linetype=5)+
+             # geom_line(aes(counter,lev-lag(rev,6)),color='red',linetype=6)+
+             # geom_line(aes(counter,lag(lev,6)-rev),color='blue',linetype=6)+
+           # geom_line(aes(counter,lev-lag(rev,9)),color='red',linetype=9)+
+             # geom_line(aes(counter,lag(lev,9)-rev),color='blue',linetype=9)+
+             # geom_point(aes(plep*10+200,100+plepV*10),color='blue',alpha=1/2)+
+             # geom_point(aes(prep*10+200,100+prepV*10),color='red',alpha=1/2)+
+             # geom_point(aes(200,100),size=3)
              # ylim(c(-100,200))
            ,
            sac=slider(2,nsac,step=1))
@@ -211,9 +214,19 @@ summary(mconj)
 
 gg<- filter(sz,verg.amp>0,verg.amp<20,max.verg.velocity<300)
 
-qplot(verg.amp,max.verg.velocity,data=gg)+stat_smooth(method='lm')
+ggplot(gg)+geom_point(aes(verg.amp,max.verg.velocity,color=saccade.type))+stat_smooth(method='lm')
+
+ggplot(filter(gg,saccade.type!='no.saccade'))+geom_point(aes(verg.amp,max.verg.velocity),alpha=1/2,size=3)+
+  stat_smooth(method='lm')+
+  xlab('Vergence Amplitude')+
+  ylab('Maximum Vergence Velocity')
+  
+
 cor(gg$verg.amp,gg$max.verg.velocity)^2
 
+g2<- filter(sz,verg.amp>0,verg.amp<20,max.verg.velocity<300,r.amp<2)
+
+qplot(verg.amp,max.verg.velocity,data=g2)+geom_point(verg.amp,max.verg.velocity,data)
 
 sz$bin.peak.conj.velocity=cut(sz$peak.conj.velocity,c(seq(50,650,by=50)))
 ggplot(filter(sz,saccade.type %in% c('converging','conj'),
