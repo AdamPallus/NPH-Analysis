@@ -1,4 +1,5 @@
 t<- readRDS('enhancemarked.RDS')
+t<- readRDS('enhancemarked-NRTP.RDS')
 
 z<- filter(t,neuron=='Bee-211')
 z<- filter(t,neuron=='Bee-108')

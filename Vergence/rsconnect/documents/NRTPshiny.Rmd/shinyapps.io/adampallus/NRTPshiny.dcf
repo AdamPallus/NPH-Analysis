@@ -1,0 +1,9 @@
+name: NRTPshiny
+account: adampallus
+server: shinyapps.io
+appId: 135183
+bundleId: 604793
+url: https://adampallus.shinyapps.io/NRTPshiny/
+when: 1478200030.51622
+asMultiple: FALSE
+asStatic: FALSE

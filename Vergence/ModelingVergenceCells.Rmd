@@ -345,6 +345,36 @@ kable(tpSOAnc,digits=c(0,2,2,2,2,2))
 ggplot(tpNRTPnc)+geom_point(aes(Convergence,Slow.Vergence),size=3,color='darkred')+
   geom_point(aes(Convergence,Slow.Vergence),color='darkblue',size=3,shape=2,data=tpSOAnc)+
   geom_abline(slope=1)
+
+ggplot(tpNRTPnc)+geom_histogram(aes(Slow.Vergence))
+
+tpNRTPnc$area='NRTP'
+tpSOAnc$area='SOA'
+tp<-rbind(tpNRTPnc,tpSOAnc)
+
+ggplot(aes(area,Slow.Vergence),data=tp)+geom_boxplot()+geom_jitter(aes(color=area))
+
+ggplot(tp)+geom_density(aes(Slow.Vergence,fill=area),alpha=0.4)
+
+ggplot(tp)+
+  # geom_density(aes(Convergence,fill=area),alpha=0.4)+
+  geom_histogram(aes(Convergence,fill=area))+
+  geom_vline(xintercept=0)
+
+ggplot(tp)+
+  geom_point(aes(verg.angle,Slow.Vergence,shape=area),size=3,alpha=0.2)+
+  geom_point(aes(verg.angle,Slow.Vergence,shape=area,size=3,color='red'),data=filter(tp,neuron=='Bee-09'))+
+  geom_abline(slope=1)+
+  xlab('Sensitivity to Vergence Angle')+
+  ylab('Sensitivity to Vergence Velocity')
+
+ggplot(tp)+
+  geom_point(aes(verg.angle,Slow.Vergence,shape=area,color=neuron),size=3,alpha=0.7)+
+  # geom_point(aes(verg.angle,Slow.Vergence,shape=area,size=3,color='red'),data=filter(tp,neuron=='Bee-09'))+
+  geom_abline(slope=1)+
+  xlab('Sensitivity to Vergence Angle')+
+  ylab('Sensitivity to Vergence Velocity')
+
 ```
 
 
