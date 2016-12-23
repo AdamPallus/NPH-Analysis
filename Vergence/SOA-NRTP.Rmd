@@ -169,6 +169,12 @@ t.old<-NULL
 t<- filter(t, monkey %in% c('Bee','Ozette'))
 ```
 
+```{r quickload}
+o<-readRDS('ChucksSOA.RDS')
+t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/SOASTRAB/",referencefile=o)
+o<-NULL
+```
+
 ```{r measureMovements}
 t %>%
   group_by(neuron) %>%
@@ -182,8 +188,11 @@ t %>%
          R.Ver=mean(repV),
          L.Hor=mean(lep),
          L.Ver=mean(lepV),
+         exatrope= monkey=='Pilchuck',
          mean.Verg.Angle=mean(verg.angle),
-         mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle<0, NA),
+         # mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle<0 & ~exatrope , NA),
+         mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle>0 & exatrope,NA ),
+         mean.Verg.Angle=replace(mean.Verg.Angle,abs(mean.Verg.Angle)>50, NA),
          max.Verg.Vel = max(verg.velocity),
          max.Verg.Ang = max(verg.angle),
          nspikes=sum(rasters),
@@ -201,12 +210,13 @@ t %>%
 
 ```{r verg.fixations,fig.height=28,fig.width=13}
 m %>%
-  filter(dur>200) %>%
+  filter(dur>50,monkey=='Pilchuck',
+         mean.Spikerate>20) %>%
   summarize(mean.Spikerate=mean.Spikerate[1],
             mean.Verg.Angle=mean.Verg.Angle[1],
             dur=dur[1]) ->
 summaryforplot
-m<- NULL
+# m<- NULL
 # s.old<-readRDS('NRTPsummaryforplot.RDS')
 # summaryforplot<-rbind(s.old,summaryforplot)
 # 
@@ -216,9 +226,11 @@ m<- NULL
 
 ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=summaryforplot)+
   geom_point(size=2,alpha=1/5)+
-  facet_wrap(~neuron)+
+  # facet_wrap(~neuron,scales='free_x')+
+    facet_wrap(~neuron,ncol=2)+
   stat_smooth(method='lm')+
   ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
+  
 
 # qplot(mean.Verg.Angle,mean.Spikerate,data=summaryforplot)+
 #   geom_point()+
@@ -296,7 +308,7 @@ t %>%
             max.verg.velocity=first(max.verg.velocity)) %>%
   filter(abs(peak.verg.velocity)<1500)->
   summaryforplot
-t<- NULL
+# t<- NULL
 ggplot(summaryforplot)+geom_point(aes(peak.verg.velocity,maxfr),alpha=1/3,size=1)+
   facet_wrap(~neuron,ncol=3,scales='free')+
   geom_hline(yintercept=200,size=1, alpha=0.5,color='orange')+

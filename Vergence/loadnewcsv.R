@@ -1,4 +1,4 @@
-loadnewcsv<- function(refrencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
+loadnewcsv<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
   require(stringr)
   require(dplyr)
   #This function loads .csv files in a particular folder. They must have the same columns for rbind
@@ -9,8 +9,8 @@ loadnewcsv<- function(refrencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergen
   #extract neuron name eg. Bee-01
   names<-sapply(files, str_match,"^[a-zA-Z]+-[0-9]+",USE.NAMES=FALSE)
   # check for new cells
-  if (!is.null(refrencefile)){
-    files<-files[!names %in% refrencefile$neuron] #comparison
+  if (!is.null(referencefile)){
+    files<-files[!names %in% referencefile$neuron] #comparison
   }
   
   nfiles<-length(files)
@@ -46,7 +46,7 @@ loadnewcsv<- function(refrencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergen
     t<- dplyr::select(t, -thp,-tvp,-time)
   }else{
     message('********NO NEW CELLS********')
-    t=NULL
+    t<-referencefile
   }
   return(t)
 }
