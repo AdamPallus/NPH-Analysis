@@ -172,6 +172,9 @@ t<- filter(t, monkey %in% c('Bee','Ozette'))
 ```{r quickload}
 o<-readRDS('ChucksSOA.RDS')
 t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/SOASTRAB/",referencefile=o)
+t %>% group_by(neuron) %>%
+  mutate(time=row_number()) ->
+  t
 o<-NULL
 ```
 

@@ -369,9 +369,9 @@ t %>% group_by(neuron) %>%
   ttest
 
 ttest %>%
-  select(term,estimate) %>%
+  dplyr::select(term,estimate) %>%
   group_by(term) %>%
-  summarize(e=mean(estimate),std=sd(estimate))->
+  dplyr::summarize(e=mean(estimate),std=sd(estimate))->
   m
   
 kable(m)
