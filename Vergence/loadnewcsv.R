@@ -1,4 +1,6 @@
 loadnewcsv<- function(refrencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
+  require(stringr)
+  require(dplyr)
   #This function loads .csv files in a particular folder. They must have the same columns for rbind
   #Saves time by only reading the csv when necessary
   
