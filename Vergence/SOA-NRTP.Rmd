@@ -170,7 +170,8 @@ t<- filter(t, monkey %in% c('Bee','Ozette'))
 ```
 
 ```{r quickload}
-o<-readRDS('ChucksSOA.RDS')
+o<-readRDS('KopachuckSOA.RDS')
+source('loadnewcsv.R')
 t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/SOASTRAB/",referencefile=o)
 t %>% group_by(neuron) %>%
   mutate(time=row_number()) ->
@@ -213,7 +214,7 @@ t %>%
 
 ```{r verg.fixations,fig.height=28,fig.width=13}
 m %>%
-  filter(dur>50,monkey=='Pilchuck',
+  filter(dur>50,monkey=='Kopachuck',
          mean.Spikerate>20) %>%
   summarize(mean.Spikerate=mean.Spikerate[1],
             mean.Verg.Angle=mean.Verg.Angle[1],
