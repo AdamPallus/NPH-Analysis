@@ -160,6 +160,26 @@ manipulate(ggplot(filter(p,sacnum==goodsacs[sac]))+
            sac=slider(2,nsac,step=1))
 
 
+makefig1<- function(t,neuronChoice,starttime,stoptime,sd=10,maxplot=150){
+  gc<- filter(t,neuron==neuronChoice)
+  gc<-mutate(gc,time=row_number(), showrasters=replace(rasters,rasters<1,NA))
+  gc<- filter(gc, time>=starttime,time<stoptime)
+  gc<- mutate(gc,sdf=spikedensity(rasters,sd=sd))
+  gs<- ggplot(gc)+
+    geom_area(aes(time,sdf),alpha=1/10)+
+    geom_line(aes(time,lev-rev),color='darkblue',alpha=1)+
+    geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
+    geom_point(aes(time,showrasters+50),shape='|')+
+    theme_bw()+
+    xlab('Time (ms)')+
+    ylab('Vergence Velocity (deg/s)')+
+    ylim(c(-100,maxplot))
+}
+
+fig1a <- makefig1(t,'Ozette-107',140000,160000,sd=15)
+fig1b <- makefig1(t, 'Bee-218',120000,127500,sd=15)
+fig1c <- makefig1(t,'Bee-215',90000,100000,sd=20,maxplot=250)
+
 gc<-mutate(gc,time=row_number(), showrasters=replace(rasters,rasters<1,NA))
 window_size <- 10000
 manipulate(ggplot(filter(gc,time>=window,time<window+window_size))+
@@ -185,7 +205,6 @@ ggplot(filter(gc,time>=140000,time<160000))+
   theme_bw()+
   xlab('Time (ms)')+
   ylab('Vergence Velocity (deg/s)')+
-  ylim(c(-100,150))
   ylim(c(-100,150))
 
 #Bee-218 - Figure 1B - A burst+pause cell

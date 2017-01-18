@@ -46,7 +46,7 @@ loadnewcsv<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Verge
     t<- dplyr::select(t, -thp,-tvp,-time)
   }else{
     message('********NO NEW CELLS********')
-    t<-referencefile
+    t<-NULL
   }
   return(t)
 }

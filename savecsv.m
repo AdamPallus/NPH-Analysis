@@ -5,7 +5,7 @@ b.spiketimes= evalin('base','spiketimes');
 end
 savespikes=questdlg('Save Spiketimes?','Save?');
 savelocation=questdlg('Save .csv to same folder?','Save?');
-exa= strcmp(questdlg('Is this data from an Exatrope?','EXA?'),'Yes');
+exa= strcmp(questdlg('Is this data from an Exatrope?','EXA?','No','Yes','No'),'Yes');
 
 if strcmp(savespikes,'Yes')
     b.spikes=evalin('base','spikes');

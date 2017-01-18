@@ -203,6 +203,24 @@ bootciEXPERIMENTAL <- function(t,n=100,alpha=0.05,formula='lagsdf~rev+lev'){
   return(ci)
 }
 
+bootciNOCONJ <- function(t,n=100,alpha=0.05,formula='lagsdf~rev+lev'){
+  neuron=t$neuron[1]
+  message(paste('Currently working on',neuron))
+  t %>%
+    ungroup() %>%
+    filter(saccade.type != 'conj') %>%
+    bootstrap(n) %>%
+    do(tidy(lm(formula,.)))%>%
+    group_by(term) %>%
+    summarize(
+      low=quantile(estimate, alpha / 2),
+      high=quantile(estimate, 1 - alpha / 2),
+      m=first(estimate)) ->
+    ci
+  ci$neuron<- neuron
+  return(ci)
+}
+
 joinsaccadesuniform<-function(t,buffer=20,threshold=30,saccade.length=150){
   
   findSaccades<-function(ev,threshold=40){
@@ -397,7 +415,7 @@ t %>% group_by(neuron) %>%
 
 t %>%
   group_by(neuron) %>%
-  mutate(bin.velocity=cut(verg.velocity,c(seq(-200,200,by=20)))) %>%
+  # mutate(bin.velocity=cut(verg.velocity,c(seq(-200,200,by=20)))) %>%
   # filter(!is.na(sacnum)) %>%
   group_by(neuron, sacnum) %>%
   mutate(conj.h=(lep+rep)/2,
@@ -446,82 +464,203 @@ ggplot(tpNRTPnc)+geom_point(aes(Convergence,Slow.Vergence),size=3,color='darkred
   geom_abline(slope=1)
 ```
 
-<!-- ```{r bootstrapmodel,fig.height=8,fig.width=12} -->
+```{r bootstrapmodel,fig.height=8,fig.width=12}
 
-<!-- ##The code below does the boostrap by converting the data.frame to a list of neurons -->
-<!-- ##This is because bootstrap doesn't work with grouped data -->
-<!-- ##Then we use lapply to apply the bootciEXPERIMENTAL function and save the result -->
-<!-- ##Use the command to load 'Boostrap1999results.RDS' to get the saved results of this -->
+##The code below does the boostrap by converting the data.frame to a list of neurons
+##This is because bootstrap doesn't work with grouped data
+##Then we use lapply to apply the bootciEXPERIMENTAL function and save the result
+##Use the command to load 'Boostrap1999results.RDS' to get the saved results of this
 
-<!-- # t<- readRDS('enhancemarked.RDS') -->
-<!-- # n=unique(t$neuron) -->
-<!-- # ci<-readRDS('TempBootstrap1999.RDS') #load the already analyzed cells -->
-<!-- # tempci<- do.call('rbind',ci) -->
-<!-- # n<- n[!n %in% unique(tempci$neuron)] #limit new analysis to unanalyzed cells -->
-<!-- #  -->
-<!-- # tlist<-NULL -->
-<!-- # for (i in 1:length(n)){ -->
-<!-- #   tlist[[i]]<- filter(t,neuron==n[i]) -->
-<!-- # } -->
-<!-- # t<-NULL -->
-<!-- #  -->
-<!-- # txx<- lapply(tlist,bootciEXPERIMENTAL,n=1999,alpha=0.05,formula='sdflag~verg.angle+verg.velocity:enhance.type') -->
-<!-- # saveRDS(txx,'tempBootstrap1999part2.RDS') -->
+# t<- readRDS('enhancemarked.RDS')
+# n=unique(t$neuron)
+# ci<-readRDS('TempBootstrap1999.RDS') #load the already analyzed cells
+# tempci<- do.call('rbind',ci)
+# n<- n[!n %in% unique(tempci$neuron)] #limit new analysis to unanalyzed cells
+# tlist<-NULL
+# for (i in 1:length(n)){
+#   tlist[[i]]<- filter(t,neuron==n[i])
+# }
+# t<-NULL
+REDOANALYSIS<- FALSE
+if (REDOANALYSIS){
+  t<- readRDS('enhanceandsaccadesmarkedSOA.RDS')
+  n=unique(t$neuron)
+  ci<- readRDS('boot1999noconj-1.RDS')
+  nnew<- n[!n %in% unique(ci$neuron)]
+  
+  #THE BELOW LOOP TAKES HOURS AND HOURS 
+  for (i in 1:length(nnew)){
+    tt<- filter(t,neuron==nnew[i])
+    b<- bootciNOCONJ(tt,n=1999,alpha=0.05,formula='sdflag~verg.angle+verg.velocity:enhance.type')
+    saveRDS(b,paste('boottemp',i,sep='_'))
+  }
+  
+  #Read the individual files. 
+  #There were 30 when I did it last time, but check how many before running
+  temp<-list()
+  for (i in 1:30){
+    temp[[i]]<- readRDS(paste('boottemp',i,sep='_'))
+  }
+  
+  ci<- readRDS('boot1999noconj-1.RDS')
+  cit<- do.call('rbind',temp)  
+  
+  ci<- rbind(ci,cit)
+  
+  saveRDS(ci,'Bootstrap1999SOAnoconj.RDS')
+} #End block of REDOANSLYSIS -- this takes hours to do
 
+--------------
 
-
-<!-- ci<- readRDS('Bootstrap1999results.RDS') -->
-
-
-
-
-
-<!-- ci %>% -->
-<!--   mutate(term=replace(term,term=='verg.velocity:enhance.typenone','Slow.Velocity'), -->
-<!--          term=replace(term,term=='verg.velocity:enhance.typeconvergence','Convergence'), -->
-<!--          term=replace(term,term=='verg.velocity:enhance.typedivergence','Divergence')) %>% -->
-<!--   # group_by(neuron) %>% -->
-<!--   filter(term != '(Intercept)') -> -->
-<!--   pci -->
-
-<!-- g<-ggplot(pci,aes(factor(term),m)) -->
-
-<!-- g+geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=2,alpha=1/2,width=0.2)+ -->
-<!--   geom_hline(yintercept = 0)+ -->
-<!--   ylab('Bootstrap conficence interval for parameter estimate')+ -->
-<!--   xlab('Term')+ -->
-<!--   # coord_cartesian(ylim=c(-1,1))+ -->
-<!--   coord_flip(ylim=c(-0.05,0.05)) -->
-
-
-<!-- ci %>% -->
-<!--    mutate(term=replace(term,term=='verg.velocity:enhance.typenone','Slow.Velocity'), -->
-<!--          term=replace(term,term=='verg.velocity:enhance.typeconvergence','Convergence'), -->
-<!--          term=replace(term,term=='verg.velocity:enhance.typedivergence','Divergence')) %>% -->
-<!--   # group_by(neuron) %>% -->
-<!--   mutate(m=(low+high)/2) %>% -->
-<!--   filter(term != '(Intercept)', term != 'verg.angle') -> -->
-<!--   pci -->
-
-<!-- g<-ggplot(pci,aes(factor(term),m)) -->
-
-<!-- g+geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=2,alpha=1/2,width=0.2)+ -->
-<!--   geom_hline(yintercept = 0)+ -->
-<!--   coord_flip()+ -->
-<!--   ylab('Bootstrap conficence interval for parameter estimate')+ -->
-<!--   xlab('Term') -->
+# ci<- readRDS('Bootstrap1999results.RDS')
+ci<- readRDS('Bootstrap1999SOAnoconj.RDS')
 
 
-<!-- ``` -->
 
-<!-- ```{r lags,fig.height=8,fig.width=12} -->
-<!-- t %>% -->
-<!--   group_by(neuron) %>% -->
-<!--   summarize(lag=first(dynamiclead)) -> -->
-<!--   s -->
 
-<!-- qplot(lag,data=s) -->
-<!-- ggplot(s)+geom_bar(aes(as.factor(neuron),lag),stat='identity') -->
-<!-- # qplot(neuron,lag,data=s,geom='line') -->
-<!-- ``` -->
+ci %>%
+  mutate(term=replace(term,term=='verg.velocity:enhance.typenone','Slow.Velocity'),
+         term=replace(term,term=='verg.velocity:enhance.typeconvergence','Convergence'),
+         term=replace(term,term=='verg.velocity:enhance.typedivergence','Divergence')) %>%
+  # group_by(neuron) %>%
+  filter(term != '(Intercept)') ->
+  pci
 
+#zoom in and show zero crossings
+g<-ggplot(pci,aes(factor(term),m))
+
+g+geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=2,alpha=1/2,width=0.2)+
+  geom_hline(yintercept = 0)+
+  ylab('Bootstrap conficence interval for parameter estimate')+
+  xlab('Term')+
+  geom_text(aes(label=neuron))+
+  coord_flip()
+  # ylim(c(-0.05,0.05))
+  # coord_cartesian(ylim=c(-1,1))+
+  # coord_flip(ylim=c(-0.05,0.05))
+
+#show only zero crossings
+g<-ggplot(filter(pci,low*high<0),aes(factor(term),m))
+g+geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=2,alpha=1/2,width=0.2)+
+  geom_hline(yintercept = 0)+
+  ylab('Bootstrap conficence interval for parameter estimate')+
+  xlab('Term')+
+  coord_flip()+
+  coord_flip(ylim=c(-0.05,0.05))+
+  geom_text(aes(label=neuron),check_overlap=F)
+# coord_cartesian(ylim=c(-1,1))+
+
+
+ci %>%
+   mutate(term=replace(term,term=='verg.velocity:enhance.typenone','Slow.Velocity'),
+         term=replace(term,term=='verg.velocity:enhance.typeconvergence','Convergence'),
+         term=replace(term,term=='verg.velocity:enhance.typedivergence','Divergence')) %>%
+  # group_by(neuron) %>%
+  mutate(m=(low+high)/2) %>%
+  filter(term != '(Intercept)', term != 'verg.angle') ->
+  pci
+
+g<-ggplot(pci,aes(factor(term),m))
+
+g+geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=2,alpha=1/2,width=0.2)+
+  geom_hline(yintercept = 0)+
+  coord_flip()+
+  ylab('Bootstrap conficence interval for parameter estimate')+
+  xlab('Term')
+
+# #Determine whether Slow.Vergence and Convergence intervals overlap
+# pci %>%
+#   group_by(neuron) %>%
+#   summarize(lowC=low[term=='Convergence'],
+#             highC=high[term=='Convergence'],
+#             lowD=low[term=='Divergence'],
+#             highD=high[term=='Divergence'],
+#             overlap=(lowC < highS & lowC > lowS) | (highC < highS & highC > lowS))->
+#   ovCS
+# 
+# filter(ovCS,overlap==TRUE)
+# 
+# pci %>%
+#   group_by(neuron) %>%
+#   summarize(lowC=low[term=='Convergence'],
+#             highC=high[term=='Convergence'],
+#             lowS=low[term=='Slow.Velocity'],
+#             highS=high[term=='Slow.Velocity'],
+#             overlap=(lowC < highS & lowC > lowS) | (highC < highS & highC > lowS))->
+#   ovCS
+# 
+# filter(ovCS,overlap==TRUE)
+
+pci %>%
+  group_by(neuron) %>%
+  summarize(lowC=low[term=='Convergence'],
+            highC=high[term=='Convergence'],
+            midC=m[term=='Convergence'],
+            lowS=low[term=='Slow.Velocity'],
+            highS=high[term=='Slow.Velocity'],
+            midS=m[term=='Slow.Velocity'],
+            lowD=low[term=='Divergence'],
+            highD=high[term=='Divergence'],
+            midD=m[term=='Divergence'],
+            lowA=low[term=='verg.angle'],
+            highA=high[term=='verg.angle'],
+            overlapZC=lowC*highC<0,
+            overlapZD=lowD*highD<0,
+            overlapZS=lowS*highS<0,
+            overlapZA=lowA*highA<0,
+            overlapCS=(lowC < highS & lowC > lowS) | (highC < highS & highC > lowS) | (midS< highC & midS > lowC),
+            overlapCD=(lowC < highD & lowC > lowD) | (highC < highD & highC > lowD) | (midD< highC & midD > lowC),
+            overlapDS=(lowD < highS & lowD > lowS) | (highD < highS & highD > lowS) | (midS< highD & midS > lowD),
+            overlapAny=(overlapZC | overlapZD | overlapZS | overlapCS | overlapCD| overlapDS))->
+  ov
+
+ov %>%
+  filter(overlapAny) %>%
+  select(c(1,11,12,13,14,15,16)) %>%
+  kable()
+
+write.csv(ov,'BoostrapOverlapAnalysis.CSV')
+
+zz<- left_join(pci,select(ov,neuron,overlapAny),by='neuron')
+
+mutate()
+
+ggplot(filter(zz,overlapAny,term != 'verg.angle'),aes(factor(term),m))+
+ geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=1,alpha=1/2,width=0.2)+
+  geom_hline(yintercept = 0)+
+  ylab('Bootstrap conficence interval for parameter estimate')+
+  xlab('Term')+
+  # coord_flip()+
+  theme(legend.position='top')+
+  # coord_flip(ylim=c(-0.05,0.05))+
+  # geom_text(aes(label=neuron),check_overlap=F)+
+  facet_wrap(~neuron,ncol=3,scales='free_y')
+
+ggsave('BootstrapOverlaps.PNG',height=6,width=9)
+
+ggplot(zz,aes(factor(term),m))+
+ geom_errorbar(aes(ymin=low,ymax=high,color=overlapAny),size=1,alpha=1/2,width=0.2)+
+  geom_hline(yintercept = 0)+
+  ylab('Bootstrap conficence interval for parameter estimate')+
+  xlab('Term')+
+  # coord_flip()+
+  theme(legend.position='top')+
+  # coord_flip(ylim=c(-0.05,0.05))+
+  # geom_text(aes(label=neuron),check_overlap=F)+
+  facet_wrap(~neuron,ncol=3,scales='free_y')
+
+ggsave('BootstrapAll.PNG',height=20,width=6)
+```
+
+```{r lags,fig.height=8,fig.width=12}
+t %>%
+  group_by(neuron) %>%
+  summarize(lag=first(dynamiclead)) ->
+  s
+
+qplot(lag,data=s)
+ggplot(s)+geom_bar(aes(as.factor(neuron),lag),stat='identity')
+# qplot(neuron,lag,data=s,geom='line')
+
+ggplot(s)+geom_boxplot(aes(area,lag))
+```
