@@ -27,7 +27,8 @@ fig1b <- makefig1(t, 'Bee-218',120000,127500,sd=15)
 fig1c <- makefig1(t,'Bee-215',90000,100000,sd=20,maxplot=250)
 
 #------------- Modeling ---------------------
-tp<-readRDS('ModelFitValues.RDS')
+# tp<-readRDS('ModelFitValues.RDS')
+tp<- readRDS('ModelParams_20ms.RDS')
 tp<- filter(tp,area=='SOA')
 
 fig2<- ggplot(tp)+
@@ -49,3 +50,74 @@ ggsave('Figure1B.pdf',plot=fig1b,height=4)
 ggsave('Figure1C.pdf',plot=fig1c,height=4)
 ggsave('Figure2.pdf',plot=fig2)
 ggsave('Figure3.pdf',plot=fig3)
+
+#------Behavior---------------
+t<- readRDS('enhanceandsaccadesmarkedSOA.RDS')
+
+t %>%
+  filter(cellnum>100) %>%
+  group_by(neuron,sacnum) %>%
+  summarize(verg.amp=first(verg.amp),
+            peak.verg.velocity=first(peak.verg.velocity),
+            saccade.type=first(saccade.type),
+            monkey=first(monkey),
+            max.verg.velocity=max(verg.velocity),
+            min.verg.velocity=min(verg.velocity),
+            nosac=saccade.type=='no.saccade',
+            max.conj.velocity=max(conj.velocity),
+            r.amp=first(r.amp)) %>%
+  filter(abs(peak.verg.velocity)<300,
+         abs(verg.amp)<20)->
+  g
+
+ggplot(g)+
+  geom_point(aes(verg.amp,peak.verg.velocity,color=saccade.type),alpha=1/20,size=2)+
+  coord_cartesian(xlim=c(-20,20),ylim=c(-300,300))+
+  facet_wrap(~monkey)
+  
+ggplot(g)+
+  geom_point(aes(verg.amp,max.verg.velocity,color=nosac),alpha=1/20,size=2)+
+  # coord_cartesian(xlim=c(-20,20),ylim=c(-300,300))+
+  facet_wrap(~monkey)
+
+ggplot(filter(g,saccade.type != 'diverging',nosac==F,r.amp>2,monkey=='Bee'))+
+  geom_point(aes(verg.amp,max.verg.velocity),alpha=1/10,size=1.5)+
+  geom_rect(xmin=-0.1, xmax=0.1,ymin=-10,ymax=100,alpha=1/50,color='red',fill=NA)+
+  geom_rect(xmin=3.9, xmax=4.1,ymin=30,ymax=155,color='blue',fill=NA)+
+  theme_bw()+
+  xlab('Vergence Amplitude (deg)')+
+  ylab('Maximum Vergence Velocity (deg/s)')+
+  annotate('text',x=0,y=-20,label='Conjugate Saccades')+
+  annotate('text',x=4,y=20,label='Converging Saccades (4 deg)')+
+  ylim(c(-25,200))
+
+  ggsave('Figure4.PDF')
+
+  # coord_cartesian(xlim=c(-20,20),ylim=c(-300,300))+
+  # facet_wrap(~monkey)+
+  # geom_abline(slope=7.5,color='pink',size=2)+
+  # stat_smooth(method='lm',aes(verg.amp,max.verg.velocity))
+
+ggplot(g)+
+  geom_point(aes(verg.amp,min.verg.velocity),alpha=1/20,size=2)+
+  # coord_cartesian(xlim=c(-20,20),ylim=c(-300,300))+
+  facet_wrap(~monkey)
+
+
+ggplot(filter(g,saccade.type == 'no.saccade'))+
+  geom_point(aes(verg.amp,max.verg.velocity),color='green', alpha=1/10,data=filter(g,saccade.type=='conj'))+
+  geom_point(aes(verg.amp,max.verg.velocity),alpha=1/5,size=2)+
+  coord_cartesian(xlim=c(-2,5),ylim=c(-25,125))+
+  facet_wrap(~monkey)
+
+ggplot(g)+
+  geom_boxplot(aes(saccade.type,max.verg.velocity))+
+  facet_wrap(~monkey)
+
+ggplot(filter(g,max.conj.velocity>150))+
+  geom_boxplot(aes(saccade.type,max.verg.velocity))+
+  facet_wrap(~monkey)
+
+ggplot(g)+
+  geom_point(aes(verg.amp,max.conj.velocity),alpha=1/20,size=2)+
+  facet_wrap(~monkey)

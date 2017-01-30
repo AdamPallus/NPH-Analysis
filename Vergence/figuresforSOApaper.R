@@ -181,7 +181,7 @@ fig1b <- makefig1(t, 'Bee-218',120000,127500,sd=15)
 fig1c <- makefig1(t,'Bee-215',90000,100000,sd=20,maxplot=250)
 
 gc<-mutate(gc,time=row_number(), showrasters=replace(rasters,rasters<1,NA))
-window_size <- 10000
+window_size <- 20000
 manipulate(ggplot(filter(gc,time>=window,time<window+window_size))+
              geom_area(aes(time,sdf),alpha=1/10)+
              geom_line(aes(time,lev-rev),color='darkblue',alpha=1)+
@@ -227,6 +227,25 @@ ggplot(filter(gc,time>=90000,time<100000))+
   theme_bw()+
   xlab('Time (ms)')+
   ylab('Vergence Velocity (deg/s)')+
+  ylim(c(-100,300))
+
+#Bee33- NRTP cell that pauses for non-saccadic divergence
+ggplot(filter(gc,time>=263000,time<268000))+
+  geom_area(aes(time,sdf),alpha=1/10)+
+  geom_line(aes(time,lev-rev),color='darkblue',alpha=1)+
+  # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
+  geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
+  geom_point(aes(time,showrasters+50),shape='|')+
+  geom_line(aes(time,rep+200),color='darkred')+
+  geom_line(aes(time,lep+200),color='blue')+
+  geom_line(aes(time,repV+220),color='darkred',linetype=2)+
+  geom_line(aes(time,lepV+220),color='blue',linetype=2)+
+  geom_line(aes(time,(lev+rev)/2),color='maroon')+
+  geom_line(aes(time,(levV+revV)/2),color='maroon',linetype=2)+
+  # geom_line(aes(time,slow.prediction),color='orange')+
+  # geom_line(aes(time,(rev+lev)/2),color='darkred')+
+  # geom_line(aes(time,(revV+levV)/2),color='red')+
+  # theme_bw()+
   ylim(c(-100,300))
 
 

@@ -372,42 +372,53 @@ markEnhancement<- function(v, threshold1=15,threshold2=8){
 <!-- t<- group_by(t,neuron) %>% mutate(time=row_number()) -->
 <!-- ``` -->
 
-<!-- ```{r markEnhancements} -->
-<!-- t<- mutate(t,verg.velocity=lev-rev) -->
-<!-- t %>% -->
-<!--   group_by(neuron) %>% -->
-<!--   do(markEnhancement(v=.$verg.velocity,threshold2=12,threshold1=50))-> -->
-<!--   zz -->
+```{r markEnhancements}
+t<- mutate(t,verg.velocity=lev-rev)
+t %>%
+  group_by(neuron) %>%
+  mutate(time=row_number()) %>%
+  do(markEnhancement(v=.$verg.velocity,threshold2=12,threshold1=50))->
+  zz
 
-<!--   zz<- dplyr::select(zz,time,enhancenum) -->
+  zz<- dplyr::select(zz,time,enhancenum)
 
-<!--   t<- left_join(t,zz,by=c('neuron','time')) -->
-<!--   t<-ungroup(t) -->
+  t<- left_join(t,zz,by=c('neuron','time'))
+  t<-ungroup(t)
 
-<!--   #determine whether it's convergence or divergence -->
-<!--   t %>% -->
-<!--     mutate(verg.enhance=!is.na(enhancenum), -->
-<!--            enhance.type='none', -->
-<!--            verg.direction=verg.velocity>0)-> -->
-<!--     t -->
-<!--   i<- t$verg.enhance & !t$verg.direction -->
-<!--   t$enhance.type[i]<- 'divergence' -->
-<!--   i<- t$verg.enhance & t$verg.direction -->
-<!--   t$enhance.type[i]<- 'convergence' -->
-<!--   t$enhance.type<- as.factor(t$enhance.type) -->
-<!--   t$verg.direction<- NULL -->
+  #determine whether it's convergence or divergence
+  t %>%
+    mutate(verg.enhance=!is.na(enhancenum),
+           enhance.type='none',
+           verg.direction=verg.velocity>0)->
+    t
+  i<- t$verg.enhance & !t$verg.direction
+  t$enhance.type[i]<- 'divergence'
+  i<- t$verg.enhance & t$verg.direction
+  t$enhance.type[i]<- 'convergence'
+  t$enhance.type<- as.factor(t$enhance.type)
+  t$verg.direction<- NULL
 
-<!--   t %>% group_by(neuron) %>% -->
-<!--     do(dynamiclead(p=.,formula='verg.angle+verg.velocity',seq(5,200,by=5))) -> -->
-<!--     t -->
+  t %>% group_by(neuron) %>%
+    do(dynamiclead(p=.,formula='verg.angle+verg.velocity:enhance.type',seq(5,200,by=5))) ->
+    t
 
-<!-- # saveRDS(t,'enhancemarked.RDS') -->
-<!-- ``` -->
+saveRDS(t,'enhancemarked2.RDS')
+```
 
 
 ```{r model}
-t<- readRDS('enhancemarked.RDS')
-t<- readRDS('enhancemarked-NRTP.RDS')
+# t<- readRDS('enhancemarked.RDS')
+# t<- readRDS('enhancemarked-NRTP.RDS')
+t<- readRDS('enhancemarked2.RDS')
+
+  # t %>% group_by(neuron) %>%
+  #   do(dynamiclead(p=.,formula='verg.angle',seq(5,60,by=5))) ->
+  #   t
+
+t %>%
+  group_by(neuron) %>%
+  mutate(sdf20= lag(sdf,20)) ->
+  t
 
 t %>% group_by(neuron) %>%
   do(joinsaccades(.,buffer=20,threshold=20))->
@@ -435,7 +446,9 @@ t %>%
 t %>% group_by(neuron) %>%
   filter(saccade.type != 'conj') %>%
   # do(dynamiclead(p=.,formula='verg.angle+verg.velocity',seq(5,200,by=5))) %>%
-  do(tidy(lm('sdflag~verg.angle+verg.velocity:enhance.type',data=.))) %>%
+  # do(tidy(lm('sdflag~verg.angle+verg.velocity:enhance.type',data=.))) %>%
+  #below: test of using standard delay  
+  do(tidy(lm('sdf20~verg.angle+verg.velocity:enhance.type',data=.))) %>%
   mutate(term=replace(term,term=='verg.velocity:enhance.typenone','Slow.Vergence'),
          term=replace(term,term=='verg.velocity:enhance.typeconvergence','Convergence'),
          term=replace(term,term=='verg.velocity:enhance.typedivergence','Divergence'))->
@@ -448,7 +461,11 @@ ttest %>%
   m
   
 kable(m)
-
+t %>%
+  group_by(neuron) %>%
+  summarize(dynamiclead=first(dynamiclead)) ->
+  s
+ttest<- left_join(ttest,s,by='neuron')
 ttest %>%
   dplyr::select(-statistic,-std.error,-p.value) %>%
   spread(term,estimate) ->
@@ -457,11 +474,8 @@ ttest %>%
 
 kable(tp,digits=c(0,2,2,2,2,2))
 
-saveRDS(tp,'modelparams-noconj-SOA.RDS')
+# saveRDS(tp,'modelparams-noconj-SOA.RDS')
 
-ggplot(tpNRTPnc)+geom_point(aes(Convergence,Slow.Vergence),size=3,color='darkred')+
-  geom_point(aes(Convergence,Slow.Vergence),color='darkblue',size=3,shape=2,data=tpSOAnc)+
-  geom_abline(slope=1)
 ```
 
 ```{r bootstrapmodel,fig.height=8,fig.width=12}
@@ -662,5 +676,5 @@ qplot(lag,data=s)
 ggplot(s)+geom_bar(aes(as.factor(neuron),lag),stat='identity')
 # qplot(neuron,lag,data=s,geom='line')
 
-ggplot(s)+geom_boxplot(aes(area,lag))
+ggplot(s)+geom_boxplot(aes(x=1,lag))
 ```
