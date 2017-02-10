@@ -111,6 +111,37 @@ maxabs<- function(x){
   }
 }
 
+makeRelImp<- function(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Ver',normalize=TRUE){
+  summaryforplot %>% 
+    group_by(neuron) %>%
+    do(m=lm(formula=formula,data=.))-> 
+    mm
+  
+  r<- data.frame()
+  r2 <- NULL
+  if (length(mm$m[[1]]$coefficients)<3){
+    message('Not enough parameters for importance calculation...')
+    message('Returning r.squared only.')
+    for (i in 1:nrow(mm)){
+      r2[i]<- summary(mm$m[[i]])$r.squared
+    }
+    r<- data.frame(neuron=mm$neuron,R2=r2)
+    return(r)
+  }  
+  for (i in 1:nrow(mm)){
+    # message('Trying...')
+    bb<- relaimpo::calc.relimp(mm$m[[i]],rela=normalize)
+    b<- bb$lmg
+    r<-rbind(r,b)
+    r2<- c(r2,bb$R2)
+    
+  }
+  r$neuron<-mm$neuron
+  r$R2<- r2
+  names(r)<- c(names(b),'neuron','R2')
+  r
+}
+
 ```
 
 ```{r loadfiles}
@@ -241,9 +272,13 @@ summaryforplot
 
 
 summaryforplot %>%
+  separate(neuron, c('monkey','cellnum2'),remove=FALSE) %>%
+  # filter(monkey=='Pilchuck') %>%
   group_by(neuron) %>%
-  filter(mean.Verg.Vel<1, 
-         dur>75) %>%
+  # filter(mean.Verg.Vel<2, 
+  #        dur>50,
+  #        mean.Verg.Angle<50,
+  #        mean.Verg.Angle> -30) %>%
   mutate(r=cor(mean.Verg.Angle,mean.Spikerate)) ->
   sp
 
@@ -255,9 +290,10 @@ summaryforplot %>%
 # 
 # summaryforplot<- readRDS('NRTPsummaryforplot-new.RDS')
 
-ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=sp)+
-  geom_point(aes(color=mean.time),size=2,alpha=1/2)+
-  scale_color_continuous(low='black',high='orange')+
+ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=filter(sp,cellnum>100))+
+    geom_point(size=2,alpha=1/2)+
+  # geom_point(aes(color=mean.time),size=2,alpha=1/2)+
+  # scale_color_continuous(low='black',high='orange')+
   # facet_wrap(~neuron,scales='free_x')+
     facet_wrap(~neuron,ncol=2)+
   stat_smooth(method='lm')+
@@ -305,6 +341,43 @@ ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=sp)+
 
 ```
 
+```{r plotall}
+t%>%
+  group_by(neuron) %>%
+  mutate(sdf20=lag(sdf,20),
+         conj.vertical=(lepV+repV)/2) ->
+  t
+# gp<- ggplot(filter(t,cellnum>100))+
+#   geom_point(aes(verg.angle,sdf20,color=(repV+lepV)/2),alpha=1/20) +
+#   facet_wrap(~neuron,ncol=3)
+
+t %>% group_by(neuron) %>%
+  do(tidy(lm('sdf20~verg.angle+verg.velocity+conj.vertical',data=.)))->
+  ttest
+
+ttest %>%
+  dplyr::select(neuron,term,estimate) %>%
+  spread(term,estimate) ->
+  tp
+         
+
+kable(tp,digits=c(0,2,2,2,2,2))
+
+r<- makeRelImp(t,formula='sdf20~verg.angle+verg.velocity+conj.vertical',norm=FALSE)
+r<- separate(r,neuron,c('monkey','cellnum'),remove=FALSE)
+
+ggplot(r)+geom_bar(aes(neuron,R2),stat='identity')
+
+ggplot(r)+
+  geom_point(aes(verg.angle,conj.vertical,color=verg.velocity),size=3)+
+  geom_text(aes(verg.angle,conj.vertical,label=cellnum),nudge_y=1/50)+
+  geom_abline(slope=1)+
+  coord_fixed()
+
+ggplot(filter(ttest,term!='(Intercept)'))+
+  geom_point(aes(term,estimate))+
+  geom_errorbar(aes(x=term,ymin=estimate-2*std.error,ymax=estimate+2*std.error,color=neuron,width=0.25))
+```
 We plot the firing rate of each cell during saccades, including 100ms before and after the movement. Convergent saccades have an amplitude change of +3, divergent, -3 and version saccades are the rest. 
 
 ```{r is.there.a.burst, fig.height=28,fig.width=13}
@@ -571,41 +644,33 @@ m %>%
             max.verg.velocity=max.Verg.Vel[1]) ->
   summaryforplot
 
+summaryforplot %>%
+  separate(neuron, c('monkey','cellnum2'),remove=FALSE) %>%
+  # filter(monkey=='Pilchuck') %>%
+  group_by(neuron) %>%
+  filter(mean.Verg.Vel<1, 
+         dur>50,
+         mean.Verg.Angle<50,
+         mean.Verg.Angle> -30) %>%
+  mutate(r=cor(mean.Verg.Angle,mean.Spikerate)) ->
+  sp
+summaryforplotold<-summaryforplot
+summaryforplot<- sp
+
 #first, plot conjugate X-Y with color as firing rate 
 ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25))+
   geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Spikerate),size=2)+
   facet_wrap(~neuron,ncol=2,scales='free')
 
-makeRelImp<- function(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Ver',normalize=TRUE){
-  summaryforplot %>% 
-    group_by(neuron) %>%
-    do(m=lm(formula=formula,data=.))-> 
-    mm
-  
-  r<- data.frame()
-  r2 <- NULL
-  if (length(mm$m[[1]]$coefficients)<3){
-    message('Not enough parameters for importance calculation...')
-    message('Returning r.squared only.')
-    for (i in 1:nrow(mm)){
-      r2[i]<- summary(mm$m[[i]])$r.squared
-    }
-    r<- data.frame(neuron=mm$neuron,R2=r2)
-    return(r)
-  }  
-  for (i in 1:nrow(mm)){
-    # message('Trying...')
-    bb<- relaimpo::calc.relimp(mm$m[[i]],rela=normalize)
-    b<- bb$lmg
-    r<-rbind(r,b)
-    r2<- c(r2,bb$R2)
-    
-  }
-  r$neuron<-mm$neuron
-  r$R2<- r2
-  names(r)<- c(names(b),'neuron','R2')
-  r
-}
+# ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25,dur>20,neuron=='Kopachuck-106'))+
+#   geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Spikerate),size=3)
+# 
+# ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25,dur>20,neuron=='Kopachuck-106'))+
+#   geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Verg.Angle),size=3)
+
+ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25))+
+  geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Verg.Angle),size=2)+
+  facet_wrap(~neuron,ncol=2,scales='free')
 
 
 #Calculate horizontal conjugate position vs vergence

@@ -38,7 +38,8 @@ loadnewcsv<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Verge
              # slong=markSaccades(conj.velocity,buffer=longbuffer,threshold=10),
              time=row_number(),
              verg.angle=lep-rep,
-             verg.velocity=parabolicdiff(verg.angle,7))->
+             # verg.velocity=parabolicdiff(verg.angle,7),
+             verg.velocity=lev-rev)->
         temp
       
       t <-rbind(t,temp)

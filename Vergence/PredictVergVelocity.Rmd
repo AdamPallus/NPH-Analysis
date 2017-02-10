@@ -1,0 +1,82 @@
+---
+title: "Predicting Vergence Velocity from SOA activity"
+author: "Adam"
+date: "February 8th, 2016"
+output: 
+html_document: 
+self_contained: no
+runtime: shiny
+---
+
+#Introduction
+Procedure:
+
+	1. identify enhancement
+	2. Smooth out SDF and vergence velocity 
+	3. Model: verg.velocity ~ sdf20+verg.angle
+		+ Omit any periods enhanced vergence
+	4. Use the model to predict what the vergence velocity should be for the rest of the data set
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+#library(knitr)
+#library(tidyr)
+#library(broom)
+#library(grid)
+# library(relaimpo)
+# library(leaps)
+#library(data.table)
+
+```
+
+
+```{R SHINYTRY}
+
+x<- readRDS('DemoPredictVV.RDS')
+#In order to make the shiny app load fast, I'm just saving the output. See BoostrapSaccades.Rmd for the actual analysis.
+# z<-readRDS(file="Bee13forshiny.RDS")
+# z<-readRDS(file='shinySOANRTP.RDS')
+# tp<-readRDS('ModelFitValues.RDS')
+# neurons=unique(z$neuron)
+windowsize<-2000
+stepsize<- 1000
+inputPanel(
+  
+  
+  sliderInput("timechoice", label = "Select a time to plot:",
+              min=1,
+              max=max(x$time-windowsize),
+              value=1,
+              step=stepsize)
+)
+
+renderPlot({
+  starttime<-input$timechoice
+
+  
+  px<-filter(x,time>=starttime,time<starttime+windowsize)
+  
+  ggplot(px)+
+    geom_point(aes(time,showrasters+30),shape='|')+
+    # geom_line(aes(time,sdf))+
+    # geom_line(aes(time,slowpredict),color='orange')+
+    # geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+    # geom_line(aes(time,predP/1000),color='darkgreen',linetype=2)+
+    geom_line(aes(time,predV),color='orange')+
+    geom_line(aes(time,verg.velocity),color='darkblue')+
+    geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
+  
+})
+
+```
+
+
+

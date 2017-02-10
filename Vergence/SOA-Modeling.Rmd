@@ -19,6 +19,7 @@ library(leaps)
 #library(data.table)
 library(stringr)
 library(dplyr)
+library(cladoRcpp)
 # source('joinsaccadesuniform.R')
 # source('Adamhelperfunctions.R')
 ```
@@ -34,7 +35,7 @@ opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
 spikedensity<-function (rasters,sd=100) {
   gsize<- sd*10
   g<-dnorm(-gsize:gsize,mean=0,sd=sd)
-  sdf<-convolve(rasters,g,type="open")
+  sdf<-rcpp_convolve(rasters,g)
   sdf<-sdf[gsize:(length(sdf)-(gsize+1))]*1000
   sdf
 }
@@ -108,10 +109,10 @@ markSaccades<-function(ev,buffer=15,threshold=40){
 
 parabolicdiff <- function(pos,n=7){
   q <- sum(2*((1:n)^2))
-  convoutput<- convolve(pos,c(-n:-1, 1:n),type="open")
+  convoutput<- rcpp_convolve(pos,c(-n:-1, 1:n))
   convoutput<- convoutput[(n*2):(length(pos)-((n*2)+1))]
   vels<- c(array(convoutput[1],dim=n*2),convoutput,array(convoutput[length(convoutput)],dim=n*2))
-  vels <- vels/q*1000
+  vels <- vels/q*-1000
 }
 
 maxabs<- function(x){
@@ -451,7 +452,9 @@ t %>% group_by(neuron) %>%
   do(tidy(lm('sdf20~verg.angle+verg.velocity:enhance.type',data=.))) %>%
   mutate(term=replace(term,term=='verg.velocity:enhance.typenone','Slow.Vergence'),
          term=replace(term,term=='verg.velocity:enhance.typeconvergence','Convergence'),
-         term=replace(term,term=='verg.velocity:enhance.typedivergence','Divergence'))->
+         term=replace(term,term=='verg.velocity:enhance.typedivergence','Divergence'),
+         low=estimate-2*std.error,
+         high=estimate+2*std.error)->
   ttest
 
 ttest %>%
@@ -459,20 +462,53 @@ ttest %>%
   group_by(term) %>%
   summarize(e=mean(estimate),std=sd(estimate))->
   m
+
+ttest %>%
+  dplyr::select(term,estimate,low,high) %>%
+  group_by(term) %>%
+  summarize(e=mean(estimate),std=sd(estimate))->
+  m
   
 kable(m)
-t %>%
-  group_by(neuron) %>%
-  summarize(dynamiclead=first(dynamiclead)) ->
-  s
-ttest<- left_join(ttest,s,by='neuron')
+# t %>%
+#   group_by(neuron) %>%
+#   summarize(dynamiclead=first(dynamiclead)) ->
+#   s
+# ttest<- left_join(ttest,s,by='neuron')
+# ttest %>%
+#   dplyr::select(-statistic,-std.error,-p.value) %>%
+#   spread(term,estimate) ->
+#   tp
 ttest %>%
-  dplyr::select(-statistic,-std.error,-p.value) %>%
+  dplyr::select(neuron,term,estimate) %>%
   spread(term,estimate) ->
   tp
-           
+         
 
 kable(tp,digits=c(0,2,2,2,2,2))
+
+ttest %>%
+  dplyr::select(neuron,term,estimate,low,high) %>%
+  rename(m=estimate)->
+  pci
+g<-ggplot(data=filter(pci,term!='(Intercept)'),aes(factor(term),m))
+
+g+geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=2,alpha=1/2,width=0.2)+
+  geom_hline(yintercept = 0)+
+  ylab('Parametric conficence interval for parameter estimate')+
+  xlab('Term')+
+  geom_text(aes(label=neuron))+
+  coord_flip()
+
+#show only zero crossings
+g<-ggplot(filter(pci,low*high<0),aes(factor(term),m))
+g+geom_errorbar(aes(ymin=low,ymax=high,color=neuron),size=2,alpha=1/2,width=0.2)+
+  geom_hline(yintercept = 0)+
+  ylab('Parametric conficence interval for parameter estimate')+
+  xlab('Term')+
+  coord_flip()+
+  coord_flip(ylim=c(-0.05,0.05))+
+  geom_text(aes(label=neuron),check_overlap=F)
 
 # saveRDS(tp,'modelparams-noconj-SOA.RDS')
 
@@ -630,7 +666,7 @@ pci %>%
 
 ov %>%
   filter(overlapAny) %>%
-  select(c(1,11,12,13,14,15,16)) %>%
+  dplyr::select(c(1,11,12,13,14,15,16)) %>%
   kable()
 
 write.csv(ov,'BoostrapOverlapAnalysis.CSV')

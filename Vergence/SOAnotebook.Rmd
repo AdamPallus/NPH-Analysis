@@ -25,6 +25,7 @@ library(relaimpo)
 library(leaps)
 #library(data.table)
 library(stringr)
+library(cladoRcpp)
 # library(checkpoint)
 # checkpoint("2017-01-20")
 ```
@@ -34,7 +35,7 @@ library(stringr)
 spikedensity<-function (rasters,sd=100) {
   gsize<- sd*10
   g<-dnorm(-gsize:gsize,mean=0,sd=sd)
-  sdf<-convolve(rasters,g,type="open")
+  sdf<-rcpp_convolve(rasters,g)
   sdf<-sdf[gsize:(length(sdf)-(gsize+1))]*1000
   sdf
 }
@@ -96,7 +97,7 @@ markSaccades<-function(ev,buffer=15,threshold=40){
 
 parabolicdiff <- function(pos,n=7){
   q <- sum(2*((1:n)^2))
-  convoutput<- convolve(pos,c(-n:-1, 1:n),type="open")
+  convoutput<- rcpp_convolve(pos,c(-n:-1, 1:n))
   convoutput<- convoutput[(n*2):(length(pos)-((n*2)+1))]
   vels<- c(array(convoutput[1],dim=n*2),convoutput,array(convoutput[length(convoutput)],dim=n*2))
   vels <- vels/q*1000
@@ -460,6 +461,8 @@ t %>%
 # t<- readRDS('enhancemarked-NRTP.RDS')
 # t<- readRDS('enhancemarked2.RDS')
 
+t<- readRDS('EnhanceMarkedSOA.RDS')
+
   # t %>% group_by(neuron) %>%
   #   do(dynamiclead(p=.,formula='verg.angle',seq(5,60,by=5))) ->
   #   t
@@ -524,6 +527,7 @@ saveRDS(tp,'modelparams-noconj-20ms-SOA.RDS')
 ```
 
 ```{r plotModelFits}
+tp<- readRDS('modelparams-noconj-20ms-SOA.RDS')
 ggplot(tp)+
   geom_point(aes(verg.angle,Slow.Vergence),size=3,alpha=0.2)+
   geom_vline(xintercept=0,linetype=2)+
