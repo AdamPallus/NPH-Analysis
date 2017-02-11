@@ -19,7 +19,7 @@ library(ggplot2)
 library(dplyr)
 library(knitr)
 library(tidyr)
-# library(broom)
+library(broom)
 # library(grid)
 library(relaimpo)
 library(leaps)
@@ -143,6 +143,60 @@ makeRelImp<- function(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mea
   r
 }
 
+loadnewcsv<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
+  require(stringr)
+  require(dplyr)
+  #This function loads .csv files in a particular folder. They must have the same columns for rbind
+  #Saves time by only reading the csv when necessary
+  
+  #get names of all files in path
+  files <- list.files(path=path,pattern='*.csv')
+  #extract neuron name eg. Bee-01
+  names<-sapply(files, str_match,"^[a-zA-Z]+-[0-9]+",USE.NAMES=FALSE)
+  # check for new cells
+  if (!is.null(referencefile)){
+    files<-files[!names %in% referencefile$neuron] #comparison
+  }
+  
+  nfiles<-length(files)
+  
+  if (nfiles>0){
+    message(c('New Files: ',files))
+    loadedfiles <- lapply(paste(path,files,sep=''),read.csv)
+    t<-data.frame()
+    # t.old<-NULL
+    for (i in 1:nfiles) {
+      f<- files[i]
+      message(paste('Loading:',f))
+      temp=loadedfiles[[i]]
+      names<-str_match(f,"(^[a-zA-Z]+)-([0-9]+)")
+      temp$neuron<-names[1]
+      temp$monkey<-names[2]
+      temp$cellnum<-as.numeric(names[3])
+      temp$sdf<-spikedensity(temp$rasters,sd=10)
+      # leadtime<-dynamiclead(temp)
+      message(paste('ms of data:',nrow(temp)))
+      mutate(temp,
+             # sdflag=lag(sdf,leadtime),
+             conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2),
+             # s=markSaccades(conj.velocity,buffer=10,threshold=10),
+             # slong=markSaccades(conj.velocity,buffer=longbuffer,threshold=10),
+             time=row_number(),
+             verg.angle=lep-rep,
+             # verg.velocity=parabolicdiff(verg.angle,7),
+             verg.velocity=lev-rev)->
+        temp
+      
+      t <-rbind(t,temp)
+    }
+    t<- dplyr::select(t, -thp,-tvp,-time)
+  }else{
+    message('********NO NEW CELLS********')
+    t<-NULL
+  }
+  return(t)
+}
+
 ```
 
 ```{r loadfiles}
@@ -202,9 +256,8 @@ t<- filter(t, monkey %in% c('Bee','Ozette'))
 ```
 
 ```{r quickload}
-o<-readRDS('KopachuckSOA.RDS')
-source('loadnewcsv.R')
-t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/SOASTRAB/",referencefile=o)
+o<-readRDS('KopachuckINC.RDS')
+t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
 
 t<- rbind(o,t)
 
@@ -437,191 +490,6 @@ levels(t$convergent)<- c('Divergent','Convergent')
 
 
 
-```{r peak.verg.velocity,fig.height=40,fig.width=10,echo=F}
-t %>%
-  group_by(neuron,sacnum) %>%
-  summarize(peak.verg.velocity=first(peak.verg.velocity),
-            maxfr=first(maxfr),
-            verg.amp=first(verg.amp),
-            max.verg.angle=first(max.verg.angle),
-            max.verg.velocity=first(max.verg.velocity)) %>%
-  filter(abs(peak.verg.velocity)<1500)->
-  summaryforplot
-# t<- NULL
-ggplot(summaryforplot)+geom_point(aes(peak.verg.velocity,maxfr),alpha=1/3,size=1)+
-  facet_wrap(~neuron,ncol=3,scales='free')+
-  geom_hline(yintercept=200,size=1, alpha=0.5,color='orange')+
-   theme(legend.position="top",
-        axis.text=element_text(size=8),
-        # panel.margin=unit(2,'lines'),
-        strip.text=element_text(size=8),
-        axis.title.x=element_text(size=8))
-# qplot(peak.verg.velocity,maxfr,data=summaryforplot)+
-#   facet_wrap(~neuron,ncol=3,scale='free')+geom_point(size=3,alpha=1/20)+
-# qplot(max.verg.velocity,maxfr,data=p,color=verg.amp)+facet_wrap(~neuron,ncol=2)+geom_point(size=3,alpha=1/20)
-```
-
-##Model Fitting: Peak transient velocity or amplitude of vergence angle change?
-In this next section we attempt to distinguish between two factors that are correlated with the peak firing rates of the vergence-burster cells: the amplitude of the vergence angle change and the peak velocity of the vergence transient. It may be possible to distinguish these because there are vergence transients even during saccades without a significant change in vergence angle. The above plot demonstrates this. In some cells, the blue points are below the red points, and above the green ones. This means that for a given peak transient velocity, the cell will fire more if the vergence angle changes more. 
-
-### Model based on the positive transient
-```{r positive.trans only,echo=F}
-# message('We are now attempting to use the stupid calc.relimpo')
-# summaryforplot %>%
-#   # filter(peak.verg.velocity>0) %>%
-#   group_by(neuron) %>%
-#   # do(b=calc.relimp(lm(maxfr~verg.amp+peak.verg.velocity,data=.)),
-#      # bic=regsubsets(maxfr~verg.amp+peak.verg.velocity,.)) ->
-#     do(b=calc.relimp(lm(maxfr~max.verg.angle+max.verg.velocity,data=.))) ->
-#   bb
-# r <- data.frame()
-# r2 <- NULL
-# for (i in 1:nrow(bb)){
-#   b<- bb$b[[i]]$lmg
-#   r<-rbind(r,b)
-# 
-#   r2<- c(r2,bb$b[[i]]$R2)
-# 
-# }
-# 
-# r$neuron<-bb$neuron
-# # r$cellnum<- bb$cellnum
-# r$R2<- r2
-# 
-# names(r)<- c(names(bb$b[[1]]$lmg),'neuron','R2')
-# 
-# r %>%
-#   separate(neuron, c('monkey','cellnum'),remove=FALSE) %>%
-#   mutate(celltype=as.factor(as.numeric(cellnum)>100))->
-#   r
-# levels(r$celltype)<- c("NRTP","SOA")
-# 
-# 
-# # r.old<-readRDS('NRTPr.RDS')
-# # r<- rbind(r.old,r)
-# if (nfiles > 0){
-#   r.old<- readRDS('NRTPr.RDS')
-#   rsave<- rbind(r.old,r)
-# saveRDS(rsave,'NRTPr-new.RDS')
-# }
-# 
-# # write.csv(r,"allfiles-r.csv")
-# # rmark<-read.csv('marksoacells.csv')
-# # r<- rbind(r,rmark[,-1])
-```
-
-```{r positive.relimp}
-summaryforplot %>% 
-  group_by(neuron) %>%
-  do(m=lm(maxfr~max.verg.angle+max.verg.velocity,data=.)) -> 
-  mm
-
-r<- data.frame()
-r2 <- NULL
-
-for (i in 1:nrow(mm)){
-  message('Trying...')
-  bb<- relaimpo::calc.relimp(mm$m[[i]])
-  b<- bb$lmg
-  r<-rbind(r,b)
-  r2<- c(r2,bb$R2)
-  
-}
-
-r$neuron<-mm$neuron
-r$R2<- r2
-
-names(r)<- c(names(b),'neuron','R2')
-
-r %>%
-  separate(neuron, c('monkey','cellnum'),remove=FALSE) %>%
-  mutate(celltype=as.factor(as.numeric(cellnum)>100))->
-  r
-levels(r$celltype)<- c("NRTP","SOA")
-
-```
-
-```{r plot.positive.trans.fit,fig.height=10,fig.width=10}
-
- ggplot(aes(max.verg.angle,max.verg.velocity),data=r)+
-   # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
-   geom_point(size=4,aes(shape=monkey,color=celltype))+
-   # geom_point(size=4,aes(color=R2))+
-   # scale_color_gradient(low='blue',high='red')+
-   # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
-   geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
-   geom_abline(intercept=0,slope=1)+
-   # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-   theme(legend.position="top")+
-   ggtitle('Relative Importance')+
-  xlab('Relative Importance of Maximum Vergence Angle')+
-  ylab('Relative Importance of Maximum Vergence Velocity')
-
-ggsave('RelativeImportanceALL.PDF')
-
- ggplot(aes(max.verg.angle,max.verg.velocity),data=r)+
-   # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
-   geom_point(size=4,aes(shape=monkey,color=celltype))+
-   # geom_point(size=4,aes(color=R2))+
-   # scale_color_gradient(low='blue',high='red')+
-   # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
-   # geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
-   geom_abline(intercept=0,slope=1)+
-   # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-   theme(legend.position="top")+
-   ggtitle('Relative Importance')+
-  xlab('Relative Importance of Maximum Vergence Angle')+
-  ylab('Relative Importance of Maximum Vergence Velocity')
-
-ggsave('RelativeImportanceALL-NoLabel.PDF')
-
-ggplot(aes(max.verg.angle,max.verg.velocity),data=filter(r,celltype=='NRTP'))+
-  # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
-  geom_point(size=4,aes(shape=monkey))+
-  # geom_point(size=4,aes(color=R2))+
-  # scale_color_gradient(low='blue',high='red')+
-  # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
-  # geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
-  geom_abline(intercept=0,slope=1)+
-  # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-  theme(legend.position="top")+
-  ggtitle('Relative Importance - NRTP cells')+
-    xlab('Relative Importance of Maximum Vergence Angle')+
-  ylab('Relative Importance of Maximum Vergence Velocity')
-
-ggsave('RelativeImportanceNRTP-NoLabel.PDF')
-
-ggplot(aes(max.verg.angle,max.verg.velocity),data=filter(r,celltype=='SOA'))+
-  # geom_point(size=4,aes(color=R2,shape=verg.amp>max.verg.velocity))+
-  geom_point(size=4,aes(shape=monkey))+
-  # geom_point(size=4,aes(color=R2))+
-  # scale_color_gradient(low='blue',high='red')+
-  # geom_point(size=4,aes(color=verg.amp>max.verg.velocity))+
-  # geom_text(aes(label=neuron),check_overlap=FALSE,size=3,vjust=-1)+
-  geom_abline(intercept=0,slope=1)+
-  # coord_cartesian(xlim=c(-0.5,1),ylim=c(-0.5,1))+
-  theme(legend.position="top")+
-  ggtitle('Relative Importance - SOA cells')+
-  xlab('Relative Importance of Maximum Vergence Angle')+
-  ylab('Relative Importance of Maximum Vergence Velocity')+
-  theme_bw()
-
-ggsave('RelativeImportanceSOA-NoLabel.PDF')
-
-ggplot(filter(r))+
-  geom_density(aes(max.verg.angle,fill=celltype),alpha=0.5)+
-    xlab('Relative Importance of Maximum Vergence Angle')
-ggsave('Comparing-VergAngle.PDF')
-
-ggplot(filter(r))+
-  geom_density(aes(max.verg.velocity,fill=celltype),alpha=0.5)+
-    xlab('Relative Importance of Maximum Vergence Velocity')
-ggsave('Comparing-VergVel.PDF')
-
-```
-
-
-
 ```{r Strab}
 
 #analyze non-saccadic portion of data
@@ -719,5 +587,18 @@ ggplot(aes(mean.R.Ver,mean.L.Ver),size=2,data=r)+
   geom_abline(slope=1)+
   xlim(c(0,1))+
   ylim(c(0,1))
+
+#EYE POSITION
+r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.C.Hor+mean.C.Ver',norm=FALSE)
+ggplot(aes(mean.C.Hor,mean.C.Ver),size=2,data=r)+
+  geom_point()+
+  geom_text(aes(label=neuron))+
+  geom_abline(slope=1)+
+  xlim(c(0,1))+
+  ylim(c(0,1))
+
+r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.C.Hor+mean.C.Ver',norm=TRUE)
+r<- mutate(r,prefDir=atan2(mean.C.Ver,mean.C.Hor)*180/pi)
+kable(r)
 
 ```
