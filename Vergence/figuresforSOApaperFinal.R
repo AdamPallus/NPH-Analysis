@@ -80,7 +80,7 @@ ggplot(g)+
   # coord_cartesian(xlim=c(-20,20),ylim=c(-300,300))+
   facet_wrap(~monkey)
 
-ggplot(filter(g,saccade.type != 'diverging',nosac==F,r.amp>2,monkey=='Bee'))+
+ggplot(filter(g,saccade.type != 'diverging',nosac==F,r.amp>8,monkey=='Bee'))+
   geom_point(aes(verg.amp,max.verg.velocity),alpha=1/10,size=1.5)+
   geom_rect(xmin=-0.1, xmax=0.1,ymin=-10,ymax=100,alpha=1/50,color='red',fill=NA)+
   geom_rect(xmin=3.9, xmax=4.1,ymin=30,ymax=155,color='blue',fill=NA)+
@@ -91,7 +91,43 @@ ggplot(filter(g,saccade.type != 'diverging',nosac==F,r.amp>2,monkey=='Bee'))+
   annotate('text',x=4,y=20,label='Converging Saccades (4 deg)')+
   ylim(c(-25,200))
 
-  ggsave('Figure4.PDF')
+gs<-ggplot(filter(g,saccade.type != 'diverging',nosac==F,r.amp>8,monkey=='Bee'))+
+  geom_point(aes(verg.amp,max.verg.velocity),alpha=1/10,size=1.5)
+
+gss<- gs+geom_rect(xmin=-0.1, xmax=0.1,ymin=-10,ymax=100,alpha=1/50,color='darkgray',fill=NA)+
+  geom_rect(xmin=3.9, xmax=4.1,ymin=30,ymax=155,color='black',fill=NA,linetype=2)+
+  xlab('Vergence Amplitude (deg)')+
+  ylab('Maximum Vergence Velocity (deg/s)')+
+  annotate('text',x=0,y=-20,label='Conjugate Saccades')+
+  annotate('text',x=4,y=20,label='Converging Saccades (4 deg)')+
+  ylim(c(-25,200))+
+  theme_bw()
+#---- 
+#smaller file attempt
+gp<- filter(g,saccade.type != 'diverging',nosac==F,r.amp>5,monkey=='Bee') 
+
+gp %>%
+  filter(max.verg.velocity<20) %>%
+  sample_frac(size=0.20) ->
+  gps
+
+gp %>%
+  filter(max.verg.velocity>=20) %>%
+  rbind(gps)->
+  gpa
+
+ggplot(sample_frac(gp,.5))+
+  geom_point(aes(verg.amp,max.verg.velocity),alpha=1/10,size=1.5)+
+  geom_rect(xmin=-0.1, xmax=0.1,ymin=-10,ymax=100,alpha=1/50,color='darkgray',fill=NA)+
+  geom_rect(xmin=3.9, xmax=4.1,ymin=30,ymax=155,color='black',fill=NA,linetype=2)+
+  xlab('Vergence Amplitude (deg)')+
+  ylab('Maximum Vergence Velocity (deg/s)')+
+  annotate('text',x=0,y=-20,label='Conjugate Saccades')+
+  annotate('text',x=4,y=20,label='Converging Saccades (4 deg)')+
+  ylim(c(-25,200))+
+  theme_bw()
+
+  ggsave('Figure 9.PDF',height=6,width=8)
 
   # coord_cartesian(xlim=c(-20,20),ylim=c(-300,300))+
   # facet_wrap(~monkey)+

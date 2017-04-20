@@ -47,8 +47,8 @@ ggplot(filter(xx,time>=22500,time<23000))+
 
 #--------------------------------------------
 
-# x<- ungroup(filter(t,neuron=='Bee-113'))
-x<- ungroup(filter(t,neuron=='Ozette-120'))
+x<- ungroup(filter(t,neuron=='Bee-113'))
+# x<- ungroup(filter(t,neuron=='Ozette-120'))
 
 #smooth?
 x %>%
@@ -57,6 +57,15 @@ x %>%
          sdf20=lag(sdf,20)) ->
   x
 
+  # x %>%
+  #   mutate(verg.velocity=parabolicdiff(lep-rep,20),
+  #          sdf=spikedensity(rasters,sd=20),
+  #          sdf20=lag(sdf,20)) %>%
+  #   do(markEnhancement(v=.$verg.velocity,threshold2=12,threshold1=50))->
+  #   testx
+  # %>%
+  #   mutate(->
+  #            x
 
 
 # mod<- lm('verg.velocity~sdf20+verg.angle',data=filter(x,saccade.type != 'conj',enhance.type=='none',sdf20>30))
@@ -78,7 +87,7 @@ manipulate(ggplot(filter(x,time>=window,time<window+window_size))+
              geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
              # geom_line(aes(time,predP/1000),color='darkgreen',linetype=2)+
              geom_line(aes(time,predV),color='orange')+
-             geom_line(aes(time,predV2),color='magenta')+
+             # geom_line(aes(time,predV2),color='magenta')+
              geom_line(aes(time,verg.velocity),color='darkblue')+
              geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
              # ylim(c(-10,20))
@@ -100,7 +109,55 @@ ggplot(filter(x,time>=9800, time<10500))+
   geom_line(aes(time,verg.velocity),color='darkblue')+
   ylim(c(-10,20))
 
+#doulble saccade demo in Bee-113
+ggplot(filter(x,time>5000,time<6000))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
 
+ggplot(filter(x,time>8000,time<9000))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
+
+ggplot(filter(x,time>12800,time<13800))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
+
+ggplot(filter(x,time>22500,time<23500))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
+
+ggplot(filter(x,time>22500,time<23500))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
+
+ggplot(filter(x,time>29000,time<30000))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
+
+ggplot(filter(x,time>39500,time<40500))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
+
+
+ggplot(filter(x,time>42500,time<43500))+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  geom_line(aes(time,predV),color='orange',size=2)+
+  geom_line(aes(time,verg.velocity),color='darkblue')
 
 #====SACCADES=================
 
@@ -220,3 +277,5 @@ spikedensity<-function (rasters,sd=100) {
   sdf<-sdf[gsize:(length(sdf)-(gsize+1))]*1000
   sdf
 }
+
+

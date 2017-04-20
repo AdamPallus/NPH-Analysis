@@ -1,0 +1,271 @@
+---
+title: "SOA Modeling"
+author: "Adam"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+```{r setup, include=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(knitr)
+library(tidyr)
+library(broom)
+# library(grid)
+library(relaimpo)
+library(leaps)
+#library(data.table)
+library(stringr)
+library(dplyr)
+library(cladoRcpp)
+select<-dplyr::select
+# source('joinsaccadesuniform.R')
+source('Adamhelperfunctions.R')
+```
+
+```{r loaddata}
+t<- readRDS('SOA-NRTP.RDS')
+```
+
+```{r measuresaccades}
+# t %>%
+#   group_by(neuron) %>%
+#   rename(verg.velocity.rough=verg.velocity) %>%
+#   mutate(verg.velocity=parabolicdiff(lep-rep,20))->
+#   t
+
+bufferlength<- 200
+saccade.length<- 150
+t%>%
+  filter(neuron=='Bee-113')%>%
+  # filter(cellnum>100,cellnum<125,monkey=='Bee')%>%
+  # group_by(neuron) %>%
+  rename(verg.velocity.rough=verg.velocity) %>%
+  mutate(sdf20=lag(sdf,20),
+         lev=parabolicdiff(lep,20),
+         rev=parabolicdiff(rep,20),
+         levV=parabolicdiff(lepV,20),
+         revV=parabolicdiff(repV,20),
+         verg.velocity=lev-rev,
+         conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2)) %>%
+         # conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2)) %>%
+  ungroup() %>%
+  mutate(time=row_number()) %>%
+  do(joinsaccadesuniformDT(.,buffer=bufferlength,threshold=20,saccade.length=saccade.length))->
+  # do(joinsaccades(.,buffer=bufferlength,threshold=20))->
+  z
+
+z %>%
+  # group_by(neuron) %>%
+  mutate(issaccade=!is.na(sacnum)) %>%
+  filter(issaccade,saccade.dur>20) %>%
+  group_by(neuron,sacnum) %>%
+  mutate(sdf20=lag(sdf,20),
+         cverg=abs(verg.velocity)>3,
+         cverg=replace(counter,cverg,NA)) %>%
+  mutate(saccade.dur=first(saccade.dur), #was originally a summary
+            saccade.end=saccade.dur+bufferlength,
+    peak.conj.velocity=maxabs(conj.velocity),
+    peak.R.H= maxabs(rev),
+    peak.R.V= maxabs(revV),
+    peak.L.H= maxabs(lev),
+    peak.L.V= maxabs(levV),
+    R.H.Amp=rep[saccade.end]-rep[bufferlength],
+    L.H.Amp=lep[saccade.end]-lep[bufferlength],
+    R.V.Amp=repV[saccade.end]-repV[bufferlength],
+    L.V.Amp=lepV[saccade.end]-lepV[bufferlength],
+    r.angle=atan2(R.V.Amp,R.H.Amp)*180/pi,
+    r.amp=sqrt(R.H.Amp^2+R.V.Amp^2),
+    vect.amp= (sqrt(R.H.Amp^2+R.V.Amp^2)+sqrt(L.H.Amp^2+L.V.Amp^2))/2,
+    maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
+    verg.amp=verg.angle[saccade.end]-verg.angle[bufferlength],
+    mean.verg.amp=mean(verg.angle[saccade.end:n()]-mean(verg.angle[1:bufferlength])),
+    peak.verg.velocity= maxabs(verg.velocity),
+    min.verg.trans = min(verg.velocity),
+    max.verg.trans = max(verg.velocity),
+    off.verg.velocity=min(abs(min.verg.trans),abs(max.verg.trans)),
+    min.verg.angle=min(verg.angle),
+    max.verg.angle=max(verg.angle),
+    max.verg.velocity=max(verg.velocity),
+    min.verg.velocity=min(verg.velocity),
+    initial.verg.angle=verg.angle[bufferlength],
+    verg.lead=bufferlength-max(cverg[100:bufferlength],na.rm=T),
+    verg.lead=replace(verg.lead,is.na(verg.lead),0))->
+  z
+
+z%>%
+  summarize_each(funs(first))->
+  s
+
+```
+
+```{r plotsummary}
+
+ggplot(filter(s,abs(mean.verg.amp)<1,max.verg.angle>12,r.amp>3))+
+  geom_point(aes(peak.conj.velocity,min.verg.trans))+
+  geom_point(aes(peak.conj.velocity,max.verg.trans),color='darkgray')+
+  coord_cartesian(xlim=c(0,1000),ylim=c(-300,300))+
+  ylab('Pos & Neg peak vg vel')+
+  stat_smooth(aes(peak.conj.velocity,min.verg.trans),method='lm',formula='y~poly(x,2)')+
+  ggtitle('Rightward saccades at near -Bee')
+
+ggplot(filter(s,abs(mean.verg.amp)<1,max.verg.angle<5,abs(r.angle)<20,r.amp>3))+
+  geom_point(aes(peak.conj.velocity,min.verg.trans))+
+  geom_point(aes(peak.conj.velocity,max.verg.trans),color='darkgray')+
+  coord_cartesian(xlim=c(0,1000),ylim=c(-300,300))+
+  ylab('Pos & Neg peak vg vel')+
+  ggtitle('Rightward saccades at far -Bee')+
+  stat_smooth(aes(peak.conj.velocity,min.verg.trans),method='lm',formula='y~poly(x,2)')
+
+
+ggplot(filter(s,abs(mean.verg.amp)<1,r.amp>3,saccade.dur>50,saccade.dur<300))+
+  geom_point(aes(peak.conj.velocity,min.verg.trans))+
+  geom_point(aes(peak.conj.velocity,max.verg.trans),color='darkgray')+
+  coord_cartesian(xlim=c(0,1000),ylim=c(-300,300))+ 
+  stat_smooth(aes(peak.conj.velocity,min.verg.trans),method='lm',formula='y~poly(x,2)')+
+  stat_smooth(aes(peak.conj.velocity,max.verg.trans),method='lm',formula='y~poly(x,2)')+
+  ylab('Pos & Neg peak vg vel')+
+  ggtitle('All saccades with verg.amp < 1 -Bee')
+```
+
+```{r hellokittenho}
+# s$saccade.dur<-NULL
+
+# z<-left_join(z,s,by='sacnum')
+z %>% 
+  group_by(sacnum) %>% 
+  mutate(counter=row_number()-bufferlength)-> 
+  z
+# z<-left_join(z,s,by=c('neuron','sacnum'))
+# z %>% 
+#   group_by(neuron,sacnum) %>% 
+#   mutate(counter=row_number()-bufferlength)-> 
+#   z
+
+
+
+# ggplot(filter(z,verg.amp>1,r.amp>5,verg.lead>10))+
+#   geom_line(aes(counter,verg.angle*10-200,group=sacnum),color='darkgreen')+
+#   geom_line(aes(counter,conj.velocity,group=sacnum),alpha=0.5)+
+#   geom_line(aes(counter,verg.velocity,group=sacnum),color='hotpink')
+
+verg.thresh<- 2
+z$saccade.type<- 'saccade.only'
+z$saccade.type[z$mean.verg.amp< -verg.thresh]= 'diverging'
+z$saccade.type[z$mean.verg.amp> verg.thresh]= 'converging'
+z$saccade.type<-as.factor(z$saccade.type)
+
+z %>% 
+  # group_by(neuron,sacnum) %>% 
+  group_by(sacnum) %>% 
+  mutate(verg.change=verg.angle-verg.angle[bufferlength],
+           norm.verg.change=verg.change/max(abs(verg.change)),
+         norm.verg.velocity=verg.velocity/max(abs(verg.velocity)),
+         verg150=verg.change[bufferlength+150])->
+  z
+
+verg.thresh<- 2
+z$saccade.type<- 'saccade.only'
+z$saccade.type[z$verg150< -verg.thresh]= 'diverging'
+z$saccade.type[z$verg150> verg.thresh]= 'converging'
+z$saccade.type<-as.factor(z$saccade.type)
+```
+
+```{r vergplots1}
+ggplot(filter(z,counter> -25,counter< 150,r.amp>7))+
+  # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
+  geom_line(aes(counter,verg.change*20,group=sacnum),color='darkgreen',alpha=0.2)+
+  geom_line(aes(counter,verg.velocity-400,group=sacnum),alpha=0.2,color='hotpink')+
+  facet_wrap(~saccade.type,ncol=1)+
+  # stat_smooth(aes(counter,verg.velocity-400))+
+  geom_hline(yintercept=c(0,-400))
+
+ggplot(filter(z,counter> -25,counter< 150,r.amp>7,abs(r.angle<20),saccade.end<280))+
+  # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
+  geom_line(aes(counter,verg.change*20,group=sacnum),color='darkgreen',alpha=0.2)+
+  geom_line(aes(counter,verg.velocity-400,group=sacnum),alpha=0.2,color='hotpink')+
+  facet_wrap(~saccade.type,ncol=1)+
+  stat_smooth(aes(counter,verg.velocity-400))+
+  geom_hline(yintercept=c(0,-400))
+
+# ggplot(filter(z,r.amp>7))+
+#   # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
+#   geom_line(aes(counter,verg.change*20,group=sacnum),color='darkgreen',alpha=0.2)+
+#   geom_line(aes(counter,verg.velocity-400,group=sacnum),alpha=0.2,color='hotpink')+
+#   facet_wrap(~saccade.type,ncol=1)+
+#   # stat_smooth(aes(counter,verg.velocity-400))+
+#   geom_hline(yintercept=c(0,-400))
+# 
+# ggplot(filter(z,r.amp>7,abs(r.angle<20),saccade.end<280))+
+#   # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
+#   geom_line(aes(counter,verg.change*20,group=sacnum),color='darkgreen',alpha=0.2)+
+#   geom_line(aes(counter,verg.velocity-400,group=sacnum),alpha=0.2,color='hotpink')+
+#   facet_wrap(~saccade.type,ncol=1)+
+#   stat_smooth(aes(counter,verg.velocity-400))+
+#   geom_hline(yintercept=c(0,-400))
+
+
+
+```
+
+```{r more plots}
+ggplot(filter(z,abs(r.angle)<60,counter> -25,counter< 150))+
+  geom_line(aes(counter,verg.velocity,group=interaction(sacnum)),alpha=0.2,color='hotpink')+
+  facet_wrap(~saccade.type,ncol=1)+
+  stat_smooth(aes(counter,verg.velocity))
+
+z<- mutate(z,near.saccade=max.verg.angle>10)
+
+z$near.saccade=as.factor(z$near.saccade)
+levels(z$near.saccade)<- c('Far','Near')
+
+z$right.saccade=as.factor(abs(z$r.angle)>90)
+levels(z$right.saccade)<- c('Left','Right')
+
+ggplot(filter(z,counter> -25,counter< 150,r.amp>7))+
+  # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
+  geom_line(aes(counter,norm.verg.change,group=interaction(sacnum)),color='darkgreen',alpha=1/20)+
+  geom_line(aes(counter,norm.verg.velocity-2,group=interaction(sacnum)),alpha=1/20,color='hotpink')+
+  facet_grid(right.saccade~saccade.type)+
+  geom_hline(yintercept=c(0,-2))
+
+# ggplot(filter(z,counter> -100,counter< 200,r.amp>7))+
+#   # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
+#   geom_line(aes(counter,verg.change*10,group=interaction(sacnum)),color='darkgreen',alpha=1)+
+#   geom_line(aes(counter,verg.velocity-evel-400,group=interaction(sacnum)),color='orange',alpha=1)+
+#   geom_line(aes(counter,evel-300,group=interaction(sacnum)),color='orange',alpha=1)+
+#   geom_line(aes(counter,verg.velocity-200,group=interaction(sacnum)),alpha=1,color='hotpink')+
+#   facet_grid(right.saccade~saccade.type)+
+#   geom_hline(yintercept=c(0,-200,-300,-400))
+```
+
+```{r doodle}
+zp<- filter(z,R.V.Amp<1,R.H.Amp>4,counter>-25,counter<200)
+zp<- filter(z,counter>-25,counter<200)
+ggplot(zp)+
+  geom_line(aes(counter,verg.velocity,group=interaction(sacnum),color=verg.lead),alpha=0.2)+
+  facet_wrap(~saccade.type,ncol=1)+
+  # stat_smooth(aes(counter,verg.velocity))+
+  coord_cartesian(ylim=c(-225,225))
+
+zp<- mutate(zp,verg.lead.bins=cut(verg.lead,breaks=c(-1,5,50,100,150,200,250)))
+ggplot(zp)+
+  geom_line(aes(counter,verg.velocity,group=interaction(sacnum),color=verg.lead),alpha=0.2)+
+  facet_grid(verg.lead.bins~saccade.type)+
+  # stat_smooth(aes(counter,verg.velocity))+
+  coord_cartesian(ylim=c(-225,225))
+
+z %>%
+  group_by(sacnum) %>%
+  mutate(counterverg=row_number()-verg.lead)->
+  z
+
+ggplot(zp)+
+  geom_line(aes(counterverg,verg.velocity.smooth,group=interaction(sacnum)),alpha=0.2)+
+  facet_wrap(~saccade.type,ncol=1)
+
+zp %>%
+  mutate(verg.velocity.smooth=parabolicdiff(lep-rep,20))->
+  zp
+```

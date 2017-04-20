@@ -14,7 +14,8 @@ else
     spikes=b.spikes;
 end
 
-clusters=unique(spikes.assigns);
+% clusters=unique(spikes.assigns);
+clusters=spikes.labels(spikes.labels(:,2)~=4,1);
 clear xx
 for i =1:length(clusters)
     xx{i}=num2str(clusters(i));

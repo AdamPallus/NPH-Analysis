@@ -1,8 +1,11 @@
+library(cladoRcpp)
+library(dplyr)
+library(data.table)
 
 spikedensity<-function (rasters,sd=100) {
   gsize<- sd*10
   g<-dnorm(-gsize:gsize,mean=0,sd=sd)
-  sdf<-convolve(rasters,g,type="open")
+  sdf<-rcpp_convolve(rasters,g)
   sdf<-sdf[gsize:(length(sdf)-(gsize+1))]*1000
   sdf
 }
@@ -23,19 +26,29 @@ dynamiclead<-function(p,lags=seq(10,300,by=10),formula='rev+lev') {
     rsq[i]<- summary(lm(formula=formula,data=p))$r.squared
   }
   #return(rsq)
-  return(lags[rsq==max(rsq)])
-}
-  
-  findSaccades<-function(ev,threshold=40){
-    mindur<-50
-    i<-which(abs(ev)>threshold) #find all the times when speed > threshold
-    sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
-    sacon<-c(1,sacoff+1) #first saccade
-    sacoff<-c(sacoff,length(i)) #end of last saccade
-    saccade.onset<-i[sacon] #get actual times
-    saccade.offset<-i[sacoff] 
-    return(data.frame(saccade.onset,saccade.offset))
+  # return(lags[rsq==max(rsq)])
+  bestlag=lags[rsq==max(rsq)]
+  p$dynamiclead<- bestlag
+  if (bestlag > 0){
+    p$sdflag<-dplyr::lag(p$sdf,bestlag)
   }
+  else{
+    p$sdflag<-dplyr::lead(p$sdf,bestlag*-1)
+  }
+  return(p)
+  
+}
+
+findSaccades<-function(ev,threshold=40){
+  mindur<-1
+  i<-which(abs(ev)>threshold) #find all the times when speed > threshold
+  sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
+  sacon<-c(1,sacoff+1) #first saccade
+  sacoff<-c(sacoff,length(i)) #end of last saccade
+  saccade.onset<-i[sacon] #get actual times
+  saccade.offset<-i[sacoff] 
+  return(data.frame(saccade.onset,saccade.offset))
+}
 
 markSaccades<-function(ev,buffer=15,threshold=40){
   #this function finds and marks saccades given a velocity input
@@ -66,10 +79,10 @@ markSaccades<-function(ev,buffer=15,threshold=40){
 
 parabolicdiff <- function(pos,n=7){
   q <- sum(2*((1:n)^2))
-  convoutput<- convolve(pos,c(-n:-1, 1:n),type="open")
+  convoutput<- rcpp_convolve(pos,c(-n:-1, 1:n))
   convoutput<- convoutput[(n*2):(length(pos)-((n*2)+1))]
   vels<- c(array(convoutput[1],dim=n*2),convoutput,array(convoutput[length(convoutput)],dim=n*2))
-  vels <- vels/q*1000
+  vels <- vels/q*-1000
 }
 
 maxabs<- function(x){
@@ -82,7 +95,9 @@ maxabs<- function(x){
   }
 }
 
-loadnewcsv<- function(r=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
+loadnewcsv<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/"){
+  require(stringr)
+  require(dplyr)
   #This function loads .csv files in a particular folder. They must have the same columns for rbind
   #Saves time by only reading the csv when necessary
   
@@ -91,8 +106,8 @@ loadnewcsv<- function(r=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
   #extract neuron name eg. Bee-01
   names<-sapply(files, str_match,"^[a-zA-Z]+-[0-9]+",USE.NAMES=FALSE)
   # check for new cells
-  if (!is.null(r)){
-    files<-files[!names %in% r$neuron] #comparison
+  if (!is.null(referencefile)){
+    files<-files[!names %in% referencefile$neuron] #comparison
   }
   
   nfiles<-length(files)
@@ -120,7 +135,8 @@ loadnewcsv<- function(r=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
              # slong=markSaccades(conj.velocity,buffer=longbuffer,threshold=10),
              time=row_number(),
              verg.angle=lep-rep,
-             verg.velocity=parabolicdiff(verg.angle,7))->
+             # verg.velocity=parabolicdiff(verg.angle,7),
+             verg.velocity=lev-rev)->
         temp
       
       t <-rbind(t,temp)
@@ -128,19 +144,229 @@ loadnewcsv<- function(r=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
     t<- dplyr::select(t, -thp,-tvp,-time)
   }else{
     message('********NO NEW CELLS********')
-    t=NULL
+    t<-NULL
   }
   return(t)
 }
 
-bootci <- function(t,n=100,alpha=0.05,formula='lagsdf~rev+lev'){
-  t %>%
-    bootstrap(n) %>%
-    do(tidy(lm(formula,.)))%>%
-    group_by(term) %>%
-    summarize(
-      low=quantile(estimate, alpha / 2),
-      high=quantile(estimate, 1 - alpha / 2)) ->
-    ci
-  return(ci)
+joinsaccadesuniformOLD<-function(t,buffer=20,threshold=30,saccade.length=150){
+  
+  findSaccades<-function(ev,threshold=40){
+    mindur<- 1
+    i<-which(abs(ev)>threshold) #find all the times when speed > threshold
+    sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
+    sacon<-c(1,sacoff+1) #first saccade
+    sacoff<-c(sacoff,length(i)) #end of last saccade
+    saccade.onset<-i[sacon] #get actual times
+    saccade.offset<-i[sacoff] 
+    
+    return(data.frame(saccade.onset,saccade.offset))
+  }
+  
+  jsac<- function(stimes){
+    summary(stimes)
+    #input should be an array of length 2: c(onsettime,offsettime, saccade.number,saccade.dur)
+    df<- data.frame(time=stimes[[1]]:stimes[[2]])
+    df$sacnum<- stimes[[4]]
+    df$saccade.dur<- stimes[[3]]
+    return(df)
+    # return(stimes[[1]]:stimes[[2]])
+  }
+  
+  stimes<-findSaccades(t$conj.velocity,threshold)
+  stimes %>%
+    mutate(dur=saccade.offset-saccade.onset,
+           s=row_number(),
+           saccade.onset=saccade.onset-buffer,
+           ###########HERE IS WHERE i MAKE SACCADES UNIFORM #######
+           saccade.offset=saccade.onset+saccade.length+2*buffer)->
+    stimes
+  
+  x<- do.call('rbind',apply(stimes,1,jsac))
+  x %>%
+    group_by(sacnum) %>%
+    mutate(counter=time-first(time)) ->
+    x
+  left_join(t,x,by='time')
+}
+
+joinsaccades<-function(t,buffer=20,threshold=30){
+  findSaccades<-function(ev,threshold=40){
+    mindur<- 1
+    i<-which(abs(ev)>threshold) #find all the times when speed > threshold
+    sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
+    sacon<-c(1,sacoff+1) #first saccade
+    sacoff<-c(sacoff,length(i)) #end of last saccade
+    saccade.onset<-i[sacon] #get actual times
+    saccade.offset<-i[sacoff] 
+    
+    return(data.frame(saccade.onset,saccade.offset))
+  }
+  
+  jsac<- function(stimes){
+    #input should be an array of length 2: c(onsettime,offsettime)
+    df<- data.frame(time=stimes[[1]]:stimes[[2]])
+    df$sacnum<- stimes[[3]]
+    return(df)
+    # return(stimes[[1]]:stimes[[2]])
+  }
+  
+  stimes<-findSaccades(t$conj.velocity,threshold)
+  stimes %>%
+    mutate(s=row_number(),
+           saccade.onset=saccade.onset-buffer,
+           saccade.offset=saccade.offset+buffer)->
+    stimes
+  x<- as.data.frame(rbindlist(apply(stimes,1,jsac)))
+  # x<- do.call('rbind',apply(stimes,1,jsac))
+  x %>%
+    group_by(sacnum) %>%
+    mutate(counter=time-first(time)) ->
+    x
+  left_join(t,x,by='time')
+}
+
+markEnhancement<- function(v, threshold1=15,threshold2=8){
+  require(dplyr)
+  
+  mindur<- 1
+  i<-which(abs(v)>threshold2) #find all the times when speed is above the lower threshold
+  sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
+  sacon<-c(1,sacoff+1) #first saccade
+  sacoff<-c(sacoff,length(i)) #end of last saccade
+  event.onset<-i[sacon] #get actual times
+  event.offset<-i[sacoff] 
+  
+  stimes<- data.frame(event.onset,event.offset)
+  nsaccades=nrow(stimes)
+  
+  jsac<- function(stimes){
+    summary(stimes)
+    #input should be an array of length 2: c(onsettime,offsettime, saccade.number,saccade.dur)
+    df<- data.frame(time=stimes[[1]]:stimes[[2]])
+    df$enhancenum<- stimes[[4]]
+    df$enhance.dur<- stimes[[3]]
+    return(df)
+    # return(stimes[[1]]:stimes[[2]])
+  }
+  
+  stimes %>%
+    mutate(dur=event.offset-event.onset,
+           s=row_number())->
+    stimes
+  
+  x<- do.call('rbind',apply(stimes,1,jsac))
+  
+  
+  v<- data.frame(v=v)
+  v<- mutate(v, time=row_number())
+  
+  xx<- left_join(v,x,by='time')
+  
+  xx %>%
+    group_by(enhancenum) %>%
+    summarize(max.vel=max(abs(v))) %>%
+    filter(max.vel>threshold1)->
+    xm
+  
+  xx %>%
+    filter(enhancenum %in% unique(xm$enhancenum)) %>%
+    dplyr::select(time,v,enhancenum) ->
+    g
+  
+  
+}
+
+makeRelImp<- function(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Ver',normalize=TRUE){
+  require(tidyr)
+  summaryforplot %>% 
+    group_by(neuron) %>%
+    do(m=lm(formula=formula,data=.))-> 
+    mm
+  
+  r<- data.frame()
+  r2 <- NULL
+  if (length(mm$m[[1]]$coefficients)<3){
+    message('Not enough parameters for importance calculation...')
+    message('Returning r.squared only.')
+    for (i in 1:nrow(mm)){
+      r2[i]<- summary(mm$m[[i]])$r.squared
+    }
+    r<- data.frame(neuron=mm$neuron,R2=r2)
+    r<- separate(r,neuron,c('monkey','cellnum'),remove=FALSE)
+    return(r)
+  }  
+  for (i in 1:nrow(mm)){
+    # message('Trying...')
+    bb<- relaimpo::calc.relimp(mm$m[[i]],rela=normalize)
+    b<- bb$lmg
+    r<-rbind(r,b)
+    r2<- c(r2,bb$R2)
+    
+  }
+  r$neuron<-mm$neuron
+  r$R2<- r2
+  names(r)<- c(names(b),'neuron','R2')
+  r<- separate(r,neuron,c('monkey','cellnum'),remove=FALSE)
+  r
+}
+
+joinsaccadesuniform<-function(t,buffer=20,threshold=30,saccade.length=150){
+  
+  findSaccades<-function(ev,threshold=40){
+    mindur<- 1
+    i<-which(abs(ev)>threshold) #find all the times when speed > threshold
+    sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
+    sacon<-c(1,sacoff+1) #first saccade
+    sacoff<-c(sacoff,length(i)) #end of last saccade
+    saccade.onset<-i[sacon] #get actual times
+    saccade.offset<-i[sacoff] 
+    
+    return(data.frame(saccade.onset,saccade.offset))
+  }
+  
+  jsac<- function(stimes){
+    summary(stimes)
+    #input should be an array of length 2: c(onsettime,offsettime, saccade.number,saccade.dur)
+    df<- data.frame(time=stimes[[1]]:stimes[[2]])
+    df$sacnum<- stimes[[4]]
+    df$saccade.dur<- stimes[[3]]
+    return(df)
+    # return(stimes[[1]]:stimes[[2]])
+  }
+  
+  stimes<-findSaccades(t$conj.velocity,threshold)
+  stimes %>%
+    mutate(dur=saccade.offset-saccade.onset,
+           s=row_number(),
+           saccade.onset=saccade.onset-buffer,
+           ###########HERE IS WHERE i MAKE SACCADES UNIFORM #######
+           saccade.offset=saccade.onset+saccade.length+2*buffer)->
+    stimes
+  
+  x<- as.data.frame(rbindlist(apply(stimes,1,jsac)))
+  x %>%
+    group_by(sacnum) %>%
+    mutate(counter=time-first(time)) ->
+    x
+  left_join(t,x,by='time')
+}
+
+dynamiclead2<-function(p,lags=seq(20,80,by=2),formula='verg.velocity~sdflag+verg.angle') {
+  #rewrote this function to work with variables other than sdflag as the prediction
+  rsq<-NULL
+  for (i in 1:length(lags)) {
+    if (lags[i] > 0){
+      p$sdflag<-dplyr::lag(p$sdf,lags[i])
+    }
+    else{
+      p$sdflag<-dplyr::lead(p$sdf,lags[i]*-1)
+    }
+    
+    rsq[i]<- summary(lm(formula=formula,data=p))$r.squared
+  }
+  # return(rsq)
+  return(lags[rsq==max(rsq)])
+  # bestlag=lags[rsq==max(rsq)]
+  
 }

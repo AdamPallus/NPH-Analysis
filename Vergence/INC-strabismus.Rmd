@@ -1,19 +1,20 @@
 ---
-title: "Vergence -- SOA and NRTP"
-author: "Adam"
-date: "May 12, 2016"
-output: html_document
+title: "Analysis of INC in strabismus"
+author: "Adam Pallus"
+output:
+  pdf_document: default
+  html_document: default
 ---
 #Introduction
-This document compares the activity of neurons in the SOA with those in the NRTP. Analysis surrounds the sensitivity to vergence angle during fixation, and an analysis of any increase in firing rate during saccades with vergence.  
+We recorded neurons in the INC of a monkeys with esotropia and pattern strabismus. In this document, we analyze the position and velocity sensitivity of these cells. 
 
 
 ```{r echo=FALSE} 
 library(knitr)
-opts_chunk$set(echo=TRUE,message=FALSE,warning=FALSE,cache=FALSE)
+opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
 ```
 
-```{r,message=FALSE}
+```{r,message=FALSE,echo=FALSE}
 
 library(ggplot2)
 library(dplyr)
@@ -23,275 +24,719 @@ library(broom)
 # library(grid)
 library(relaimpo)
 library(leaps)
-#library(data.table)
 library(stringr)
-source('joinsaccadesuniform.R')
 library(cladoRcpp)
+library(boot)
+source('Adamhelperfunctions.R')
+select<- dplyr::select
 ```
 
-```{r helperfunctions}
-
-spikedensity<-function (rasters,sd=100) {
-  gsize<- sd*10
-  g<-dnorm(-gsize:gsize,mean=0,sd=sd)
-  sdf<-rcpp_convolve(rasters,g)
-  sdf<-sdf[gsize:(length(sdf)-(gsize+1))]*1000
-  sdf
-}
-
-dynamiclead<-function(p,lags=seq(10,300,by=10)) {
-  
-  rsq<-NULL
-  for (i in 1:length(lags)) {
-    if (lags[i] > 0){
-      p$sdflag<-dplyr::lag(p$sdf,lags[i])
-    }
-    else{
-      p$sdflag<-dplyr::lead(p$sdf,lags[i]*-1)
-    }
-    
-    rsq[i]<- summary(lm(sdflag~rep+lep+repV+lepV,data=p))$r.squared
-  }
-  #return(rsq)
-  return(lags[rsq==max(rsq)])
-}
-
-findSaccades<-function(ev,threshold=40){
-  mindur<-50
-  i<-which(abs(ev)>threshold) #find all the times when speed > threshold
-  sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
-  sacon<-c(1,sacoff+1) #first saccade
-  sacoff<-c(sacoff,length(i)) #end of last saccade
-  saccade.onset<-i[sacon] #get actual times
-  saccade.offset<-i[sacoff] 
-  return(data.frame(saccade.onset,saccade.offset))
-}
-
-markSaccades<-function(ev,buffer=15,threshold=40){
-  #this function finds and marks saccades given a velocity input
-  stimes<-findSaccades(ev,threshold)
-  
-  #remove saccades without enough data at the end of the file, based on buffer size
-  toolong<- stimes$saccade.offset> length(ev)-buffer
-  tooshort<- stimes$saccade.onset<buffer+1
-  stimes<- filter(stimes, !tooshort, !toolong)
-  
-  nsaccades=nrow(stimes)
-
-  stimes$saccade.onset=stimes$saccade.onset-buffer
-  stimes$saccade.offset=stimes$saccade.offset+buffer
-  
-  s<-1:length(ev)*0
-  
-  for (k in 1:nsaccades){
-    s[stimes$saccade.onset[k]:stimes$saccade.offset[k]]<- k
-    if(k>1){
-      s[stimes$saccade.offset[k-1]:stimes$saccade.onset[k]]<-(k*-1)
-    }
-  }
-  s[1:stimes$saccade.onset[1]]<- -1
-  s[stimes$saccade.offset[nrow(stimes)]:length(s)]<- (nrow(stimes)*-1)-1
-  return(s)
-}
-
-parabolicdiff <- function(pos,n=7){
-  q <- sum(2*((1:n)^2))
-  convoutput<- rcpp_convolve(pos,c(-n:-1, 1:n))
-  convoutput<- convoutput[(n*2):(length(pos)-((n*2)+1))]
-  vels<- c(array(convoutput[1],dim=n*2),convoutput,array(convoutput[length(convoutput)],dim=n*2))
-  vels <- vels/q*-1000
-}
-
-maxabs<- function(x){
-  m1<-max(x,na.rm=T)
-  m2<-min(x,na.rm=T)
-  if (abs(m1)>abs(m2)) {
-    return(m1)
-  } else{
-    return(m2)
-  }
-}
-
-makeRelImp<- function(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Ver',normalize=TRUE){
-  summaryforplot %>% 
-    group_by(neuron) %>%
-    do(m=lm(formula=formula,data=.))-> 
-    mm
-  
-  r<- data.frame()
-  r2 <- NULL
-  if (length(mm$m[[1]]$coefficients)<3){
-    message('Not enough parameters for importance calculation...')
-    message('Returning r.squared only.')
-    for (i in 1:nrow(mm)){
-      r2[i]<- summary(mm$m[[i]])$r.squared
-    }
-    r<- data.frame(neuron=mm$neuron,R2=r2)
-    return(r)
-  }  
-  for (i in 1:nrow(mm)){
-    # message('Trying...')
-    bb<- relaimpo::calc.relimp(mm$m[[i]],rela=normalize)
-    b<- bb$lmg
-    r<-rbind(r,b)
-    r2<- c(r2,bb$R2)
-    
-  }
-  r$neuron<-mm$neuron
-  r$R2<- r2
-  names(r)<- c(names(b),'neuron','R2')
-  r
-}
-
-loadnewcsv<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/PPRF/"){
-  require(stringr)
-  require(dplyr)
-  #This function loads .csv files in a particular folder. They must have the same columns for rbind
-  #Saves time by only reading the csv when necessary
-  
-  #get names of all files in path
-  files <- list.files(path=path,pattern='*.csv')
-  #extract neuron name eg. Bee-01
-  names<-sapply(files, str_match,"^[a-zA-Z]+-[0-9]+",USE.NAMES=FALSE)
-  # check for new cells
-  if (!is.null(referencefile)){
-    files<-files[!names %in% referencefile$neuron] #comparison
-  }
-  
-  nfiles<-length(files)
-  
-  if (nfiles>0){
-    message(c('New Files: ',files))
-    loadedfiles <- lapply(paste(path,files,sep=''),read.csv)
-    t<-data.frame()
-    # t.old<-NULL
-    for (i in 1:nfiles) {
-      f<- files[i]
-      message(paste('Loading:',f))
-      temp=loadedfiles[[i]]
-      names<-str_match(f,"(^[a-zA-Z]+)-([0-9]+)")
-      temp$neuron<-names[1]
-      temp$monkey<-names[2]
-      temp$cellnum<-as.numeric(names[3])
-      temp$sdf<-spikedensity(temp$rasters,sd=10)
-      # leadtime<-dynamiclead(temp)
-      message(paste('ms of data:',nrow(temp)))
-      mutate(temp,
-             # sdflag=lag(sdf,leadtime),
-             conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2),
-             # s=markSaccades(conj.velocity,buffer=10,threshold=10),
-             # slong=markSaccades(conj.velocity,buffer=longbuffer,threshold=10),
-             time=row_number(),
-             verg.angle=lep-rep,
-             # verg.velocity=parabolicdiff(verg.angle,7),
-             verg.velocity=lev-rev)->
-        temp
-      
-      t <-rbind(t,temp)
-    }
-    t<- dplyr::select(t, -thp,-tvp,-time)
-  }else{
-    message('********NO NEW CELLS********')
-    t<-NULL
-  }
-  return(t)
-}
-
-```
-
-```{r loadfiles}
-#load all the .csv files in the data folder, then add a column naming the neuron, 
-#using the file name as the default name, then put them all together in one long data frame
-
-path<- "C:/Users/setup/Desktop/NRTP Vergence/"
-buffer<- 20
-longbuffer<- 200
-
-#get names of all files in path
-files <- list.files(path=path,pattern='*.csv')
-#extract neuron name eg. Bee-01
-names<-sapply(files, str_match,"^[a-zA-Z]+-[0-9]+",USE.NAMES=FALSE)
-# check for new cells
-message('Loading Saved Data')
-t.old<-readRDS('SOA-NRTP.RDS')
-files<-files[!names %in% t.old$neuron] #comparison
-nfiles<-length(files)
- # nfiles=1
-if (nfiles>0){
-  message(c('New Files: ',files))
-  loadedfiles <- lapply(paste(path,files,sep=''),read.csv)
- t<-data.frame()
-
- for (i in 1:nfiles) {
-   f<- files[i]
-   message(paste('Loading:',f))
-   temp=loadedfiles[[i]]
-   names<-str_match(f,"(^[a-zA-Z]+)-([0-9]+)")
-   temp$neuron<-names[1]
-   temp$monkey<-names[2]
-   temp$cellnum<-as.numeric(names[3])
-   temp$sdf<-spikedensity(temp$rasters,sd=10)
-   # leadtime<-dynamiclead(temp)
-   mutate(temp,
-                # sdflag=lag(sdf,leadtime),
-                conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2),
-                # s=markSaccades(conj.velocity,buffer=10,threshold=10),
-                # slong=markSaccades(conj.velocity,buffer=longbuffer,threshold=10),
-                time=row_number(),
-                verg.angle=lep-rep,
-                verg.velocity=parabolicdiff(verg.angle,7))->
-     temp
-
-   t <-rbind(t,temp)
- }
- t<- rbind(t.old,t)
- saveRDS(rbind(t),'SOA-NRTP-new.RDS')
-t.old<- NULL
- }else{
-  message('********NO NEW CELLS********')
-t<-t.old
-t.old<-NULL
- }
-t<- filter(t, monkey %in% c('Bee','Ozette'))
-```
-
-```{r quickload}
-o<-readRDS('KopachuckINC.RDS')
+```{r quickload,echo=FALSE}
+# o<-readRDS('KopachuckINC.RDS')
+o<-readRDS('KopaBeeINC.RDS')
+# o<- NULL
 t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
 
-t<- rbind(o,t)
+if (!is.null(t)){
+  t<- rbind(o,t)
+  saveRDS(t,paste('KopachuckINC',substr(date(),1,10)))
+}else{
+  t<-o
+}
+
+# t<- rbind(o,t)
 
 t %>% group_by(neuron) %>%
   mutate(time=row_number()) ->
   t
 
 o<-NULL
-```
 
-```{r measureMovements}
+#Calculate ISI
 t %>%
   group_by(neuron) %>%
-  mutate(s=markSaccades(conj.velocity,buffer=10,threshold=10),
+  dplyr::select(neuron, rasters,time) %>%
+  # mutate(time=row_number()) %>%
+  filter(rasters==1) %>%
+  mutate(isi=time-lag(time,1)) %>%
+  left_join(t,.,by=c('neuron','time','rasters')) ->
+  t
+
+```
+#Results
+```{r simple model INC}
+
+t%>%
+  group_by(neuron) %>%
+  mutate(sdf10=lag(sdf,10))->
+  t
+
+r<- makeRelImp(t,formula='sdf10~repV+revV',norm=FALSE)
+
+
+t %>% group_by(neuron) %>%
+  do(tidy(lm('sdf10~repV+revV',data=.)))->
+  ttest
+
+ttest %>%
+  dplyr::select(neuron,term,estimate) %>%
+  spread(term,estimate) ->
+  tp
+         
+tp$b<-tp$'(Intercept)'
+tp$'(Intercept)'=NULL
+
+
+
+tp %>%
+  ungroup() %>%
+  mutate(absb=abs(b),
+         absrepV=abs(repV),
+         absrevV=abs(revV)) %>%
+  dplyr::select(neuron,absb,absrepV,absrevV)->
+  tpa
+names(tp)<- c('neuron','V_Posion','V_Velocity','b')
+
+tp<- left_join(tp,dplyr::select(r,neuron,R2),by='neuron')
+
+kable(tp,digits=c(0,2,2,2,2))
+
+tpa<- separate(tpa,neuron,c('monkey','cellnum'),remove=FALSE)
+
+#add R^2 since tidy doesn't automatically grab that
+tpa<- left_join(tpa,dplyr::select(r,neuron,R2),by='neuron')
+
+
+tpa %>%
+  filter(monkey=='Kopachuck') %>%
+  dplyr::select(-neuron,-monkey,-cellnum)->
+  xx
+
+kable(summary(xx))
+
+tpa %>%
+  filter(monkey=='Bee') %>%
+  dplyr::select(-neuron,-monkey,-cellnum)->
+  xx
+
+kable(summary(xx))
+
+
+
+ggplot(r)+geom_histogram(aes(R2))+
+  ggtitle('Goodness of Fit')+
+  facet_wrap(~monkey)+
+  geom_vline(xintercept = 0.1)+
+  annotate("text", x=0.25,y=6,label= "R^2 == 0.1",parse=TRUE)
+
+
+
+removeIrregular=TRUE
+
+if (removeIrregular){
+  tpa<- filter(tpa,R2>0.1)
+}
+
+tpa %>%
+  group_by(monkey) %>%
+  dplyr::select(-neuron,-cellnum) %>%
+  summarize_each(funs(mean))->
+  vs
+
+ggplot(tpa)+
+  geom_histogram(aes(absb),bins=20)+
+  xlab('Bias (absolute value)')+
+  facet_wrap(~monkey)+
+  geom_vline(aes(xintercept = absb),data=vs)+
+  geom_label(aes(x=absb,y=3.5,label=round(absb,2)),data=vs)
+
+ggplot(tpa)+
+  geom_histogram(aes(absrepV),bins=20)+
+  geom_vline(aes(xintercept = absrepV),data=vs)+
+  xlab('Right Eye Vertical Position Sensitivity (absolute value)')+
+  facet_wrap(~monkey)+
+    geom_label(aes(x=absrepV,y=3.5,label=round(absrepV,2)),data=vs)
+
+ggplot(tpa)+
+  geom_histogram(aes(absrevV),bins=20)+
+  geom_vline(aes(xintercept = absrevV),data=vs)+
+  xlab('Right Eye Vertical Velocity Sensitivity (absolute value)')+
+  facet_wrap(~monkey)+
+    geom_label(aes(x=absrevV,y=3.5,label=round(absrevV,2)),data=vs)
+
+ggplot(tpa)+
+  geom_boxplot(aes(monkey,absb))+
+  ylab("Intercept")
+
+ggplot(tpa)+
+  geom_boxplot(aes(monkey,absrepV))+
+  ylab("Sensitivity to Right Eye Position")
+
+ggplot(tpa)+
+  geom_boxplot(aes(monkey,absrevV))+
+  ylab("Sensitivity to Right Eye Velocity")
+
+```
+
+```{r simpleH model INC}
+
+
+r<- makeRelImp(t,formula='sdf10~rep+rev',norm=FALSE)
+
+
+t %>% group_by(neuron) %>%
+  do(tidy(lm('sdf10~rep+rev',data=.)))->
+  ttest
+
+ttest %>%
+  dplyr::select(neuron,term,estimate) %>%
+  spread(term,estimate) ->
+  tp
+         
+tp$b<-tp$'(Intercept)'
+tp$'(Intercept)'=NULL
+
+
+
+tp %>%
+  ungroup() %>%
+  mutate(absb=abs(b),
+         absrep=abs(rep),
+         absrev=abs(rev)) %>%
+  dplyr::select(neuron,absb,absrep,absrev)->
+  tpa
+names(tp)<- c('neuron','H_Posion','H_Velocity','b')
+
+kable(tp,digits=c(0,2,2,2))
+
+tpa<- separate(tpa,neuron,c('monkey','cellnum'),remove=FALSE)
+
+#add R^2 since tidy doesn't automatically grab that
+tpa<- left_join(tpa,dplyr::select(r,neuron,R2),by='neuron')
+
+
+tpa %>%
+  filter(monkey=='Kopachuck') %>%
+  dplyr::select(-neuron,-monkey,-cellnum)->
+  xx
+
+kable(summary(xx))
+
+tpa %>%
+  filter(monkey=='Bee') %>%
+  dplyr::select(-neuron,-monkey,-cellnum)->
+  xx
+
+kable(summary(xx))
+
+
+
+ggplot(r)+geom_histogram(aes(R2))+
+  ggtitle('Goodness of Fit')+
+  facet_wrap(~monkey)+
+  geom_vline(xintercept = 0.1)+
+  annotate("text", x=0.25,y=6,label= "R^2 == 0.1",parse=TRUE)
+
+
+
+removeIrregular=FALSE
+
+if (removeIrregular){
+  tpa<- filter(tpa,R2>0.1)
+}
+
+tpa %>%
+  group_by(monkey) %>%
+  dplyr::select(-neuron,-cellnum) %>%
+  summarize_each(funs(mean))->
+  vs
+
+ggplot(tpa)+
+  geom_histogram(aes(absb),bins=20)+
+  xlab('Bias (absolute value)')+
+  facet_wrap(~monkey)+
+  geom_vline(aes(xintercept = absb),data=vs)+
+  geom_label(aes(x=absb,y=3.5,label=round(absb,2)),data=vs)
+
+ggplot(tpa)+
+  geom_histogram(aes(absrep),bins=20)+
+  geom_vline(aes(xintercept = absrep),data=vs)+
+  xlab('Right Eye Horizontal Position Sensitivity (absolute value)')+
+  facet_wrap(~monkey)+
+    geom_label(aes(x=absrep,y=3.5,label=round(absrep,2)),data=vs)
+
+ggplot(tpa)+
+  geom_histogram(aes(absrev),bins=20)+
+  geom_vline(aes(xintercept = absrev),data=vs)+
+  xlab('Right Eye Horizontal Velocity Sensitivity (absolute value)')+
+  facet_wrap(~monkey)+
+    geom_label(aes(x=absrev,y=3.5,label=round(absrev,2)),data=vs)
+
+ggplot(tpa)+
+  geom_boxplot(aes(monkey,absb))+
+  ylab("Intercept")
+
+ggplot(tpa)+
+  geom_boxplot(aes(monkey,absrep))+
+  ylab("Sensitivity to Right Eye HORIZONTAL Position")
+
+ggplot(tpa)+
+  geom_boxplot(aes(monkey,absrev))+
+  ylab("Sensitivity to Right Eye HORIZONTAL Velocity")
+
+```
+
+##Time Series Bootstrapping
+The boot package for R provides a function called tsboot. This function deals with the problem of time series data continaing autocorrelated data. Instead of treating each point individually for bootstrapping, it chooses chunks of the data set. We can set how large each chunk is. Let's try 1000ms per chunk.
+```{r timeseriesbootstrapping}
+
+#------TSBOOT
+inc.fun <- function(tsb) {
+       fit <- lm(data=tsb,formula='sdf10~repV+revV')
+       return(coef(fit)) }
+
+# tb<-tsboot(t, inc.fun, R=999,sim="geom", l=1000)
+# plot(tb)
+# tbs<-tidy(tb)
+# tbs<-mutate(tbs,low95=statistic-2*std.error,high95=statistic+2*std.error)
+
+#---- 
+t %>%
+  group_by(neuron) %>%
+  do(tidy(tsboot(.,inc.fun,R=1999,sim="geom",l=1000))) %>%
+  mutate(low95=statistic-2*std.error,high95=statistic+2*std.error)->
+  tsba
+
+tsba %>%
+  mutate(zerocross=low95*high95<0)->
+  tsba
+
+tsba %>%
+  dplyr::select(neuron,term,statistic) %>%
+  spread(term,statistic)->
+  tplot
+
+
+tsba %>%
+  dplyr::select(neuron,term,low95) %>%
+  spread(term,low95) %>%
+  rename(repV.low=repV,revV.low=revV)->
+  tlow
+
+
+
+tsba %>%
+  dplyr::select(neuron,term,high95) %>%
+  spread(term,high95) %>%
+  rename(repV.high=repV,revV.high=revV)->
+  thigh
+
+tplot<- left_join(tplot,tlow,by='neuron')
+tplot<- left_join(tplot,thigh,by='neuron')
+
+ggplot(tplot,aes(repV,revV))+
+  geom_point()+
+  geom_errorbar(aes(ymin=revV.low,ymax=revV.high))+
+  geom_errorbarh(aes(xmin=repV.low,xmax=repV.high))+
+  geom_hline(yintercept = 0,color='pink')+
+  geom_vline(xintercept = 0,color='pink')
+
+saveRDS(tplot, 'tsbootstrapresults1999.RDS')
+
+
+```
+##Dynamic Modeling
+We fit the entire data set with a linear model considering conjugate horizontal and vertical position and velocity:
+
+```{r model INC}
+t%>%
+  group_by(neuron) %>%
+  mutate(sdf10=lag(sdf,20),
+         conj.VP=(lepV+repV)/2,
+         conj.HP=(lep+rep)/2,
+         conj.VV=(levV+revV)/2,
+         conj.HV=(lev+rev)/2)->
+  t
+
+t %>% group_by(neuron) %>%
+  do(tidy(lm('sdf10~conj.VP+conj.HP+conj.VV+conj.HV',data=.)))->
+  ttest
+
+
+ttest %>%
+  dplyr::select(neuron,term,estimate) %>%
+  spread(term,estimate) ->
+  tp
+
+r<- makeRelImp(t,formula='sdf10~conj.VP+conj.HP+conj.VV+conj.HV',norm=FALSE)
+
+tp<- left_join(tp,dplyr::select(r,neuron,R2),by='neuron')
+
+kable(tp,digits=c(0,2,2,2,2,2,2))
+
+
+#direction preference:
+# tp %>%
+#   summarize(dir.pref=atan2(conj.VP+conj.VV,conj.HP+conj.HV)*180/pi) %>%
+#   left_join(r,.,by='neuron')->
+#   r
+tp %>%
+  summarize(dir.pref=atan2(conj.VP,conj.HP)*180/pi) %>%
+  left_join(r,.,by='neuron')->
+  r
+  
+```
+
+We plot the *R^2* for each neuron then calculate relative importance of the 4 parameters and plot those comparisons:
+
+```{r makeplots,fig.height=5,fig.width=5}
+
+ggplot(r)+geom_bar(aes(as.numeric(cellnum) %% 100,R2),stat='identity')+
+  ggtitle('Goodness of Fit')+
+  facet_wrap(~monkey,scales='free_x')
+
+ggplot(r)+geom_histogram(aes(R2))+
+  ggtitle('Goodness of Fit')
+
+ggplot(r,aes(conj.HP,conj.VP,label=cellnum,color=monkey))+
+  geom_point(size=3,alpha=1/2)+
+  geom_text(alpha=1/2,color='black',data=filter(r,R2>0.1))+
+  geom_abline(slope=1)+
+  ggtitle('Comparing Importantance of \nHorizontal and Vertical Position')+
+  xlab('Horizontal Position')+
+  ylab('Vertical Position')+
+  coord_fixed()+
+  expand_limits(x=-0.1,y=-0.1)+
+  theme(legend.position = 'bottom')
+
+ggplot(r,aes(conj.HV,conj.VV,label=cellnum))+
+  geom_point(size=3)+
+  geom_label()+
+  geom_abline(slope=1)+
+  ggtitle('Comparing Importantance of Horizontal and Vertical Velocity')+
+  xlab('Horizontal Velocity')+
+  ylab('Vertical Velocity')+
+  facet_wrap(~monkey)
+
+ggplot(r,aes(conj.VP,conj.VV,label=cellnum))+
+  geom_point(size=3)+
+  geom_label()+
+  geom_abline(slope=1)+
+  ggtitle('Comparing Importance of Vertical Position and Velocity')+
+  xlab('Vertical Position')+
+  ylab('Vertical Velocity')+
+  facet_wrap(~monkey)
+
+
+ggplot(r,aes(conj.HP,conj.HV,label=cellnum))+
+  geom_point(size=3)+
+  geom_label()+
+  geom_abline(slope=1)+
+  ggtitle('Comparing Importance of Horizontal Position and Velocity')+
+  xlab('Horizontal Position')+
+  ylab('Horizontal Velocity')+
+  facet_wrap(~monkey)
+
+##Error Bars for parameter estimates
+# ggplot(filter(ttest,term!='(Intercept)'))+
+#   geom_point(aes(term,estimate))+
+#   geom_errorbar(aes(x=term,ymin=estimate-2*std.error,
+#                     ymax=estimate+2*std.error,color=neuron,width=0.25))
+```
+
+We calculate direction preference by the arctangent of the relative importance of the horizontal and conjugate position on firing rate. First, plotted with the radius of the arrow indicating the *R^2*, then just showing the direction: 
+
+```{r Direction Preference}  
+ggplot(r)+
+    geom_segment(aes(yend=R2,xend=dir.pref,y=0,x=dir.pref,color=cellnum),
+               alpha=0.5,arrow=arrow(type='closed',length =unit(0.1,"inches")))+
+  # geom_text(aes(dir.pref,R2+0.05,label=cellnum),alpha=1)+
+  coord_polar(direction=-1,start=pi/2)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  theme_bw()+
+  ggtitle('Direction preference and goodness of fit')+
+  ylab('Goodness of Fit')+
+  xlab('Preferred Direction')+
+  facet_wrap(~monkey)
+
+ggplot(r)+
+    geom_segment(aes(yend=1,xend=dir.pref,y=0,x=dir.pref,color=cellnum),
+               alpha=0.5,arrow=arrow(type='closed',length =unit(0.1,"inches")))+
+  # geom_text(aes(dir.pref,R2+0.05,label=cellnum),alpha=1)+
+  coord_polar(direction=-1,start=pi/2)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  theme_bw()+
+  ggtitle('Direction preference')+
+  ylab('')+
+  xlab('Preferred Direction')+
+  facet_wrap(~monkey)
+
+ggplot(filter(r,R2>0.1))+
+    geom_segment(aes(yend=R2,xend=dir.pref,y=0,x=dir.pref,color=cellnum),
+               alpha=0.5,arrow=arrow(type='closed',length =unit(0.1,"inches")))+
+  # geom_text(aes(dir.pref,R2+0.05,label=cellnum),alpha=1)+
+  coord_polar(direction=-1,start=pi/2)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  theme_bw()+
+  ggtitle('Direction preference and goodness of fit')+
+  ylab('Goodness of Fit')+
+  xlab('Preferred Direction')+
+  facet_wrap(~monkey)+
+  ggtitle("Irregular Cells Removed")
+
+ggplot(filter(r,R2>0.1))+
+    geom_segment(aes(yend=1,xend=dir.pref,y=0,x=dir.pref,color=cellnum),
+               alpha=0.5,arrow=arrow(type='closed',length =unit(0.1,"inches")))+
+  geom_text(aes(dir.pref,1,label=cellnum),alpha=1)+
+  coord_polar(direction=-1,start=pi/2)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  theme_bw()+
+  ggtitle('Direction preference')+
+  ylab('')+
+  xlab('Preferred Direction')+
+  facet_wrap(~monkey)+
+  ggtitle('Irregular Cells Removed')
+
+ggplot(filter(r,R2>0.1,monkey=='Kopachuck'))+
+    geom_segment(aes(yend=R2,xend=dir.pref,y=0,x=dir.pref),
+               alpha=0.5,arrow=arrow(type='closed',length =unit(0.1,"inches")))+
+  # geom_text(aes(dir.pref,R2+0.05,label=cellnum),alpha=1)+
+  coord_polar(direction=-1,start=pi/2)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  theme_bw()+
+  ggtitle('Direction preference and goodness of fit')+
+  ylab('Goodness of Fit')+
+  xlab('Preferred Direction')+
+  facet_wrap(~monkey)+
+  ggtitle("Irregular Cells Removed")
+
+ggplot(filter(r,R2>0.1,monkey=='Bee'))+
+    geom_segment(aes(yend=R2,xend=dir.pref,y=0,x=dir.pref),
+               alpha=0.5,arrow=arrow(type='closed',length =unit(0.1,"inches")))+
+  # geom_text(aes(dir.pref,R2+0.05,label=cellnum),alpha=1)+
+  coord_polar(direction=-1,start=pi/2)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  theme_bw()+
+  ggtitle('Direction preference and goodness of fit')+
+  ylab('Goodness of Fit')+
+  xlab('Preferred Direction')+
+  facet_wrap(~monkey)+
+  ggtitle("Irregular Cells Removed")
+
+```
+
+\newpage
+##Saccades
+Next, we analyze the activity during saccades. We plot peak firing rate as a function of peak vertical and horizontal velocity: 
+
+```{r saccadeburst,fig.height=9,fig.width=7}
+t %>% group_by(neuron) %>%
+  do(joinsaccadesuniform(.,buffer=50,threshold=30))->
+  ts
+
+ts %>%
+  group_by(neuron) %>%
+  # mutate(bin.velocity=cut(verg.velocity,c(seq(-200,200,by=20)))) %>%
+  # filter(!is.na(sacnum)) %>%
+  group_by(neuron, sacnum) %>%
+  mutate(peak.H.vel=maxabs(lev+rev)/2,
+         peak.V.vel=maxabs((levV+revV)/2),
+         conj.h=(lep+rep)/2,
+         conj.v=(lepV+repV)/2,
+         conj.h.amp=last(conj.h)-first(conj.h),
+         conj.v.amp=last(conj.v)-first(conj.v),
+         conj.angle=atan2(conj.v,conj.h)*180/pi,
+         peak.verg.velocity=maxabs(verg.velocity),
+         r.amp=sqrt(conj.h.amp^2+conj.v.amp^2),
+         peak.FR=max(sdf10)) ->
+  ts
+
+ts %>%
+  group_by(neuron,sacnum) %>%
+  summarize(saccade.amp=first(r.amp),
+            peak.H.vel=first(peak.H.vel),
+            peak.V.vel=first(peak.V.vel),
+            peak.FR=first(peak.FR),
+            conj.h.amp=first(conj.h.amp),
+            conj.v.amp=first(conj.v.amp)) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  sp
+```
+
+```{r bigplots, fig.height=8,fig.width=5}
+# qplot(peak.V.vel,peak.FR,data=filter(sp,abs(peak.V.vel)>100))+
+#   facet_wrap(~neuron,scales='free',ncol=3)+
+#   stat_smooth(method='lm')
+
+qplot(conj.h.amp,peak.FR,data=filter(sp,abs(conj.h.amp)>4))+
+facet_wrap(~neuron,scales='free',ncol=3)+
+stat_smooth(method='lm')+
+  xlab('Horizontal Saccade Amplitude (deg)')+
+  ylab('Peak firing rate (deg/s)')
+
+```
+
+\pagebreak
+
+```{r plot2, fig.height=8,fig.width=5}
+# qplot(peak.H.vel,peak.FR,data=filter(sp,abs(peak.H.vel)>100))+
+#   facet_wrap(~neuron,scales='free',ncol=3)+
+#   stat_smooth(method='lm')
+
+qplot(conj.v.amp,peak.FR,data=filter(sp,abs(conj.v.amp)>4))+
+facet_wrap(~neuron,scales='free',ncol=3)+
+stat_smooth(method='lm')+
+    xlab('Vertical Saccade Amplitude (deg)')+
+  ylab('Peak firing rate (deg/s)')
+
+# ggplot(filter(sp,abs(conj.v.amp)>5))+
+#   geom_point(aes(peak.V.vel,peak.FR))+
+#   facet_wrap(~neuron,scales='free')
+# 
+# ggplot(filter(sp,abs(conj.h.amp)>5))+
+#   geom_point(aes(peak.H.vel,peak.FR))+
+#   facet_wrap(~neuron,scales='free')
+
+# ggplot(filter(ts,conj.v.amp>5))+
+#   geom_line(aes(counter,sdf10,group=sacnum))+
+#   facet_wrap(~neuron)+
+#   coord_cartesian(xlim=c(0,500))
+
+
+```
+
+\newpage
+##Monocularity
+We assess the cells for monocular preference. 
+
+```{r monoculartest}
+r<- makeRelImp(t,formula='sdf10~rep+lep+rev+lev',norm=FALSE)
+
+ggplot(r,aes(rep,lep,label=cellnum))+
+  geom_point(size=3)+
+  geom_label()+
+  geom_abline(slope=1)+
+  ggtitle('Comparing Importantance of Left and Right Eye Vertical Position')+
+  xlab('Right Eye')+
+  ylab('Left Eye')
+
+t %>% group_by(neuron) %>%
+  do(tidy(lm('sdf10~repV+lepV+revV+levV',data=.)))->
+  ttest
+
+# #Error Bars for parameter estimates
+# ggplot(filter(ttest,term %in% c('repV','lepV')))+
+#   geom_point(aes(term,estimate))+
+#   geom_errorbar(aes(x=term,ymin=estimate-2*std.error,
+#                     ymax=estimate+2*std.error,color=neuron,width=1))
+
+ttest %>%
+  dplyr::select(neuron,term,std.error) %>%
+  spread(term,std.error) %>%
+  dplyr::select(neuron,lepV,repV) %>%
+  rename(lepV.e=lepV,repV.e=repV)->
+  tp.e
+
+ttest %>%
+  dplyr::select(neuron,term,estimate) %>%
+  spread(term,estimate) %>%
+  left_join(.,tp.e,by='neuron') %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  tp
+
+# ggplot(tp,aes(repV,lepV,label=cellnum))+
+#   # geom_point(size=3)+
+#   # geom_label()+
+#   geom_abline(slope=-1)+
+#   geom_errorbar(aes(ymin=lepV-2*lepV.e,ymax=lepV+2*lepV.e))+
+#   geom_errorbarh(aes(xmin=repV-2*repV.e,xmax=repV+2*repV.e))
+# 
+#   ggtitle('Comparing Sensitivity Left and Right Eye to Vertical Position')+
+#   xlab('Right Eye')+
+#   ylab('Left Eye')
+
+```
+
+```{r monocularBOOT}
+
+#------TSBOOT
+inc.mono.fun <- function(tsb) {
+       fit <- lm(data=tsb,formula='sdf10~repV+lepV')
+       return(coef(fit)) }
+
+# tb<-tsboot(t, inc.fun, R=999,sim="geom", l=1000)
+# plot(tb)
+# tbs<-tidy(tb)
+# tbs<-mutate(tbs,low95=statistic-2*std.error,high95=statistic+2*std.error)
+
+#---- 
+t %>%
+  group_by(neuron) %>%
+  do(tidy(tsboot(.,inc.mono.fun,R=99,sim="geom",l=1000))) %>%
+  mutate(low95=statistic-2*std.error,high95=statistic+2*std.error)%>%
+  mutate(zerocross=low95*high95<0)->
+  tsba
+
+tsba %>%
+  dplyr::select(neuron,term,statistic) %>%
+  spread(term,statistic)->
+  tplot
+
+
+tsba %>%
+  dplyr::select(neuron,term,low95) %>%
+  spread(term,low95) %>%
+  rename(repV.low=repV,lepV.low=lepV)->
+  tlow
+
+
+
+tsba %>%
+  dplyr::select(neuron,term,high95) %>%
+  spread(term,high95) %>%
+  rename(repV.high=repV,lepV.high=lepV)->
+  thigh
+
+tplot<- left_join(tplot,tlow,by='neuron')
+tplot<- left_join(tplot,thigh,by='neuron')
+
+ggplot(tplot,aes(repV,lepV))+
+  geom_point()+
+  geom_errorbar(aes(ymin=lepV.low,ymax=lepV.high))+
+  geom_errorbarh(aes(xmin=repV.low,xmax=repV.high))+
+  geom_hline(yintercept = 0,color='pink')+
+  geom_vline(xintercept = 0,color='pink')+
+  geom_abline()+
+  geom_abline(slope=-1)
+```
+
+```{R isi}
+#Calculate ISI
+# t %>%
+#   group_by(neuron) %>%
+#   dplyr::select(neuron, rasters,time) %>%
+#   # mutate(time=row_number()) %>%
+#   filter(rasters==1) %>%
+#   mutate(isi=time-lag(time,1)) %>%
+#   left_join(t,.,by=c('neuron','time','rasters')) ->
+#   t
+
+t %>%
+  group_by(neuron) %>%
+  mutate(s=markSaccades(conj.velocity,buffer=20,threshold=25),
     isfixation=s<0) %>%
   filter(isfixation) %>% #This removes all saccades from the dataframe
   group_by(neuron,s) %>%
-  mutate(meanfr=mean(sdf),
+  summarize(meanfr=mean(sdf),
          maxfr=max(sdf),
          R.Hor=mean(rep),
          R.Ver=mean(repV),
          L.Hor=mean(lep),
          L.Ver=mean(lepV),
-         # exatrope= monkey=='Pilchuck',
-         mean.Verg.Angle=mean(verg.angle),
-         mean.Verg.Vel=mean(verg.velocity),
-         # mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle<0 & ~exatrope , NA),
-         # mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle>0 & exatrope,NA ),
-         # mean.Verg.Angle=replace(mean.Verg.Angle,abs(mean.Verg.Angle)>50, NA),
-         max.Verg.Vel = max(verg.velocity),
-         max.Verg.Ang = max(verg.angle),
-         nspikes=sum(rasters),
          dur=n(),
          mean.Spikerate=sum(rasters)/dur*1000,
+         mean.ISI=mean(isi,na.rm=T),
+         var.ISI=var(isi,na.rm=T),
          R.H.Amp=rep[1]-rep[length(rep)],
          L.H.Amp=lep[1]-lep[length(lep)],
          R.V.Amp=repV[1]-repV[length(repV)],
@@ -300,305 +745,65 @@ t %>%
   m
 
 
-```
+qplot(mean.ISI,sqrt(var.ISI),data=m)+facet_wrap(~neuron,ncol=3,scales='free')
 
-```{r verg.fixations,fig.height=28,fig.width=13}
-# m %>%
-#   filter(dur>50,monkey=='Kopachuck',
-#          mean.Spikerate>20) %>%
-#   summarize(mean.Spikerate=mean.Spikerate[1],
-#             mean.Verg.Angle=mean.Verg.Angle[1],
-#             dur=dur[1]) ->
-# summaryforplot
+ggplot(m)
+  geom_histogram(aes(dur))+
+  facet_wrap(~neuron,ncol=3,scales='free')
+
+ggplot(filter(m,dur>50,dur<500))+
+  geom_point(aes(R.Ver,mean.Spikerate))+
+  facet_wrap(~neuron,ncol=3,scales='free')
+
+
 m %>%
   group_by(neuron,s) %>%
-  # dplyr::filter(dur>50) %>%
-  summarize(mean.Spikerate=mean.Spikerate[1],
-            mean.Verg.Angle=mean.Verg.Angle[1],
-            mean.Verg.Vel=first(mean.Verg.Vel),
-            dur=dur[1],
-            mean.time=mean(time),
-            cellnum=cellnum[1],
-            maxfr=maxfr[1],
-            max.verg.angle=max.Verg.Ang[1],
-            max.verg.velocity=max.Verg.Vel[1]) ->
-summaryforplot
-
-
-summaryforplot %>%
-  separate(neuron, c('monkey','cellnum2'),remove=FALSE) %>%
-  # filter(monkey=='Pilchuck') %>%
-  group_by(neuron) %>%
-  # filter(mean.Verg.Vel<2, 
-  #        dur>50,
-  #        mean.Verg.Angle<50,
-  #        mean.Verg.Angle> -30) %>%
-  mutate(r=cor(mean.Verg.Angle,mean.Spikerate)) ->
-  sp
-
-# m<- NULL
-# s.old<-readRDS('NRTPsummaryforplot.RDS')
-# summaryforplot<-rbind(s.old,summaryforplot)
-# 
-# saveRDS(rbind(s.old,summaryforplot),'NRTPsummaryforplot-new.RDS')
-# 
-# summaryforplot<- readRDS('NRTPsummaryforplot-new.RDS')
-
-ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=filter(sp,cellnum>100))+
-    geom_point(size=2,alpha=1/2)+
-  # geom_point(aes(color=mean.time),size=2,alpha=1/2)+
-  # scale_color_continuous(low='black',high='orange')+
-  # facet_wrap(~neuron,scales='free_x')+
-    facet_wrap(~neuron,ncol=2)+
-  stat_smooth(method='lm')+
-  geom_label(aes(0,100,label=paste('r = ',round(r,2))))+
-  ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
-
-# 
-# gp<-ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=filter(sp,mean.Verg.Angle> -5))+
-# geom_point(size=2,alpha=1/5)+
-# # facet_wrap(~neuron,scales='free_x')+
-# facet_wrap(~neuron,ncol=3)+
-# stat_smooth(method='lm')+
-# geom_label(aes(0,100,label=paste('r = ',round(r,2))))+
-# ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
-# ggsave('TestRasterLabel.png',height=45,width=5,plot=gp)
-
-
-# gp<- ggplot(filter(summaryforplot,dur>50,cellnum %in% c(1,25,28))) +
-# geom_point(aes(mean.Verg.Angle,mean.Spikerate),size=2,alpha=1/5)+
-#   # facet_wrap(~neuron,scales='free_x')+
-#     facet_wrap(~neuron,ncol=2)+
-#   stat_smooth(method='lm')+
-#   ggtitle('Firing Rate as a function of Vergence Angle during Fixations')+
-#   xlab('Mean Vergence Angle (deg)')+
-#   ylab('Mean Firing Rate (spk/s)')+
-#   theme_bw()
-# ggsave('NRTP-RatePosition.PDF',plot=gp)
-# 
-# gp<- ggplot(filter(summaryforplot,dur>50,cellnum %in% c(30))) +
-# geom_point(aes(mean.Verg.Angle,mean.Spikerate),size=3,alpha=1/2)+
-#   # facet_wrap(~neuron,scales='free_x')+
-#     facet_wrap(~neuron,ncol=2)+
-#   stat_smooth(method='lm')+
-#   ggtitle('Firing Rate as a function of Vergence Angle during Fixations')+
-#   xlab('Mean Vergence Angle (deg)')+
-#   ylab('Mean Firing Rate (spk/s)')+
-#   theme_bw()
-# ggsave('NRTP-RatePosition-Single.PDF',plot=gp)
-
-# qplot(mean.Verg.Angle,mean.Spikerate,data=summaryforplot)+
-#   geom_point()+
-#   stat_smooth(method='lm')+
-#   facet_wrap(~neuron)+
-#   ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
+  summarize(CV=sqrt(var.ISI)/mean.ISI) %>%
+  summarize(CV=mean(CV,na.rm=T)) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  sm
 
 ```
 
-```{r plotall}
-t%>%
-  group_by(neuron) %>%
-  mutate(sdf20=lag(sdf,20),
-         conj.vertical=(lepV+repV)/2) ->
-  t
-# gp<- ggplot(filter(t,cellnum>100))+
-#   geom_point(aes(verg.angle,sdf20,color=(repV+lepV)/2),alpha=1/20) +
-#   facet_wrap(~neuron,ncol=3)
 
-t %>% group_by(neuron) %>%
-  do(tidy(lm('sdf20~verg.angle+verg.velocity+conj.vertical',data=.)))->
-  ttest
+```{r gaussianfit}
+# First present the data in a data-frame
+# tab <- data.frame(x=seq_along(r), r=r)
+#Apply function nls
+m %>% 
+  filter(neuron=='Bee-102') %>%
+  ungroup() %>%
+  mutate(direc=atan2(R.V.Amp,R.H.Amp)*180/pi) %>%
+  select(meanfr,direc) ->
+  tab
 
-ttest %>%
-  dplyr::select(neuron,term,estimate) %>%
-  spread(term,estimate) ->
-  tp
-         
+res <- nls( meanfr ~ direc*exp(-1/2*(direc-mu)^2/sigma^2), start=c(mu=15,sigma=5,k=1) , data = tab)
 
-kable(tp,digits=c(0,2,2,2,2,2))
+And from the output, I was able to obtain the following fitted "Gaussian curve":
 
-r<- makeRelImp(t,formula='sdf20~verg.angle+verg.velocity+conj.vertical',norm=FALSE)
-r<- separate(r,neuron,c('monkey','cellnum'),remove=FALSE)
+v <- summary(res)$parameters[,"Estimate"]
+plot(r~x, data=tab)
+plot(function(x) v[3]*exp(-1/2*(x-v[1])^2/v[2]^2),col=2,add=T,xlim=range(tab$x) )
 
-ggplot(r)+geom_bar(aes(neuron,R2),stat='identity')
 
-ggplot(r)+
-  geom_point(aes(verg.angle,conj.vertical,color=verg.velocity),size=3)+
-  geom_text(aes(verg.angle,conj.vertical,label=cellnum),nudge_y=1/50)+
-  geom_abline(slope=1)+
-  coord_fixed()
 
-ggplot(filter(ttest,term!='(Intercept)'))+
-  geom_point(aes(term,estimate))+
-  geom_errorbar(aes(x=term,ymin=estimate-2*std.error,ymax=estimate+2*std.error,color=neuron,width=0.25))
-```
-We plot the firing rate of each cell during saccades, including 100ms before and after the movement. Convergent saccades have an amplitude change of +3, divergent, -3 and version saccades are the rest. 
+x <- tab$direc  
+r<- tab$meanfr
 
-```{r is.there.a.burst, fig.height=28,fig.width=13}
-bufferlength<- 200
-saccade.length<- 150
-t%>%
-  group_by(neuron) %>%
-  mutate(time=row_number()) %>%
-  do(joinsaccadesuniform(.,buffer=200,threshold=20,saccade.length=saccade.length))->
-  # do(joinsaccades(.,buffer=bufferlength,threshold=20))->
-  t
+f <- function(par)
+{
+    m <- par[1]
+    sd <- par[2]
+    k <- par[3]
+    rhat <- k * exp(-0.5 * ((x - m)/sd)^2)
+    sum((r - rhat)^2)
+}
 
-#Once saccades have been marked, we measure lots of things about each saccade. 
-#For this plot, we also remove all data that isn't part of a saccade or the buffer period
-t %>%
-  group_by(neuron) %>%
-  mutate(issaccade=!is.na(sacnum)) %>%
-  filter(issaccade) %>%
-  group_by(neuron,sacnum) %>%
-  mutate(#dur=n(),
-    peak.conj.velocity=maxabs(conj.velocity),
-    peak.R.H= maxabs(rev),
-    peak.R.V= maxabs(revV),
-    peak.L.H= maxabs(lev),
-    peak.L.V= maxabs(levV),
-    R.H.Amp=rep[n()]-rep[1],
-    L.H.Amp=lep[n()]-lep[1],
-    R.V.Amp=repV[n()]-repV[1],
-    L.V.Amp=lepV[n()]-lepV[1],
-    r.angle=atan2(R.V.Amp,R.H.Amp)*180/pi,
-    r.amp=sqrt(R.H.Amp^2+R.V.Amp^2),
-    nspikes=sum(rasters),
-    vect.amp= (sqrt(R.H.Amp^2+R.V.Amp^2)+sqrt(L.H.Amp^2+L.V.Amp^2))/2,
-    maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
-    verg.amp=verg.angle[n()-bufferlength]-verg.angle[bufferlength+1],
-    peak.verg.velocity= maxabs(verg.velocity),
-    min.verg.trans = min(verg.velocity),
-    max.verg.trans = max(verg.velocity),
-    off.verg.velocity=min(abs(min.verg.trans),abs(max.verg.trans)),
-    min.verg.angle=min(verg.angle),
-    max.verg.angle=max(verg.angle),
-    max.verg.velocity=max(verg.velocity),
-    min.verg.velocity=min(verg.velocity),
-    maxfr=max(sdf),
-    counter=time-time[1]-bufferlength,
-    verg.change=verg.angle-mean(verg.angle[1:50]),
-    # verg.amp= last(verg.angle)-first(verg.angle),
-    verg.amp= verg.angle[n()-bufferlength]-verg.angle[bufferlength],
-    showrasters=replace(rasters,rasters<1,NA))->
-  t
+zz<- optim(c(15, 2, 1), f, method="BFGS", control=list(reltol=1e-9))
 
-#This just gives a name to convergent and divergent saccades so the figure is automatically labled
-t$convergent<- as.factor(t$verg.amp>0)
-levels(t$convergent)<- c('Divergent','Convergent')
 ```
 
 
 
-```{r Strab}
-
-#analyze non-saccadic portion of data
-m %>%
-  group_by(neuron,s) %>%
-  # dplyr::filter(dur>50) %>%
-  summarize(mean.Spikerate=mean.Spikerate[1],
-            mean.Verg.Angle=mean.Verg.Angle[1],
-            mean.Verg.Vel=first(mean.Verg.Vel),
-            mean.R.Hor=first(R.Hor),
-            mean.R.Ver=first(R.Ver),
-            mean.L.Hor=first(L.Hor),
-            mean.L.Ver=first(L.Ver),
-            mean.C.Hor=(mean.R.Hor+mean.L.Hor)/2,
-            mean.C.Ver=(mean.R.Ver+mean.L.Ver)/2,
-            dur=dur[1],
-            mean.time=mean(time),
-            cellnum=cellnum[1],
-            maxfr=maxfr[1],
-            max.verg.angle=max.Verg.Ang[1],
-            max.verg.velocity=max.Verg.Vel[1]) ->
-  summaryforplot
-
-summaryforplot %>%
-  separate(neuron, c('monkey','cellnum2'),remove=FALSE) %>%
-  # filter(monkey=='Pilchuck') %>%
-  group_by(neuron) %>%
-  filter(mean.Verg.Vel<1, 
-         dur>50,
-         mean.Verg.Angle<50,
-         mean.Verg.Angle> -30) %>%
-  mutate(r=cor(mean.Verg.Angle,mean.Spikerate)) ->
-  sp
-summaryforplotold<-summaryforplot
-summaryforplot<- sp
-
-#first, plot conjugate X-Y with color as firing rate 
-ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25))+
-  geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Spikerate),size=2)+
-  facet_wrap(~neuron,ncol=2,scales='free')
-
-# ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25,dur>20,neuron=='Kopachuck-106'))+
-#   geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Spikerate),size=3)
-# 
-# ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25,dur>20,neuron=='Kopachuck-106'))+
-#   geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Verg.Angle),size=3)
-
-ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25))+
-  geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Verg.Angle),size=2)+
-  facet_wrap(~neuron,ncol=2,scales='free')
 
 
-#Calculate horizontal conjugate position vs vergence
-r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Hor',norm=FALSE)
-
-ggplot(aes(mean.C.Hor,mean.Verg.Angle),size=2,data=r)+
-  geom_point()+
-  geom_text(aes(label=neuron))+
-  geom_abline(slope=1)+
-  xlim(c(0,1))+
-  ylim(c(0,1))
-
-#Calculate vertical conjugate position vs vergence
-r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Ver',norm=FALSE)
-
-ggplot(aes(mean.C.Ver,mean.Verg.Angle),size=2,data=r)+
-  geom_point()+
-  geom_text(aes(label=neuron))+
-  geom_abline(slope=1)+
-  xlim(c(0,1))+
-  ylim(c(0,1))
-
-#caclculate R^2 value for verg.angle
-r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle',norm=FALSE)
-ggplot(r)+geom_bar(aes(neuron,R2),stat='identity')
-
-
-#compare left vs right eyes
-#HORIZONTAL
-r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.R.Hor+mean.L.Hor',norm=FALSE)
-
-ggplot(aes(mean.R.Hor,mean.L.Hor),size=2,data=r)+
-  geom_point()+
-  geom_text(aes(label=neuron))+
-  geom_abline(slope=1)+
-  xlim(c(0,1))+
-  ylim(c(0,1))
-
-#VERTICAL
-r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.R.Ver+mean.L.Ver',norm=FALSE)
-
-ggplot(aes(mean.R.Ver,mean.L.Ver),size=2,data=r)+
-  geom_point()+
-  geom_text(aes(label=neuron))+
-  geom_abline(slope=1)+
-  xlim(c(0,1))+
-  ylim(c(0,1))
-
-#EYE POSITION
-r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.C.Hor+mean.C.Ver',norm=FALSE)
-ggplot(aes(mean.C.Hor,mean.C.Ver),size=2,data=r)+
-  geom_point()+
-  geom_text(aes(label=neuron))+
-  geom_abline(slope=1)+
-  xlim(c(0,1))+
-  ylim(c(0,1))
-
-r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.C.Hor+mean.C.Ver',norm=TRUE)
-r<- mutate(r,prefDir=atan2(mean.C.Ver,mean.C.Hor)*180/pi)
-kable(r)
-
-```

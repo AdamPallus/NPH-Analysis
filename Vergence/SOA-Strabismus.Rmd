@@ -1,0 +1,273 @@
+---
+title: "Vergence -- SOA and NRTP"
+author: "Adam"
+date: "May 12, 2016"
+output: html_document
+---
+#Introduction
+This document compares the activity of neurons in the SOA with those in the NRTP. Analysis surrounds the sensitivity to vergence angle during fixation, and an analysis of any increase in firing rate during saccades with vergence.  
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=TRUE,message=FALSE,warning=FALSE,cache=FALSE)
+```
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(broom)
+# library(grid)
+library(relaimpo)
+library(leaps)
+#library(data.table)
+library(stringr)
+library(cladoRcpp)
+source('Adamhelperfunctions.R')
+```
+
+```{r helperfunctions}
+source('Adamhelperfunctions.R')
+```
+
+```{r quickload}
+o<-readRDS('KopachuckSOA.RDS')
+t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/SOASTRAB/",referencefile=o)
+
+if (!is.null(t)){
+  t<- rbind(o,t)
+  saveRDS(t,paste('KopachuckSOA',substr(date(),1,10)))
+}else{
+  t<-o
+}
+
+t %>% group_by(neuron) %>%
+  mutate(time=row_number()) ->
+  t
+
+
+o<-NULL
+```
+
+```{r measureMovements}
+t %>%
+  group_by(neuron) %>%
+  mutate(s=markSaccades(conj.velocity,buffer=10,threshold=10),
+    isfixation=s<0) %>%
+  filter(isfixation) %>% #This removes all saccades from the dataframe
+  group_by(neuron,s) %>%
+  mutate(meanfr=mean(sdf),
+         maxfr=max(sdf),
+         R.Hor=mean(rep),
+         R.Ver=mean(repV),
+         L.Hor=mean(lep),
+         L.Ver=mean(lepV),
+         # exatrope= monkey=='Pilchuck',
+         mean.Verg.Angle=mean(verg.angle),
+         mean.Verg.Vel=mean(verg.velocity),
+         # mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle<0 & ~exatrope , NA),
+         # mean.Verg.Angle=replace(mean.Verg.Angle, mean.Verg.Angle>0 & exatrope,NA ),
+         # mean.Verg.Angle=replace(mean.Verg.Angle,abs(mean.Verg.Angle)>50, NA),
+         max.Verg.Vel = max(verg.velocity),
+         max.Verg.Ang = max(verg.angle),
+         nspikes=sum(rasters),
+         dur=n(),
+         mean.Spikerate=sum(rasters)/dur*1000,
+         R.H.Amp=rep[1]-rep[length(rep)],
+         L.H.Amp=lep[1]-lep[length(lep)],
+         R.V.Amp=repV[1]-repV[length(repV)],
+         L.V.Amp=lepV[1]-lepV[length(lepV)],
+         maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)))->
+  m
+
+
+```
+
+```{r verg.fixations,fig.height=28,fig.width=13}
+# m %>%
+#   filter(dur>50,monkey=='Kopachuck',
+#          mean.Spikerate>20) %>%
+#   summarize(mean.Spikerate=mean.Spikerate[1],
+#             mean.Verg.Angle=mean.Verg.Angle[1],
+#             dur=dur[1]) ->
+# summaryforplot
+m %>%
+  group_by(neuron,s) %>%
+  # dplyr::filter(dur>50) %>%
+  summarize(mean.Spikerate=mean.Spikerate[1],
+            mean.Verg.Angle=mean.Verg.Angle[1],
+            mean.Verg.Vel=first(mean.Verg.Vel),
+            dur=dur[1],
+            mean.time=mean(time),
+            cellnum=cellnum[1],
+            maxfr=maxfr[1],
+            max.verg.angle=max.Verg.Ang[1],
+            max.verg.velocity=max.Verg.Vel[1]) ->
+summaryforplot
+
+
+summaryforplot %>%
+  separate(neuron, c('monkey','cellnum2'),remove=FALSE) %>%
+  # filter(monkey=='Pilchuck') %>%
+  group_by(neuron) %>%
+  # filter(mean.Verg.Vel<2, 
+  #        dur>50,
+  #        mean.Verg.Angle<50,
+  #        mean.Verg.Angle> -30) %>%
+  mutate(r=cor(mean.Verg.Angle,mean.Spikerate)) ->
+  sp
+
+ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=filter(sp,cellnum>100))+
+    geom_point(size=2,alpha=1/2)+
+  # geom_point(aes(color=mean.time),size=2,alpha=1/2)+
+  # scale_color_continuous(low='black',high='orange')+
+  # facet_wrap(~neuron,scales='free_x')+
+    facet_wrap(~neuron,ncol=2)+
+  stat_smooth(method='lm')+
+  geom_label(aes(0,100,label=paste('r = ',round(r,2))))+
+  ggtitle('Firing Rate as a function of Vergence Angle during Fixations')
+
+```
+
+```{r plotall}
+t%>%
+  group_by(neuron) %>%
+  mutate(sdf20=lag(sdf,20),
+         conj.vertical=(lepV+repV)/2) ->
+  t
+# gp<- ggplot(filter(t,cellnum>100))+
+#   geom_point(aes(verg.angle,sdf20,color=(repV+lepV)/2),alpha=1/20) +
+#   facet_wrap(~neuron,ncol=3)
+
+t %>% group_by(neuron) %>%
+  do(tidy(lm('sdf20~verg.angle+verg.velocity+conj.vertical',data=.)))->
+  ttest
+
+ttest %>%
+  dplyr::select(neuron,term,estimate) %>%
+  spread(term,estimate) ->
+  tp
+         
+
+kable(tp,digits=c(0,2,2,2,2,2))
+
+r<- makeRelImp(t,formula='sdf20~verg.angle+verg.velocity+conj.vertical',norm=FALSE)
+# r<- separate(r,neuron,c('monkey','cellnum'),remove=FALSE)
+
+ggplot(r)+geom_bar(aes(cellnum,R2),stat='identity')
+
+ggplot(r)+
+  geom_point(aes(verg.angle,conj.vertical,color=verg.velocity),size=3)+
+  geom_text(aes(verg.angle,conj.vertical,label=cellnum),nudge_y=1/50)+
+  geom_abline(slope=1)+
+  coord_fixed()
+
+ggplot(filter(ttest,term!='(Intercept)'))+
+  geom_point(aes(term,estimate))+
+  geom_errorbar(aes(x=term,ymin=estimate-2*std.error,ymax=estimate+2*std.error,color=neuron,width=0.25))
+```
+
+
+
+```{r Strab, fig.hight=28, fig.width=10}
+
+#analyze non-saccadic portion of data
+m %>%
+  group_by(neuron,s) %>%
+  # dplyr::filter(dur>50) %>%
+  summarize(mean.Spikerate=mean.Spikerate[1],
+            mean.Verg.Angle=mean.Verg.Angle[1],
+            mean.Verg.Vel=first(mean.Verg.Vel),
+            mean.R.Hor=first(R.Hor),
+            mean.R.Ver=first(R.Ver),
+            mean.L.Hor=first(L.Hor),
+            mean.L.Ver=first(L.Ver),
+            mean.C.Hor=(mean.R.Hor+mean.L.Hor)/2,
+            mean.C.Ver=(mean.R.Ver+mean.L.Ver)/2,
+            dur=dur[1],
+            mean.time=mean(time),
+            cellnum=cellnum[1],
+            maxfr=maxfr[1],
+            max.verg.angle=max.Verg.Ang[1],
+            max.verg.velocity=max.Verg.Vel[1]) ->
+  summaryforplot
+
+summaryforplot %>%
+  separate(neuron, c('monkey','cellnum2'),remove=FALSE) %>%
+  # filter(monkey=='Pilchuck') %>%
+  group_by(neuron) %>%
+  filter(mean.Verg.Vel<1, 
+         dur>50,
+         mean.Verg.Angle<50,
+         mean.Verg.Angle> -30) %>%
+  mutate(r=cor(mean.Verg.Angle,mean.Spikerate)) ->
+  sp
+summaryforplotold<-summaryforplot
+summaryforplot<- sp
+
+#first, plot conjugate X-Y with color as firing rate 
+ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25))+
+  geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Spikerate),size=2)+
+  facet_wrap(~neuron,ncol=2,scales='free')
+
+# ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25,dur>20,neuron=='Kopachuck-106'))+
+#   geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Spikerate),size=3)
+# 
+# ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25,dur>20,neuron=='Kopachuck-106'))+
+#   geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Verg.Angle),size=3)
+
+ggplot(filter(summaryforplot,abs(mean.C.Ver)<25,abs(mean.C.Hor)<25))+
+  geom_point(aes(mean.C.Hor,mean.C.Ver,color=mean.Verg.Angle),size=2)+
+  facet_wrap(~neuron,ncol=2,scales='free')
+
+
+#Calculate horizontal conjugate position vs vergence
+r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Hor',norm=FALSE)
+
+ggplot(aes(mean.C.Hor,mean.Verg.Angle),size=2,data=r)+
+  # geom_point()+
+  geom_text(aes(label=cellnum))+
+  geom_abline(slope=1)+
+  xlim(c(0,1))+
+  ylim(c(0,1))
+
+#Calculate vertical conjugate position vs vergence
+r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle+mean.C.Ver',norm=FALSE)
+
+ggplot(aes(mean.C.Ver,mean.Verg.Angle),size=2,data=r)+
+  # geom_point()+
+  geom_text(aes(label=cellnum))+
+  geom_abline(slope=1)+
+  xlim(c(0,1))+
+  ylim(c(0,1))
+
+#caclculate R^2 value for verg.angle
+r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.Verg.Angle',norm=FALSE)
+ggplot(r)+geom_bar(aes(cellnum,R2),stat='identity')
+
+
+#compare left vs right eyes
+#HORIZONTAL
+r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.R.Hor+mean.L.Hor',norm=FALSE)
+
+ggplot(aes(mean.R.Hor,mean.L.Hor),size=2,data=r)+
+  # geom_point()+
+  geom_text(aes(label=cellnum))+
+  geom_abline(slope=1)+
+  xlim(c(0,1))+
+  ylim(c(0,1))
+
+#VERTICAL
+r<- makeRelImp(summaryforplot,formula='mean.Spikerate~mean.R.Ver+mean.L.Ver',norm=FALSE)
+
+ggplot(aes(mean.R.Ver,mean.L.Ver),size=2,data=r)+
+  # geom_point()+
+  geom_text(aes(label=cellnum))+
+  geom_abline(slope=1)+
+  xlim(c(0,1))+
+  ylim(c(0,1))
+
+```

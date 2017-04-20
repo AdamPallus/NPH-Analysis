@@ -130,7 +130,7 @@ m<-lm(min.verg.trans~mean.verg.amp+poly(peak.conj.velocity,2)+poly(r.amp,2)+r.an
 b<-calc.relimp(m)
 plot(b)
 
-
+f<- ungroup(f)
 f<- mutate(f,predicted.transient=predict(m,newdata=f))
 
 
@@ -151,7 +151,8 @@ qplot(sacnum,predict.error.percent,data=f)
 i<- f$sacnum[abs(f$predict.error.percent)>1]
 
 ff<-filter(f,sacnum %in% i)
-qplot(peak.conj.velocity,min.verg.trans,data=f)+geom_point(aes(peak.conj.velocity,min.verg.trans),data=ff,color='hotpink',size=2)
+qplot(peak.conj.velocity,min.verg.trans,data=f)+
+  geom_point(aes(peak.conj.velocity,min.verg.trans),data=ff,color='hotpink',size=2)
 
 
 
@@ -205,7 +206,7 @@ ggplot(filter(z,counter> -25,counter< 150,r.amp>7))+
   geom_line(aes(counter,verg.change*20,group=sacnum),color='darkgreen',alpha=0.2)+
   geom_line(aes(counter,verg.velocity-400,group=sacnum),alpha=0.2,color='hotpink')+
   facet_wrap(~saccade.type,ncol=1)+
-  stat_smooth(aes(counter,verg.velocity-400))+
+  # stat_smooth(aes(counter,verg.velocity-400))+
   geom_hline(yintercept=c(0,-400))
 
 ggplot(filter(z,counter> -25,counter< 150,r.amp>7,abs(r.angle<20),saccade.end<280))+
@@ -219,7 +220,7 @@ ggplot(filter(z,counter> -25,counter< 150,r.amp>7,abs(r.angle<20),saccade.end<28
 
 
 ggplot(filter(z,abs(r.angle)<60,counter> -25,counter< 150))+
-  geom_line(aes(counter,verg.velocity,group=interaction(neuron,sacnum)),alpha=0.2,color='hotpink')+
+  geom_line(aes(counter,verg.velocity,group=interaction(sacnum)),alpha=0.2,color='hotpink')+
   facet_wrap(~saccade.type,ncol=1)+
   stat_smooth(aes(counter,verg.velocity))
 
@@ -233,17 +234,17 @@ levels(z$right.saccade)<- c('Left','Right')
 
 ggplot(filter(z,counter> -25,counter< 150,r.amp>7))+
   # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
-  geom_line(aes(counter,norm.verg.change,group=interaction(neuron,sacnum)),color='darkgreen',alpha=1/20)+
-  geom_line(aes(counter,norm.verg.velocity-2,group=interaction(neuron,sacnum)),alpha=1/20,color='hotpink')+
+  geom_line(aes(counter,norm.verg.change,group=interaction(sacnum)),color='darkgreen',alpha=1/20)+
+  geom_line(aes(counter,norm.verg.velocity-2,group=interaction(sacnum)),alpha=1/20,color='hotpink')+
   facet_grid(right.saccade~saccade.type)+
   geom_hline(yintercept=c(0,-2))
 
 ggplot(filter(z,counter> -100,counter< 200,r.amp>7))+
   # geom_line(aes(counter,conj.velocity,group=interaction(neuron,sacnum)),alpha=0.2)+
-  geom_line(aes(counter,verg.change*10,group=interaction(neuron,sacnum)),color='darkgreen',alpha=1)+
-  geom_line(aes(counter,verg.velocity-evel-400,group=interaction(neuron,sacnum)),color='orange',alpha=1)+
-  geom_line(aes(counter,evel-300,group=interaction(neuron,sacnum)),color='orange',alpha=1)+
-  geom_line(aes(counter,verg.velocity-200,group=interaction(neuron,sacnum)),alpha=1,color='hotpink')+
+  geom_line(aes(counter,verg.change*10,group=interaction(sacnum)),color='darkgreen',alpha=1)+
+  geom_line(aes(counter,verg.velocity-evel-400,group=interaction(sacnum)),color='orange',alpha=1)+
+  geom_line(aes(counter,evel-300,group=interaction(sacnum)),color='orange',alpha=1)+
+  geom_line(aes(counter,verg.velocity-200,group=interaction(sacnum)),alpha=1,color='hotpink')+
   facet_grid(right.saccade~saccade.type)+
   geom_hline(yintercept=c(0,-200,-300,-400))
 
@@ -351,7 +352,7 @@ ggplot(filter(sz))+
             alpha=1/20,
             data=filter(z,saccade.type=='converging',counter>-25,counter<150))+
   geom_line(aes(counter,transient.template,color=saccade.type),size=2)
-
+ 
 
 
 #-------------------

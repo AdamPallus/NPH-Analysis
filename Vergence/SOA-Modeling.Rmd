@@ -438,6 +438,7 @@ t %>%
          peak.verg.velocity=maxabs(verg.velocity),
          r.amp=sqrt(conj.h^2+conj.v^2),
          verg.amp=last(verg.angle)-first(verg.angle),
+         peak.FR=max(sdf20),
          saccade.type='conj',
          saccade.type=replace(saccade.type,verg.amp< -2 & r.amp>2,'diverging'),
          saccade.type=replace(saccade.type,verg.amp> 2& r.amp>2,'converging'),
