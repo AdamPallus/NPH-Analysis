@@ -6,9 +6,9 @@ t %>%
   #filter(neuron=='Kopachuck-902') %>%
   # filter(monkey=='Kopachuck')%>%
   do(joinsaccadesuniform(.,buffer=50,threshold=30))->
-  tt
+  t
   
-tt %>%
+t %>%
   group_by(neuron) %>%
   mutate(sdf10=lag(sdf,10)) %>%
   # mutate(bin.velocity=cut(verg.velocity,c(seq(-200,200,by=20)))) %>%
@@ -30,11 +30,11 @@ tt %>%
          conv.dur=sum(verg.velocity>30),
          div.dur=sum(verg.velocity< -30),
          peak.FR=max(sdf10)) ->
-  ts
+  t
 
 # tv<- filter(ts,conj.v.amp>5,abs(peak.V.vel)>200)
 
-tv<-filter(ts,abs(r.amp)>5,!is.na(sacnum))
+tv<-filter(t,abs(r.amp)>5,!is.na(sacnum))
 
 # tv<- mutate(tv,showrasters=replace(rasters,rasters<1,NA))
 
@@ -43,7 +43,7 @@ nsac=length(goodsacs)
 
 
 
-manipulate(ggplot(filter(tv,sacnum==goodsacs[currentsac]))+
+manipulate(ggplot(filter(tv,sacnum==goodsacs[currentsac]),aes(group=neuron))+
              # geom_line(aes(counter,sdf10,group=sacnum))+
              # geom_line(aes(counter,(levV+revV)/20),color='magenta')+ #conjugate vertical velocity
              # geom_line(aes(counter,(lepV+repV)/2),color='orange')+ #conjugate vertical position
@@ -146,6 +146,6 @@ ggplot(tp)+
 currentsac=1
 
 ggplot(filter(tv,sacnum==currentsac))+
-  geom_line(aes(counter,sdf20,group=sacnum))+
-  geom_line(aes(counter,levV+revV)/2),color='magenta')+
+  geom_line(aes(counter,sdf,group=sacnum))+
+  geom_line(aes(counter,(levV+revV)/2),color='magenta')+
   facet_wrap(~neuron)

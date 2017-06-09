@@ -1,0 +1,93 @@
+---
+  title: "Analysis of SOA in monkey with convergence insuffiency - lack of disparity vergence"
+author: "Adam Pallus"
+output:
+  pdf_document: default
+html_document: default
+---
+  #Introduction
+  We recorded neurons in the INC of a monkeys with esotropia and pattern strabismus. In this document, we analyze the position and velocity sensitivity of these cells. 
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
+```
+
+```{r,message=FALSE,echo=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(broom)
+# library(grid)
+library(relaimpo)
+library(leaps)
+library(stringr)
+library(cladoRcpp)
+library(boot)
+source('Adamhelperfunctions.R')
+select<- dplyr::select
+```
+
+```{r quickload,echo=FALSE}
+
+o<- NULL
+t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/WOOTEN/",
+               referencefile=o,
+               keeptarget = TRUE)
+
+
+```
+#Results
+```{r simple model INC}
+
+
+t<- mutate(t,
+           rev=parabolicdiff(rep,20),
+           lev=parabolicdiff(lep,20),
+           verg.velocity=lev-rev,
+           target.vergence=thp2-thp,
+           # target.vergence=as.vector(smooth(target.vergence,kind='3RS3R')),
+           target.vergence.velocity=parabolicdiff(target.vergence,n=30),
+           sdf=spikedensity(rasters,45),
+           showrasters=replace(rasters,rasters==0,NA),
+           time=row_number(),
+           sdf20=lag(sdf,20))
+
+ggplot(filter(t,time>50000,time<100000))+
+  geom_line(aes(time,target.vergence))+
+  geom_line(aes(time,verg.angle),color='darkgreen')+
+  geom_point(aes(time,showrasters+15),shape='|')+
+  # geom_area(aes(time,sdf20),alpha=0.2)+
+  theme_bw()
+
+ggplot(filter(t,time>50000,time<100000))+
+  geom_line(aes(time,target.vergence.velocity))+
+  geom_line(aes(time,verg.velocity),color='darkblue')+
+    geom_point(aes(time,showrasters+15),shape='|')+
+  # geom_line(aes(time,sdf20-25),alpha=0.2)+
+  theme_bw()+
+  ylim(c(-25,25))
+
+ggplot(filter(t,time>55000,time<70000))+
+  geom_line(aes(time,target.vergence.velocity))+
+  geom_line(aes(time,verg.velocity),color='darkblue')+
+    geom_point(aes(time,showrasters+15),shape='|')+
+  # geom_line(aes(time,sdf20-25),alpha=0.2)+
+  theme_bw()+
+  ylim(c(-25,25))
+
+ggplot(filter(t,time>55000,time<70000))+
+  geom_line(aes(time,target.vergence.velocity))+
+  geom_line(aes(time,as.vector(sma(verg.velocity,order=40,silent='all')$fitted)),color='darkblue')+
+    geom_point(aes(time,showrasters+15),shape='|')+
+  # geom_line(aes(time,sdf20-25),alpha=0.2)+
+  theme_bw()+
+  ylim(c(-25,25))
+
+# m<- lm(sdf20~verg.velocity+verg.angle,data=t)
+# summary(m)
+
+```

@@ -43,10 +43,17 @@ else
     lepV=b.V_Eye2.values;%vertical right eye position
 end  
 
+%apply Hamming Filter (from Cullen)
+hamming=fir1(51,0.25);
+rep=conv(rep,hamming,'same');
+repV=conv(repV,hamming,'same');
+lep=conv(lep,hamming,'same');
+lepV=conv(lepV,hamming,'same');
 
-%this needs to be updated because there should be two target locations
 thp=b.H_Targ.values; %horizontal target position
 tvp=b.V_Targ.values; %vertical target position
+thp2=b.H2_Targ.values; %horizontal target position
+tvp2=b.V2_Targ.values; %vertical target position
 
 trimlength=min(length(rep),length(lep));
 
@@ -55,7 +62,9 @@ if length(rep) ~= length(lep)
     rep=rep(1:trimlength);
     repV=repV(1:trimlength);
     thp=thp(1:trimlength);
-    tvp=tvp(1:trimlength);
+    tvp=tvp(1:trimlength);    
+    thp2=thp2(1:trimlength);
+    tvp2=tvp2(1:trimlength);
     lep=lep(1:trimlength);
     lepV=lepV(1:trimlength);
 end
@@ -67,6 +76,8 @@ end
 if length(tvp)>trimlength
     thp=thp(1:trimlength);
     tvp=tvp(1:trimlength);
+    thp2=thp2(1:trimlength);
+    tvp2=tvp2(1:trimlength);
 end
 
 if length(rasters) > trimlength
@@ -92,9 +103,9 @@ levV=parabolicdiff(smooth(lepV,15),5);%vertical right eye velocity
 %     'lep','lev','lepV','levV','thp','tvp'});
 
 t=table(rasters,rep,rev,repV,revV,...
-    lep,lev,lepV,levV,thp,tvp,...
+    lep,lev,lepV,levV,thp,tvp,thp2,tvp2,...
     'variablenames',{'rasters','rep','rev','repV','revV'...
-    'lep','lev','lepV','levV','thp','tvp'});
+    'lep','lev','lepV','levV','thp','tvp','thp2','tvp2'});
 
 if exa
     defaultname=[b.filepath, b.filename(1:end-4),'-EXA','.csv'];

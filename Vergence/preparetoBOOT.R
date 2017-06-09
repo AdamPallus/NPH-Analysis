@@ -1,50 +1,32 @@
-ModelEnhancement<- function(z,d=NULL){
-  # CalculateEnhancement<- function(t,chosenCell='Bee-211'){
-  #I originally wrote this function to spit out the parameters for the regression
-  #comparing vergence amplitude to vergence enhnacement, defined as the difference between
-  #observed peak vergence velocity and predicted peak vergence velocity based on firing rate
+preparetoBOOT<- function(z){
   
-  #this function can easily be modified for plotting. See "EnhancementApril2017.R"
-  # z<- filter(t,neuron==chosenCell)
-  bufferlength=200
-  saccade.length=150
-  z%>%
-    # group_by(neuron) %>%
-    mutate(#sdf20=lag(sdf,d), #d comes from dynamiclead2 function
-      lev=parabolicdiff(lep,20),
-      rev=parabolicdiff(rep,20),
-      levV=parabolicdiff(lepV,20),
-      revV=parabolicdiff(repV,20),
-      # sdf=spikedensity(rasters,50),
-      verg.velocity=lev-rev,
-      conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2))->
+  z%>% #this block smooths out velocity traces
+    mutate(lev=parabolicdiff(lep,20),
+           rev=parabolicdiff(rep,20),
+           levV=parabolicdiff(lepV,20),
+           revV=parabolicdiff(repV,20),
+           # sdf=spikedensity(rasters,50),
+           verg.velocity=lev-rev,
+           conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2))->
     z
   
-  if (is.null(d)){
-    # message('calculating dynamic lead...')
-    d<- dynamiclead2(p=z,formula = 'verg.velocity~sdflag+verg.angle',lags=seq(0,40,by=2))
-  }
+  bufferlength=200
+  saccade.length=150
+  d=20
   
-  z %>%
-    mutate(sdf20=lag(sdf,d)) %>%
-    ungroup() %>%
-    mutate(time=row_number()) %>%
+  z %>% #this is just one neuron's worth of data
+    mutate(sdf20=lag(sdf,d),
+           time=row_number()) %>%
     do(joinsaccadesuniform(.,buffer=bufferlength,threshold=20,saccade.length=saccade.length))%>%
     group_by(sacnum) %>%
     mutate(realsaccade=counter>bufferlength & counter< bufferlength + saccade.dur) %>%
     ungroup()->
     z
   
-  
-  mod<- lm('verg.velocity~sdf20+verg.angle',data=filter(z,!realsaccade,verg.velocity>0))
-  
-  z<-mutate(z, predV=predict(mod,newdata=z))
-  
   z %>%
-    # group_by(neuron) %>%
     mutate(issaccade=!is.na(sacnum)) %>%
     filter(issaccade,saccade.dur>20) %>%
-    group_by(neuron,sacnum) %>%
+    group_by(sacnum) %>%
     mutate(cverg=abs(verg.velocity)>3,
            cverg=replace(counter,cverg,NA)) %>%
     mutate(peakFR=max(sdf20),
@@ -76,13 +58,16 @@ ModelEnhancement<- function(z,d=NULL){
            initial.verg.angle=verg.angle[bufferlength],
            verg.lead=bufferlength-max(cverg[100:bufferlength],na.rm=T),
            verg.lead=replace(verg.lead,is.na(verg.lead),0),
-           predict.ratio=sum(predV)/sum(verg.velocity))->
+           total.verg.amp=last(verg.angle)-first(verg.angle))->
     z
+  z<- mutate(z,verg.bins=cut(verg.amp,c(-50,-1,1,50)))
+  
+  levels(z$verg.bins)<- c('Diverging','Conjugate','Converging')
+  
   z %>%
     group_by(sacnum) %>%
-    mutate(predict.verg.change=cumsum(predV)/1000+first(verg.angle),
-           max.predict.velocity=max(predV,na.rm=T),
-           total.verg.amp=last(verg.angle)-first(verg.angle),
-           total.predict.amp=last(predict.verg.change)-first(predict.verg.change))->
+    mutate(enhance.type='none',
+           enhance.type=replace(enhance.type,realsaccade & verg.velocity>0, 'converging'),
+           enhance.type=replace(enhance.type,realsaccade & verg.velocity<0, 'diverging'))->
     z
 }

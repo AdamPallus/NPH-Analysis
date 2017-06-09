@@ -25,9 +25,10 @@ t<- readRDS('SOA-NRTP.RDS')
 #############################
 ########OPTIONS##############
 Cells.to.Plot = c(33)
-Cells.to.Plot=c('Bee-33','Bee-112','Bee-211')
-sample.saccades= TRUE
-Remove.Multiverg= TRUE
+# Cells.to.Plot=c('Bee-33','Bee-112','Bee-211')
+Cells.to.Plot=c('Kopachuck-106','Kopachuck-110','Kopachuck-122', 'Kopachuck-126','Kopachuck-127')
+sample.saccades= FALSE
+Remove.Multiverg= FALSE
 #############################
 #############################
 
@@ -43,6 +44,7 @@ bufferlength<- 400
 #To counter this, I duplicate any data that would overlap so we don't have to worry about it after this point.
 
 t%>%
+  # filter(cellnum %in% c(124,125,126,127))%>%
   # filter(as.numeric(cellnum)>200) %>%
   # filter(monkey=='Bee',as.numeric(cellnum) %in% Cells.to.Plot) %>%
   filter(neuron %in% Cells.to.Plot) %>%
@@ -148,7 +150,7 @@ if (sample.saccades) {
 ggplot(g) + 
   theme_bw()+ #Removes gray background 
   xlab('Time from Saccade Onset (ms)')+
-  geom_histogram(aes(spiketimes,100*..ncount..),alpha=1,binwidth=10,fill='black',color='black')+
+  geom_histogram(aes(spiketimes,100*..ncount..),alpha=1,binwidth=15,fill='black',color='black')+
   # geom_freqpoly(aes(spiketimes,100*..ncount..),alpha=1,bins=40,color='darkred',size=1)+
   geom_point(aes(counter,showrasters* snum*5+110),shape='|',size=0.5,color='black')+
   facet_grid(neuron~convergent,scales='free_y',space='free_y')+

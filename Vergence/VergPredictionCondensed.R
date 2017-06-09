@@ -32,14 +32,103 @@ modelVV<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30){
              # predV2=predict(mod2,newdata=x),
              showrasters=replace(rasters,rasters<1,NA))
 }
+
+modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
+                    model.form='verg.velocity~sdf20+verg.angle',
+                    lagsdf=31){
+  #free parameters:
+  #1) lag for sdf
+  #2) width of sdf gaussian
+  #3) width of parabolic diff kernel
+  #5) saccade buffer and threshold
+  
+  x<- ungroup(filter(t,neuron==chosenCell))
+  if (!('time' %in% names(x))){
+    x<- mutate(x,time=row_number())
+  }
+  x %>%
+    mutate(verg.velocity=parabolicdiff(lep-rep,25),
+           sdf=spikedensity(rasters,sd=20),
+           sdf20=dplyr::lag(sdf,lagsdf),
+           conj.velocity=sqrt(((rev+lev)/2)^2)+sqrt(((revV+levV)/2)^2)) ->
+    x
+  
+  x<- joinsaccades(x,buffer=saccadebuffer,threshold=saccadethreshold)
+  
+  # mod<- lm('verg.velocity~sdf20+verg.angle',data=filter(x,enhance.type=='none'))
+  # df=filter(x,verg.velocity<0)
+  x<- mutate(x,saccadic=!is.na(sacnum))
+  # mod<- lm('verg.velocity~sdf20:saccadic+verg.angle',data=filter(x,verg.velocity>0))
+  mod<- lm(model.form,data=filter(x,!saccadic))
+  print(tidy(mod))
+  # mod2<- lm('verg.velocity~sdf20+verg.angle',data=filter(x,enhance.type=='none',sdf20>30))
+  message(paste('R-squared =', summary(mod)$r.squared))
+  # x<- dplyr::select(x,-sacnum,-counter)
+  x<- mutate(x,predV=predict(mod,newdata=x),
+             # predV2=predict(mod2,newdata=x),
+             showrasters=replace(rasters,rasters<1,NA))
+}
+
+modelVV3<- function(t,chosenCell='Bee-113',lagsdf=33,
+                    model.form='verg.velocity~sdf20+sdf20:conj.velocity+verg.angle'){
+  #free parameters:
+  #1) lag for sdf
+  #2) width of sdf gaussian
+  #3) width of parabolic diff kernel
+  #5) saccade buffer and threshold
+  
+  x<- ungroup(filter(t,neuron==chosenCell))
+  if (!('time' %in% names(x))){
+    x<- mutate(x,time=row_number())
+  }
+  x %>%
+    mutate(verg.velocity=parabolicdiff(lep-rep,25),
+           sdf=spikedensity(rasters,sd=20),
+           sdf20=dplyr::lag(sdf,lagsdf)) ->
+    x
+  x<- mutate(x,conj.velocity=sqrt(((rev+lev)/2)^2)+sqrt(((revV+levV)/2)^2))
+
+
+  mod<- lm(model.form,data=filter(x,verg.velocity>0))
+  # mod<- lm('verg.velocity~sdf20+sdf20:conj.velocity+verg.angle',data=x)
+  print(tidy(mod))
+  message(paste('R-squared =', summary(mod)$r.squared))
+  # calc.relimp(mod)
+  x<- mutate(x,predV=predict(mod,newdata=x),
+             showrasters=replace(rasters,rasters<1,NA))
+}
+
+getmodelVV<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30){
+  #free parameters:
+  #1) lag for sdf
+  #2) width of sdf gaussian
+  #3) width of parabolic diff kernel
+  #5) saccade buffer and threshold
+  
+  x<- ungroup(filter(t,neuron==chosenCell))
+  if (!('time' %in% names(x))){
+    x<- mutate(x,time=row_number())
+  }
+  x %>%
+    mutate(verg.velocity=parabolicdiff(lep-rep,25),
+           sdf=spikedensity(rasters,sd=20),
+           sdf20=dplyr::lag(sdf,33)) ->
+    x
+  
+  x<- joinsaccades(x,buffer=saccadebuffer,threshold=saccadethreshold)
+  
+  # mod<- lm('verg.velocity~sdf20+verg.angle',data=filter(x,enhance.type=='none'))
+  mod<- lm('verg.velocity~sdf20+verg.angle',data=filter(x,is.na(sacnum),verg.velocity>0))
+  
+}
 makeVergPlot<- function(x,starttime=22500,stoptime=23500,savename=NULL){
   
   print(ggplot(filter(x,time>starttime,time<stoptime))+
           geom_point(aes(rep,repV),color='red')+
           geom_point(aes(lep,lepV),color='blue3')+
           annotate('text',4,-10,label='Initial Fixation')+
-          annotate('text',4,2,label='Right Eye',color='red')+
-          annotate('text',15,1,label='Left Eye',color='blue3')+
+          # annotate('text',4,2,label='Right Eye',color='red')+
+          # annotate('text',15,1,label='Left Eye',color='blue3')+
           xlab('Horizontal Position (deg)')+
           ylab('Vertical Position (deg)')+
           coord_fixed())
@@ -114,7 +203,11 @@ makeVergPlot<- function(x,starttime=22500,stoptime=23500,savename=NULL){
   }
 }
 
-x<- modelVV(t,chosenCell='Bee-113',saccadebuffer=10,saccadethreshold=20)
+x<- modelVV(t,chosenCell='Bee-211',saccadebuffer=10,saccadethreshold=20)
+x2<- modelVV2(t,chosenCell='Bee-211',saccadebuffer=10,saccadethreshold=20)
+x3<- modelVV3(t,chosenCell='Bee-211',lagsdf=31)
+
+x<- mutate(x,conj.velocity=sqrt(((rev+lev)/2)^2)+sqrt(((revV+levV)/2)^2))
 
 manipulate(ggplot(filter(x,time>=window,time<window+window_size))+
              geom_point(aes(time,showrasters+30),shape='|')+
@@ -126,10 +219,31 @@ manipulate(ggplot(filter(x,time>=window,time<window+window_size))+
              geom_line(aes(time,predV),color='orange')+
              # geom_line(aes(time,predV2),color='magenta')+
              geom_line(aes(time,verg.velocity),color='darkblue')+
+             geom_area(aes(time,conj.velocity),alpha=1/3)+
              # geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
-             ylim(c(-150,150))
+             ylim(c(NA,150))
            ,
            window=slider(window_size,max(x$time-window_size),step=step_size))
+
+manipulate({d=filter(x3,time>=window,time<window+window_size)
+ggplot(d)+
+  geom_point(aes(time,showrasters+30),shape='|')+
+  # geom_point(aes(time,showenhance*verg.velocity),color='magenta')+
+  # geom_area(aes(time,sdf),color='black',fill='pink',alpha=1/10)+
+  # geom_line(aes(time,slowpredict),color='orange')+
+  geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+  # geom_line(aes(time,predP/1000),color='darkgreen',linetype=2)+
+  geom_line(aes(time,predV),color='orange')+
+  # geom_line(aes(time,predV2),color='magenta')+
+  geom_line(aes(time,verg.velocity),color='darkblue')+
+  geom_area(aes(time,conj.velocity),alpha=1/3)+
+  geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
+  # geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
+  ylim(c(NA,150))}
+,
+window=slider(window_size,max(x$time-window_size),step=step_size))
+
+
 
 
 #-----saccades----

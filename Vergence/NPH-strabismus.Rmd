@@ -33,13 +33,13 @@ select<- dplyr::select
 
 ```{r quickload,echo=FALSE}
 # o<-readRDS('KopachuckINC.RDS')
-o<-readRDS('KopaBeeINC.RDS')
-# o<- NULL
-t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
+# o<-readRDS('KopaBeeINC.RDS')
+o<- NULL
+t<- loadnewcsv2(path="C:/Users/setup/Documents/GitHub/NPH-Analysis/data/",referencefile=o)
 
 if (!is.null(t)){
   t<- rbind(o,t)
-  saveRDS(t,paste('KopachuckINC',substr(date(),1,10)))
+  saveRDS(t,paste('NPHdata',substr(date(),1,10),'.RDS'))
 }else{
   t<-o
 }
@@ -53,68 +53,16 @@ t %>% group_by(neuron) %>%
 o<-NULL
 
 #Calculate ISI
-t %>%
-  group_by(neuron) %>%
-  dplyr::select(neuron, rasters,time) %>%
-  # mutate(time=row_number()) %>%
-  filter(rasters==1) %>%
-  mutate(isi=time-lag(time,1)) %>%
-  left_join(t,.,by=c('neuron','time','rasters')) ->
-  t
+# t %>%
+#   group_by(neuron) %>%
+#   dplyr::select(neuron, rasters,time) %>%
+#   # mutate(time=row_number()) %>%
+#   filter(rasters==1) %>%
+#   mutate(isi=time-lag(time,1)) %>%
+#   left_join(t,.,by=c('neuron','time','rasters')) ->
+#   t
 
 ```
-
-```{r fixationISI}
-
-
-t %>%
-  group_by(neuron) %>%
-  mutate(conj.velocity=sqrt(((rev+lev)/2)^2)+sqrt(((revV+levV)/2)^2),
-           s=markSaccades(conj.velocity,buffer=15,threshold=40)) %>%
-  filter(s<0) %>%
-  group_by(neuron,s) %>%
-  summarize(misi=mean(isi,na.rm=T),
-            sdisi=sd(isi,na.rm=T))->
-  st
-
-st%>%
-  group_by(neuron) %>%
-  summarize(r=cor(misi,sdisi,use='complete.obs')) %>%
-  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
-  rst
-
-rst %>%
-  ungroup() %>%
-  rename(rISISD=r) %>%
-  left_join(t,rst,by='neuron')->
-  t
-
-
-qplot(r,data=rst,bins=10)+facet_wrap(~monkey,ncol=1)
-
-rst %>%
-  group_by(monkey) %>%
-  summarize(mean.r=mean(r,na.rm=T),
-    ci.low=as.numeric(t.test(r)$conf.int[1]),
-    ci.high=as.numeric(t.test(r)$conf.int[2]))->
-  srst
-  
-
-qplot(misi,sdisi,data=filter(st,neuron=='Bee-101',misi<200))+stat_smooth(method='lm')
-
-qplot(misi,sdisi,data=filter(st,misi<200))+stat_smooth(method='lm')+facet_wrap(~neuron,ncol=4)
-
-qplot(r,data=rst,bins=10)+facet_wrap(~monkey,ncol=1)
-
-ggplot(rst,aes(r))+geom_histogram(aes(fill=monkey),position='dodge')+
-  geom_errorbarh(aes(x=mean.r,y=6,xmin=ci.low,xmax=ci.high,color=monkey),data=srst)+
-  geom_vline(aes(xintercept=mean.r,color=monkey),data=srst)
-
-
-ggplot(srst,aes(x=mean.r,y=0))+geom_point()+geom_errorbarh(aes(xmin=ci.low,xmax=ci.high,color=monkey,height=0.01))
-
-```
-
 #Results
 ```{r simple model INC}
 
@@ -138,6 +86,8 @@ ttest %>%
 tp$b<-tp$'(Intercept)'
 tp$'(Intercept)'=NULL
 
+
+
 tp %>%
   ungroup() %>%
   mutate(absb=abs(b),
@@ -155,13 +105,6 @@ tpa<- separate(tpa,neuron,c('monkey','cellnum'),remove=FALSE)
 
 #add R^2 since tidy doesn't automatically grab that
 tpa<- left_join(tpa,dplyr::select(r,neuron,R2),by='neuron')
-
-rst %>% #from ISI block, above
-  select(neuron,r)%>%
-  rename(rISI=r) %>%
-  left_join(tpa,.,by='neuron')->
-  tpaa
-
 
 
 tpa %>%
@@ -554,7 +497,7 @@ ggplot(filter(r,R2>0.1))+
   facet_wrap(~monkey)+
   ggtitle('Irregular Cells Removed')
 
-ggplot(filter(r,R2>0.1,monkey=='Kopachuck'))+
+ggplot(filter(r,R2>0.1,monkey=='Patos'))+
     geom_segment(aes(yend=R2,xend=dir.pref,y=0,x=dir.pref),
                alpha=0.5,arrow=arrow(type='closed',length =unit(0.1,"inches")))+
   # geom_text(aes(dir.pref,R2+0.05,label=cellnum),alpha=1)+

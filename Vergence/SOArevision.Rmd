@@ -38,7 +38,7 @@ t<- readRDS('SOA-NRTP.RDS')
 bufferlength<- 200
 saccade.length<- 150
 t%>%
-  filter(neuron=='Bee-113')%>%
+  filter(neuron=='Bee-101')%>%
   # filter(cellnum>100,cellnum<125,monkey=='Bee')%>%
   # group_by(neuron) %>%
   rename(verg.velocity.rough=verg.velocity) %>%
@@ -52,7 +52,7 @@ t%>%
          # conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2)) %>%
   ungroup() %>%
   mutate(time=row_number()) %>%
-  do(joinsaccadesuniformDT(.,buffer=bufferlength,threshold=20,saccade.length=saccade.length))->
+  do(joinsaccadesuniform(.,buffer=bufferlength,threshold=20,saccade.length=saccade.length))->
   # do(joinsaccades(.,buffer=bufferlength,threshold=20))->
   z
 

@@ -124,7 +124,7 @@ gs
 #######################################################################
 
 #Next:single saccade demos
-ChosenCell='Bee-215'
+ChosenCell='Ozette-120'
 gc<- filter(t,neuron==ChosenCell) #saved as a separate variable so it can be used later
 
 p<- filter(gc,abs(verg.amp)>3) #saved as a separate variable so it can be repeated
@@ -181,13 +181,18 @@ fig1b <- makefig1(t, 'Bee-218',120000,127500,sd=15)
 fig1c <- makefig1(t,'Bee-215',90000,100000,sd=20,maxplot=250)
 
 gc<-mutate(gc,time=row_number(), showrasters=replace(rasters,rasters<1,NA))
-window_size <- 20000
+window_size <- 10000
 manipulate(ggplot(filter(gc,time>=window,time<window+window_size))+
              geom_area(aes(time,sdf),alpha=1/10)+
              geom_line(aes(time,lev-rev),color='darkblue',alpha=1)+
              # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
              geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
              geom_point(aes(time,showrasters+50),shape='|')+
+             geom_line(aes(time,conj.velocity),color='hotpink',alpha=1/10)+
+             geom_line(aes(time,rep+100),color='red')+
+             geom_line(aes(time,lep+100),color='blue')+
+             geom_line(aes(time,repV+100),color='red',linetype=2)+
+             geom_line(aes(time,lepV+100),color='blue',linetype=2)+
              # geom_line(aes(time,slow.prediction),color='orange')+
              # geom_line(aes(time,(rev+lev)/2),color='darkred')+
              # geom_line(aes(time,(revV+levV)/2),color='red')+

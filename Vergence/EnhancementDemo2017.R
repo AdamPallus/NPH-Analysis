@@ -15,42 +15,49 @@ select<-dplyr::select
 # source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 source('ModelEnhancement.R')
+library(manipulate)
 
 t<- readRDS('SOA-NRTP.RDS')
 
 #Measure----
 chosenCell='Bee-211'
 z<- filter(t,neuron==chosenCell)
-z<- ModelEnhancement(z,42)
+z<- ModelEnhancement(z)
 #Plotting----
-p<- filter(z,verg.amp>4)
-p<- filter(z,total.verg.amp>4)
+# p<- filter(z,verg.amp>4)
+p<- filter(z,total.verg.amp< -4)
+p<- mutate(p,showrasters=replace(rasters,rasters<1,NA))
 # p<- filter(z,predict.ratio>1,total.verg.amp>2)
 goodsacs=unique(p$sacnum)
 nsac=length(goodsacs)
 
 
+
 manipulate(ggplot(filter(p,sacnum==goodsacs[sac]))+
-             geom_line(aes(counter,lev),color='blue')+
-             geom_line(aes(counter,rev),color='red')+
-             geom_line(aes(counter,levV),color='blue',linetype=2)+
-             geom_line(aes(counter,revV),color='red',linetype=2)+
+             geom_point(aes(counter,showrasters*100),shape='|')+
+             # geom_line(aes(counter,lev),color='blue')+
+             # geom_line(aes(counter,rev),color='red')+
+             # geom_line(aes(counter,levV),color='blue',linetype=2)+
+             # geom_line(aes(counter,revV),color='red',linetype=2)+
              geom_line(aes(counter,(lev-rev)),color='darkblue',alpha=1)+
-             geom_line(aes(counter,verg.velocity),color='darkblue',linetype=2)+
+             # geom_line(aes(counter,verg.velocity),color='darkblue',linetype=2)+
              geom_line(aes(counter,(lep-rep)*10),color='darkgreen')+
              geom_line(aes(counter,conj.velocity/10))+
              geom_label(x=100,y=0,aes(label=unique(verg.lead)))+
              geom_label(x=100,y=20,aes(label=paste('sacnum = ',sacnum)))+
-             geom_label(x=100,y=-20,aes(label=paste('angle = ',round(r.angle,2))))+
-             geom_label(x=100,y=25,aes(label=paste('predict ratio = ',round(sum(predV)/sum(verg.velocity),2))))+
+             # geom_label(x=100,y=-30,aes(label=paste('angle = ',round(r.angle,2))))+
+             # geom_label(x=100,y=40,aes(label=paste('predict ratio = ',round(sum(predV)/sum(verg.velocity),2))))+
              geom_vline(aes(xintercept=200-verg.lead))+
-             geom_line(aes(counter,predV),color='orange')+
-             geom_line(aes(counter,verg.velocity-predV),color='hotpink')+
-             geom_line(aes(counter,predict.verg.change*10),color='darkred')
+             geom_area(aes(counter,sdf),alpha=1/10)
+             # geom_line(aes(counter,predV),color='orange')+
+             # geom_line(aes(counter,verg.velocity-predV),color='hotpink')+
+             # geom_line(aes(counter,predict.verg.change*10),color='darkred')
            ,
            sac=slider(1,nsac,step=1))
 
 zs<- summarize_each(group_by(z,sacnum),funs(first))
+
+zs<- filter(zs,abs(total.verg.amp)<15,abs(verg.amp)<15)
 
 qplot(verg.amp,peakFR,data=zs)+
   ylab('Peak Firing Rate (spikes/s)')+
@@ -114,6 +121,15 @@ qplot(total.verg.amp,max.verg.velocity-max.predict.velocity,data=filter(zs,verg.
   xlab('Total Vergence Change (deg)')+
   ylab('Actual - Predicted peak vergence velocity')
 
+qplot(r,data=xxx)+
+  xlab('Slope of vergence change ~ actual-predicted peak vergence velocity')+
+  ylab('Number of cells')
+
+
+qplot(r,data=filter(xxx,modR2>0.1),bins=15)+
+  xlab('Slope of vergence change ~ actual-predicted peak vergence velocity')+
+  ylab('Number of cells')
+
 
 qplot(verg.amp,predict.ratio,data=filter(zs,verg.amp>1,abs(predict.ratio)<5))+
   stat_smooth()+
@@ -127,8 +143,16 @@ qplot(total.verg.amp,predict.ratio,data=filter(zs,total.verg.amp>1,abs(predict.r
   xlab('Total Vergence Change (deg)')+
   ggtitle('Fraction of vergence change accounted for')
 
+qplot(total.verg.amp,predict.ratio,data=zs)+
+  stat_smooth()+
+  ylim(c(-1,10))+
+  xlim(c(1,12))+
+  ylab('Vergence change ratio: predicted:actual')+
+  xlab('Total Vergence Change (deg)')+
+  ggtitle('Fraction of vergence change accounted for')
+
 zs<- mutate(zs,Direction=cut(abs(r.angle),c(0,45,135,180)))
-levels(zs$Direction)<-c('Rightward','Upward','Leftward')
+levels(zs$Direction)<-c('Horizontal','Vertical','Horizontal')
 
 qplot(total.verg.amp,log(predict.ratio),
       color=Direction,
@@ -171,6 +195,7 @@ qplot(verg.lead,min.verg.velocity,data=ps)+
   annotate('text',x=20,y=-40,label='Negative')
 
 p %>%
+  
   group_by(counter) %>%
   summarise_each(funs(mean))->
   pc
@@ -194,30 +219,30 @@ ggplot(pc)+
   xlab('Time (ms)')+
   ylab('Velocity (deg/s) and Position*10 (deg)')
 
-p2<- filter(z,total.verg.amp>4)
-p2 %>%
-  group_by(counter) %>%
-  summarise_each(funs(mean))->
-  pc
-
-ggplot(pc)+
-  geom_line(aes(counter,(lev-rev)),color='darkblue',alpha=1)+
-  geom_line(aes(counter,(lep-rep)*10),color='darkgreen')+
-  geom_line(aes(counter,conj.velocity),color='gray')+
-  geom_vline(aes(xintercept=200-verg.lead))+
-  geom_line(aes(counter,predV),color='orange')+
-  # geom_line(aes(counter,verg.velocity-predV),color='hotpink')+
-  geom_line(aes(counter,predict.verg.change*10),color='darkred')+
-  coord_cartesian(ylim=c(0,120))+
-  ggtitle('Average of saccades with Total Vergence Amp > 4')+
-  annotate('text',x=160,y=100,label='Vergence Lead',color='black')+
-  annotate('text',x=400,y=100,label='Vergence Angle',color='darkgreen')+
-  annotate('text',x=400,y=60,label='Predicted Vergence Angle',color='darkred')+
-  annotate('text',x=240,y=110,label='Pythagorean Velocity',color='gray')+
-  annotate('text',x=260,y=10,label='Predicted Vergence Velocity',color='orange')+
-  annotate('text',x=320,y=30,label='Vergence Velocity',color='darkblue')+
-  xlab('Time (ms)')+
-  ylab('Velocity (deg/s) and Position*10 (deg)')
+# p2<- filter(z,total.verg.amp>4)
+# p2 %>%
+#   group_by(counter) %>%
+#   summarise_each(funs(mean))->
+#   pc
+# 
+# ggplot(pc)+
+#   geom_line(aes(counter,(lev-rev)),color='darkblue',alpha=1)+
+#   geom_line(aes(counter,(lep-rep)*10),color='darkgreen')+
+#   geom_line(aes(counter,conj.velocity),color='gray')+
+#   geom_vline(aes(xintercept=200-verg.lead))+
+#   geom_line(aes(counter,predV),color='orange')+
+#   # geom_line(aes(counter,verg.velocity-predV),color='hotpink')+
+#   geom_line(aes(counter,predict.verg.change*10),color='darkred')+
+#   coord_cartesian(ylim=c(0,120))+
+#   ggtitle('Average of saccades with Total Vergence Amp > 4')+
+#   annotate('text',x=160,y=100,label='Vergence Lead',color='black')+
+#   annotate('text',x=400,y=100,label='Vergence Angle',color='darkgreen')+
+#   annotate('text',x=400,y=60,label='Predicted Vergence Angle',color='darkred')+
+#   annotate('text',x=240,y=110,label='Pythagorean Velocity',color='gray')+
+#   annotate('text',x=260,y=10,label='Predicted Vergence Velocity',color='orange')+
+#   annotate('text',x=320,y=30,label='Vergence Velocity',color='darkblue')+
+#   xlab('Time (ms)')+
+#   ylab('Velocity (deg/s) and Position*10 (deg)')
 
 
 

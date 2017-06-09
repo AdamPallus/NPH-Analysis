@@ -1,7 +1,6 @@
 ---
-title: "Vergence -- SOA and NRTP"
+title: "SOA in strabismus"
 author: "Adam"
-date: "May 12, 2016"
 output: html_document
 ---
 #Introduction
@@ -29,9 +28,6 @@ library(cladoRcpp)
 source('Adamhelperfunctions.R')
 ```
 
-```{r helperfunctions}
-source('Adamhelperfunctions.R')
-```
 
 ```{r quickload}
 o<-readRDS('KopachuckSOA.RDS')
@@ -55,7 +51,7 @@ o<-NULL
 ```{r measureMovements}
 t %>%
   group_by(neuron) %>%
-  mutate(s=markSaccades(conj.velocity,buffer=10,threshold=10),
+  mutate(s=markSaccades(conj.velocity,buffer=10,threshold=20),
     isfixation=s<0) %>%
   filter(isfixation) %>% #This removes all saccades from the dataframe
   group_by(neuron,s) %>%
@@ -120,7 +116,7 @@ summaryforplot %>%
   mutate(r=cor(mean.Verg.Angle,mean.Spikerate)) ->
   sp
 
-ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=filter(sp,cellnum>100))+
+ggplot(aes(mean.Verg.Angle,mean.Spikerate),data=filter(sp,cellnum>100,dur>40))+
     geom_point(size=2,alpha=1/2)+
   # geom_point(aes(color=mean.time),size=2,alpha=1/2)+
   # scale_color_continuous(low='black',high='orange')+
