@@ -1,24 +1,77 @@
 #Bee-211----
 ChosenCell='Bee-211'
 gc<- filter(t,neuron==ChosenCell) #saved as a separate variable so it can be used later
-gc<-mutate(gc,time=row_number(), showrasters=replace(rasters,rasters<1,NA))
+z<-mutate(z,showrasters=replace(rasters,rasters<1,NA))
 
 
 #PERFECT NON-SACCADIC VERGENCE
 window=543500 #Bee-211
 window_size=2000
-ggplot(filter(gc,time>=window,time<window+window_size))+
-  geom_area(aes(time,sdf),alpha=1/10)+
-  geom_line(aes(time,lev-rev),color='darkblue',alpha=1)+
+d=filter(z,time>=window,time<window+window_size)
+d<- group_by(d,time) %>% summarize_each(funs(first))
+
+ggplot(d)+
+  geom_area(aes(time,sdf),alpha=1/2)+
+  geom_line(aes(time,lev-rev),color='blue',alpha=1)+
   # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
-  geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
+  # geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
   geom_point(aes(time,showrasters+50),shape='|')+
-  geom_line(aes(time,rep+100),color='red')+
-  geom_line(aes(time,lep+100),color='blue')+
-  geom_line(aes(time,repV+100),color='red',linetype=2)+
-  geom_line(aes(time,lepV+100),color='blue',linetype=2)+
-  
-  geom_line(aes(time,conj.velocity),color='hotpink')
+  # geom_line(aes(time,rep+100),color='red')+
+  # geom_line(aes(time,lep+100),color='blue')+
+  # geom_line(aes(time,repV+100),color='red',linetype=2)+
+  # geom_line(aes(time,lepV+100),color='blue',linetype=2)+
+  # geom_line(aes(time,conj.velocity),color='hotpink')+
+  geom_line(aes(time,predV),color='orange')+
+  theme_minimal()
+
+ggplot(d)+
+  # geom_area(aes(time,sdf),alpha=1/2)+
+  # geom_line(aes(time,lev-rev),color='blue',alpha=1)+
+  # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
+  geom_line(aes(time,(lep-rep)),color='darkgreen',size=2)+
+  # geom_point(aes(time,showrasters+50),shape='|')+
+  geom_line(aes(time,rep),color='red',size=2)+
+  geom_line(aes(time,lep),color='blue',size=2)+
+  geom_line(aes(time,(repV+lepV)/2),color='violet',size=2)+
+  # geom_line(aes(time,repV),color='red',linetype=1,size=2)+
+  # geom_line(aes(time,lepV),color='blue',linetype=1,size=2)+
+  # geom_line(aes(time,conj.velocity),color='hotpink')+
+  # geom_line(aes(time,predV),color='orange')+
+  theme_minimal()
+
+ggplot(d)+
+  # geom_area(aes(time,sdf),alpha=1/2)+
+  geom_line(aes(time,verg.velocity),color='blue',alpha=1)+
+  # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
+  # geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
+  # geom_point(aes(time,showrasters+50),shape='|')+
+  # geom_line(aes(time,rep+100),color='red')+
+  # geom_line(aes(time,lep+100),color='blue')+
+  # geom_line(aes(time,repV+100),color='red',linetype=2)+
+  # geom_line(aes(time,lepV+100),color='blue',linetype=2)+
+  geom_line(aes(time,conj.velocity),color='hotpink')+
+  geom_line(aes(time,predV),color='orange')+
+  ylim(-10,30)+
+  theme_minimal()
+
+
+ggplot(d)+
+  geom_area(aes(time,sdf),alpha=1)+
+  # geom_line(aes(time,lev-rev),color='blue',alpha=1)+
+  # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
+  # geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
+  geom_point(aes(time,showrasters+20),shape='|',color='white')+
+  # geom_line(aes(time,rep+100),color='red')+
+  # geom_line(aes(time,lep+100),color='blue')+
+  # geom_line(aes(time,repV+100),color='red',linetype=2)+
+  # geom_line(aes(time,lepV+100),color='blue',linetype=2)+
+  # geom_line(aes(time,conj.velocity),color='hotpink')+
+  # geom_line(aes(time,predV),color='orange')+
+  theme_minimal()
+
+
+
+
 
 
 window=49000

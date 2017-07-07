@@ -1,12 +1,12 @@
 preparetoBOOT<- function(z){
   
   z%>% #this block smooths out velocity traces
-    mutate(lev=parabolicdiff(lep,20),
-           rev=parabolicdiff(rep,20),
-           levV=parabolicdiff(lepV,20),
-           revV=parabolicdiff(repV,20),
-           # sdf=spikedensity(rasters,50),
-           verg.velocity=lev-rev,
+    mutate(#lev=parabolicdiff(lep,20),
+           #rev=parabolicdiff(rep,20),
+           #levV=parabolicdiff(lepV,20),
+           #revV=parabolicdiff(repV,20),
+           sdf=spikedensity(rasters,10),
+           #verg.velocity=lev-rev,
            conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2))->
     z
   
@@ -66,7 +66,8 @@ preparetoBOOT<- function(z){
   
   z %>%
     group_by(sacnum) %>%
-    mutate(enhance.type='none',
+    mutate(enhance.type='slowC',
+           enhance.type=replace(enhance.type,!realsaccade&verg.velocity<0,'slowD'),
            enhance.type=replace(enhance.type,realsaccade & verg.velocity>0, 'converging'),
            enhance.type=replace(enhance.type,realsaccade & verg.velocity<0, 'diverging'))->
     z

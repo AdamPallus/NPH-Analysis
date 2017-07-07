@@ -1,7 +1,9 @@
 ---
 title: "SOA in strabismus"
 author: "Adam"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 #Introduction
 This document compares the activity of neurons in the SOA with those in the NRTP. Analysis surrounds the sensitivity to vergence angle during fixation, and an analysis of any increase in firing rate during saccades with vergence.  

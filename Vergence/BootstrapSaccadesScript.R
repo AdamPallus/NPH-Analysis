@@ -3,11 +3,11 @@ bootstrapSaccades<- function(n){
   # z<- readRDS('bootstrapSaccades.RDS')
   get('z') #get from global environment
   # if (n %% 100 == 0){
-  #   message(n)
+    message(n)
   # }
   z %>%
-    group_by(verg.bins) %>%
-    filter(verg.bins != 'Conjugate') %>%
+    # group_by(verg.bins) %>%
+    # filter(verg.bins != 'Conjugate') %>%
     sample_frac(1,replace=TRUE) %>%
     ungroup() %>%
     do(tidy(lm(sdf20~verg.angle+verg.velocity:enhance.type,data=.))) %>%
@@ -16,70 +16,82 @@ bootstrapSaccades<- function(n){
 }
 
 
+t<-readRDS('SOA.RDS')
 
 nreps=1999
-n<- matrix(1:nreps)
+nbreps<- matrix(1:nreps)
 
-p<- filter(t,monkey %in% c('Bee','Ozette'),cellnum>100)
-neurons=unique(p$neuron)
-p<-NULL
+
+# p<- filter(t,monkey %in% c('Bee','Ozette'),cellnum>100)
+# p<- filter(t,neuron=='Bee-211')
+neurons=unique(t$neuron)
+# p<-NULL
 xx<- NULL
 for (i in 1:length(neurons)){
 # for(i in 1:2){
   message(paste('Processing: ',neurons[i]))
   z <- filter(t,neuron==neurons[i])
-  z<-preparetoBOOT(z)
-  x<- as.data.frame(rbindlist(apply(n,1,bootstrapSaccades)))
+  z<-preparetoBOOT2(z)
+  z %>%
+    group_by(verg.bins) %>%
+    filter(verg.bins != 'Conjugate',
+           abs(verg.velocity)<350) ->
+    z
+  x<- as.data.frame(rbindlist(apply(nbreps,1,bootstrapSaccades)))
   x<- mutate(x,neuron=neurons[i])
   xx[[i]]<- x
 }
 
 xx<- rbindlist(xx)
-xx %>%
-  mutate(term=replace(term,term=='verg.velocity:enhance.typeconverging','ConvergenceE'),
-         term=replace(term,term=='verg.velocity:enhance.typediverging','DivergenceE'),
-         term=replace(term,term=='verg.velocity:enhance.typenone','Slow'))->
-  xx
-xx<- separate(xx,neuron,c('monkey','cellnum'),remove=FALSE)
-
-saveRDS(xx,paste('Bootstrap',nreps,'.RDS',sep=''))
-
-qplot(estimate,data=filter(xx,term != '(Intercept)',term != 'verg.angle'),bins=10)+
-  facet_grid(term~neuron,scales='free')
-
-xxp<- filter(xx,term != '(Intercept)',
-                            term != 'verg.angle',
-                            as.numeric(cellnum)>100,
-                            monkey %in% c('Bee','Ozette'))
-
-qplot(estimate,data=filter(xxp,monkey=='Bee'),bins=50)+
-  facet_grid(term~neuron,scales='free')
+saveRDS(xx,'Bootstrap1999-6-15-OzetteWeirdos.RDS')
 
 
-qplot(estimate,data=filter(xxp,monkey=='Ozette'),bins=50)+
-  facet_grid(term~neuron,scales='free')
-
-
-xxp %>%
-  # group_by(verg.bins,term) %>%
-  group_by(neuron,term) %>%
-  summarize(e=mean(estimate),
-            stdev=sd(estimate),
-            ci=2*stdev/sqrt(nreps))->
-  xs
-
-xxa<- filter(xx,term == 'verg.angle',
-             as.numeric(cellnum)>100,
-             monkey %in% c('Bee','Ozette'))
-qplot(estimate,data=filter(xxa,monkey=='Ozette'),bins=50)+
-  facet_wrap(~neuron,ncol=1,scales='free')
-
-xxv<- filter(xx,term == 'Slow',
-             as.numeric(cellnum)>100,
-             monkey %in% c('Bee','Ozette'))
-
-qplot(estimate,data=filter(xxv,monkey=='Ozette'),bins=50)+
-  facet_wrap(~neuron,ncol=1,scales='free')
+# 
+# xx %>%
+#   mutate(term=replace(term,term=='verg.velocity:enhance.typeconverging','ConvergenceE'),
+#          term=replace(term,term=='verg.velocity:enhance.typediverging','DivergenceE'),
+#          term=replace(term,term=='verg.velocity:enhance.typenone','Slow'))->
+#   xx
+# xx<- separate(xx,neuron,c('monkey','cellnum'),remove=FALSE)
+# 
+# saveRDS(xx,paste('Bootstrap',nreps,'.RDS',sep=''))
+# 
+# qplot(estimate,data=filter(xx,term != '(Intercept)',term != 'verg.angle'),bins=10)+
+#   facet_grid(term~neuron,scales='free')
+# 
+# xxp<- filter(xx,term != '(Intercept)',
+#                             term != 'verg.angle',
+#                             as.numeric(cellnum)>100,
+#                             monkey %in% c('Bee','Ozette'))
+# 
+# qplot(estimate,data=filter(xxp,monkey=='Bee'),bins=50)+
+#   facet_grid(term~neuron,scales='free')
+# 
+# 
+# qplot(estimate,data=filter(xxp,monkey=='Ozette'),bins=50)+
+#   facet_grid(term~neuron,scales='free')
+# 
+# 
+# xxp %>%
+#   # group_by(verg.bins,term) %>%
+#   group_by(neuron,term) %>%
+#   summarize(e=mean(estimate),
+#             stdev=sd(estimate),
+#             ci=2*stdev/sqrt(nreps))->
+#   xs
+# 
+# xxa<- filter(xx,term == 'verg.angle',
+#              as.numeric(cellnum)>100,
+#              monkey %in% c('Bee','Ozette'))
+# qplot(estimate,data=filter(xxa,monkey=='Ozette'),bins=50)+
+#   facet_wrap(~neuron,ncol=1,scales='free')
+# 
+# xxv<- filter(xx,term == 'Slow',
+#              as.numeric(cellnum)>100,
+#              monkey %in% c('Bee','Ozette'))
+# 
+# qplot(estimate,data=filter(xxv,monkey=='Ozette'),bins=50)+
+#   facet_wrap(~neuron,ncol=1,scales='free')
 
 #simpler model----
 

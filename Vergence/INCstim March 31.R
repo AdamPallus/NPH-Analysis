@@ -39,7 +39,7 @@ sx %>%
   sp
 
 
-chosensite='Kopachuck-505'
+chosensite='Kopachuck-506'
 spt<- filter(sp,neuron==chosensite)
 # spt<- dplyr::select(spt,1:10)
 

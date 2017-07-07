@@ -26,10 +26,11 @@ t<- readRDS('SOA-NRTP.RDS')
 ########OPTIONS##############
 Cells.to.Plot = c(33)
 # Cells.to.Plot=c('Bee-33','Bee-112','Bee-211')
-Cells.to.Plot=c('Kopachuck-106','Kopachuck-110','Kopachuck-122', 'Kopachuck-126','Kopachuck-127')
+Cells.to.Plot='Kopachuck-110'
+Cells.to.Plot=c( 'Kopachuck-126','Kopachuck-127')
 Cells.to.Plot=c('Bee-211','Bee-216')
-sample.saccades= TRUE
-Remove.Multiverg= TRUE
+sample.saccades= FALSE
+Remove.Multiverg= FALSE
 #############################
 #############################
 
@@ -152,9 +153,9 @@ if (sample.saccades) {
 ggplot(g) + 
   theme_bw()+ #Removes gray background 
   xlab('Time from Saccade Onset (ms)')+
-  geom_histogram(aes(spiketimes,100*..ncount..),alpha=1,binwidth=15,fill='black',color='black')+
+  geom_histogram(aes(spiketimes,200*..ncount..),alpha=1,binwidth=15,fill='black',color='black')+
   # geom_freqpoly(aes(spiketimes,100*..ncount..),alpha=1,bins=40,color='darkred',size=1)+
-  geom_point(aes(counter,showrasters* snum*5+110),shape='|',size=0.5,color='black')+
+  geom_point(aes(counter,showrasters* snum*5+210),shape='|',size=0.5,color='black')+
   # facet_grid(neuron~convergent,scales='free_y',space='free_y')+
   facet_grid(convergent~neuron,scales='free_y',space='free_y')+
   # facet_wrap(~neuron,ncol=1)+
@@ -166,15 +167,15 @@ ggplot(g) +
   geom_line(aes(counter,lep-50,group=sacnum),color='red',size=0.5,alpha=1/10)+
   geom_line(aes(counter,repV-100,group=sacnum),color='blue',size=0.5,alpha=1/10)+
   geom_line(aes(counter,lepV-100,group=sacnum),color='red',size=0.5,alpha=1/10)+
-  geom_line(aes(counter,verg.angle*10-300,group=sacnum),color='darkgreen',size=0.5,alpha=1/5)+
+  geom_line(aes(counter,verg.angle*10-400,group=sacnum),color='darkgreen',size=0.5,alpha=1/5)+
   # geom_line(aes(counter,sdf-500,group=sacnum),color='orange',size=0.5,alpha=1/5)
   # coord_cartesian(xlim=c(-200,300),expand=FALSE)+
   theme(axis.text=element_text(size=16),
         panel.margin=unit(2,'lines'),
         strip.text=element_text(size=16),
         axis.title.x=element_text(size=16))+
-  scale_y_continuous(breaks=c(-300,-250,-200,-150),labels=c(0,5,10,15))+ #re-labels so verg.angle is accurate
+  scale_y_continuous(breaks=c(-400,-350,-300,-250,-200),labels=c(0,5,10,15,20))+ #re-labels so verg.angle is accurate
   ylab('Degrees')+
   expand_limits(y=c(-300))
 
-ggsave('Rastersall.PDF',height=15,width=8)
+# ggsave('Rastersall.PDF',height=15,width=8)

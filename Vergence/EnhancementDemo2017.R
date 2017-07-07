@@ -24,8 +24,8 @@ chosenCell='Bee-211'
 z<- filter(t,neuron==chosenCell)
 z<- ModelEnhancement(z)
 #Plotting----
-# p<- filter(z,verg.amp>4)
-p<- filter(z,total.verg.amp< -4)
+p<- filter(z,verg.amp>3)
+# p<- filter(z,total.verg.amp< -4)
 p<- mutate(p,showrasters=replace(rasters,rasters<1,NA))
 # p<- filter(z,predict.ratio>1,total.verg.amp>2)
 goodsacs=unique(p$sacnum)
@@ -182,13 +182,23 @@ ggplot(p,aes(group=sacnum))+
 
 ps<- summarize_each(group_by(p,sacnum),funs(first))
 
-qplot(verg.lead,min.verg.velocity,data=ps)+
+qplot(verg.lead,min.verg.trans,data=ps)+
   xlab('Vergence Lead (ms)')+
-  ylab('Minimum Vergence Velocity (deg/s) npk')
+  ylab('Minimum Vergence Velocity (deg/s) npk')+
+  geom_hline(yintercept = 0,linetype=2)+
+  theme_minimal()+
+  ggtitle('Minimum Vergence Velocity During Converging Saccades')
 
+ggplot(ps)+
+  geom_point(aes(verg.lead,min.verg.trans,color=verg.amp))+
+  xlab('Vergence Lead (ms)')+
+  ylab('Minimum Vergence Velocity (deg/s) npk')+
+  geom_hline(yintercept = 0,linetype=2)+
+  theme_minimal()+
+  ggtitle('Minimum Vergence Velocity During Converging Saccades')
 
-qplot(verg.lead,min.verg.velocity,data=ps)+
-  geom_point(aes(verg.lead,max.verg.velocity),color='hotpink')+
+qplot(verg.lead,min.verg.trans,data=ps)+
+  geom_point(aes(verg.lead,max.verg.trans),color='hotpink')+
   xlab('Vergence Lead (ms)')+
   ylab('Peak Vergence Velocity (deg/s)')+
   annotate('text',x=20,y=125,label='Positive',color='hotpink')+

@@ -33,9 +33,9 @@ select<- dplyr::select
 
 ```{r quickload,echo=FALSE}
 # o<-readRDS('KopachuckINC.RDS')
-o<-readRDS('KopaBeeINC.RDS')
-# o<- NULL
-t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
+# o<-readRDS('KopaBeeINC.RDS')
+o<- NULL
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/HAMMING/",referencefile=o)
 
 if (!is.null(t)){
   t<- rbind(o,t)

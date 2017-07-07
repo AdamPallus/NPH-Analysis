@@ -13,13 +13,13 @@
     # geom_line(aes(time,predP/1000),color='darkgreen',linetype=2)+
     geom_line(aes(time,predV),color='orange')+
     # geom_line(aes(time,predV2),color='magenta')+
-    geom_line(aes(time,verg.velocity),color='darkblue')+
+    geom_line(aes(time,lev-rev),color='darkblue')+
     geom_area(aes(time,conj.velocity),alpha=1/3)+
     geom_line(aes(time,rep+100),color='red')+
     geom_line(aes(time,lep+100),color='blue')+
     geom_line(aes(time,repV+100),color='red',linetype=2)+
     geom_line(aes(time,lepV+100),color='blue',linetype=2)+
-    geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
+    # geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
     # geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
     ylim(c(NA,200))
 
@@ -35,14 +35,14 @@ d2<- ungroup(filter(z,sacnum==378))
 d2<- ungroup(filter(z,sacnum==27))
 
 A<-ggplot(d2)+
-  # geom_point(aes(counter,showrasters+30),shape='|')+
+  geom_point(aes(counter,showrasters+30),shape='|')+
   geom_line(aes(counter-bufferlength,verg.velocity),color='darkblue',size=2)+
   geom_line(aes(counter-bufferlength,conj.velocity),color='magenta',size=2)+
-  geom_vline(xintercept=c(bufferlength,139)-bufferlength,linetype=3,size=2)+
-  geom_vline(xintercept = c(41,213)-bufferlength,linetype=3,size=2)+
+  # geom_vline(xintercept=c(bufferlength,139)-bufferlength,linetype=3,size=2)+
+  # geom_vline(xintercept = c(41,213)-bufferlength,linetype=3,size=2)+
   ylim(c(NA,150))+
   xlab('Time (ms)')+
-  ylab('Velocity (deg/s)')
+  ylab('Velocity (deg/s)')+theme_minimal()
 
 A
 ggsave('Figure3A_1.PDF',plot = A)
@@ -57,11 +57,12 @@ B<-ggplot(d2)+
   geom_line(aes(counter-bufferlength,rep),color='red',size=2)+
   geom_line(aes(counter-bufferlength,lep),color='blue',size=2)+
   geom_line(aes(counter-bufferlength,(repV+lepV)/2),color='darkviolet',linetype=2,size=2)+
-  geom_vline(aes(xintercept=c(bufferlength,saccade.end))-bufferlength,linetype=3,size=2)+
-  geom_vline(xintercept = c(41,213)-bufferlength,linetype=3,size=2)+
+  # geom_vline(aes(xintercept=c(bufferlength,saccade.end))-bufferlength,linetype=3,size=2)+
+  # geom_vline(xintercept = c(41,213)-bufferlength,linetype=3,size=2)+
   ylim(c(NA,15))+
   xlab('Time (ms)')+
-  ylab('Position (deg)')
+  ylab('Position (deg)')+
+  theme_minimal()
 
 B
 
@@ -74,7 +75,7 @@ C<-ggplot(d2)+
   geom_point(aes(counter-bufferlength,showrasters+30),shape='|',size=3)+
   geom_line(aes(counter-bufferlength,verg.velocity),color='darkblue',size=2)+
   geom_line(aes(counter-bufferlength,conj.velocity),color='magenta',size=2)+
-  geom_vline(xintercept=c(0,first(d2$saccade.dur)),linetype=3,size=2)+
+  # geom_vline(xintercept=c(0,first(d2$saccade.dur)),linetype=3,size=2)+
   # geom_vline(xintercept = c(41,213)-bufferlenagth,linetype=3,size=2)+
   geom_line(aes(counter-bufferlength,predV),color='orange',size=2)+
   ylim(c(NA,50))+

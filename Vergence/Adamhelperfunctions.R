@@ -413,7 +413,7 @@ loadnewcsv2<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Verg
       message(paste('ms of data:',nrow(temp)))
       mutate(loadedfiles[[i]],
              # sdflag=lag(sdf,leadtime),
-             conj.velocity=sqrt((rev^2+lev^2)/2)+sqrt((revV^2+levV^2)/2),
+             conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2),
              # s=markSaccades(conj.velocity,buffer=10,threshold=10),
              # slong=markSaccades(conj.velocity,buffer=longbuffer,threshold=10),
              time=row_number(),
