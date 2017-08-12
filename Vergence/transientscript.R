@@ -10,10 +10,11 @@ source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
 source('markEnhancement.R')
 t<-readRDS('SOA-NRTP.RDS')
-z<- filter(t,neuron=='Ozette-122')
+z<- filter(t,neuron=='Bee-211')
+
 
 # z<-filter(t,cellnum>200,cellnum<204,monkey=='Bee')
-t<-NULL
+# t<-NULL
 z<- mutate(z,time=row_number())
 
 
@@ -24,8 +25,8 @@ z<- mutate(z,time=row_number())
 #   z
 
 z %>%
-  mutate(g=floor(time/200000)) %>%
-  group_by(g) %>%
+  # mutate(g=floor(time/200000)) %>%
+  # group_by(g) %>%
   mutate(rev=parabolicdiff(rep,20),
          lev=parabolicdiff(lep,20),
          revV=parabolicdiff(repV,20),
@@ -179,8 +180,8 @@ z %>%
   filter(saccade.type!='saccade.only',counter> -100) %>%
   group_by(sacnum) %>%
   mutate(verg.ismoving=abs(verg.velocity)>3) %>%
-  summarize(verg.onset=first(counter[verg.ismoving]),
-            enhance.onset=first(counter[verg.enhance]),
+  summarize(verg.onset=counter[verg.ismoving][1],
+            enhance.onset=counter[verg.enhance][1],
             verg.lead=enhance.onset-verg.onset)->
   xxx
 

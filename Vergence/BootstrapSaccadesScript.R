@@ -140,10 +140,10 @@ source('preparetoBOOT.R')
 #that just loads the necessary libraries, helper functions and the main data file: ('SOA-NRTP.RDS')
 nreps=1999 #number of bootstrap iterations
 n<- matrix(1:nreps) #set this up in the proper form to work with apply below
+t<- readRDS('SOA.RDS')
 
-p<- filter(t,monkey %in% c('Bee','Ozette'),cellnum>100)
-neurons=unique(p$neuron)
-p<-NULL
+neurons=unique(t$neuron)
+
 xx<- NULL
 for (i in 1:length(neurons)){
   # for(i in 1:2){

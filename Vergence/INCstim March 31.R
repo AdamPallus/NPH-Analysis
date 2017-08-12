@@ -11,7 +11,7 @@ library(cladoRcpp)
 library(boot)
 source('Adamhelperfunctions.R')
 
-s<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/INCstim/")
+s<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstim/")
 
 # s<- filter(t,neuron %in% c('Kopachuck-501','Kopachuck-502'))
 bufferlength=200
@@ -39,8 +39,19 @@ sx %>%
   sp
 
 
-chosensite='Kopachuck-506'
+chosensite='Kopachuck-5102'
 spt<- filter(sp,neuron==chosensite)
+
+ggplot(spt,aes(group=stimes))+
+  geom_line(aes(counter,repDIFF),color='red')+
+  geom_line(aes(counter,lepDIFF),color='blue')+
+  geom_point(aes(counter,showstim+10),shape='|',alpha=1/20)
+
+ggplot(spt,aes(group=stimes))+
+  geom_line(aes(counter,repVDIFF),color='red',linetype=2)+
+  geom_line(aes(counter,lepVDIFF),color='blue',linetype=2)+
+  geom_point(aes(counter,showstim+10),shape='|',alpha=1/20)
+  
 # spt<- dplyr::select(spt,1:10)
 
 #data wrangling to let us to facet_grid with horizontal and vertical separated 
@@ -63,7 +74,7 @@ levels(x$is.Vertical)<- c("Horizontal",'Vertical')
 #   facet_grid(is.Vertical~stimes)+
 #   geom_vline(xintercept = 200)
 
-#cool trick: use export then preview in Rstudio so expand the graph without writing a file
+#cool trick: use export then preview in Rstudio to expand the graph without writing a file
 ggplot(x)+
   geom_line(aes(counter,Position,color=ComponentP))+
   geom_point(aes(counter,showstim+10),shape='|',alpha=1/20)+
@@ -85,7 +96,10 @@ ggplot(spt)+
   xlab('Horizontal Position (deg)')+
   ylab('Vertical Position (deg)')
 
-ggsave('XYdemo5111.PDF',height=30,width=15)
+ggplot(spt)+
+  geom_line(aes(counter,lep-rep,group=stimes),color='darkgreen',data=spt)
+
+# ggsave('XYdemo5111.PDF',height=30,width=15)
             
 # ggplot(spt)+
 #   geom_line(aes(rep,repV),color='red',alpha=1/20,linetype=2,data=filter(spt,!isstim))+
@@ -118,4 +132,15 @@ manipulate(ggplot(filter(spt,neuron==stimlocs[chosenSite]))+
   ,
   chosenSite=slider(1,length(stimlocs),step=1))
 
+stimlocs=unique(sp$neuron)
 
+manipulate({
+  d=filter(sp,neuron==stimlocs[chosenSite])
+  ggplot(d,aes(group=stimes))+
+    geom_line(aes(counter,repDIFF),color='red')+
+    geom_line(aes(counter,lepDIFF),color='blue')+
+    geom_point(aes(counter,showstim+10),shape='|',alpha=1/20)+
+    ggtitle(stimlocs[chosenSite])
+}
+,
+chosenSite=slider(1,length(stimlocs),step=1))

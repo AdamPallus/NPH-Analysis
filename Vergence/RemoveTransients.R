@@ -6,15 +6,15 @@ source('calculateTransient.R')
 library(dplyr)
 # z<- readRDS('NRTP.RDS')
 z<- readRDS('SOA.RDS')
-# d<- filter(z,neuron=='Bee-16')
-d<- filter(z,neuron %in% c('Bee-101','Bee-107','Bee-112','Bee-202','Bee-205','Bee-211','Bee-215','Bee-218'))
+d<- filter(z,neuron=='Bee-211')
+# d<- filter(z,neuron %in% c('Bee-101','Bee-107','Bee-112','Bee-202','Bee-205','Bee-211','Bee-215','Bee-218'))
 # z<- filter(z,cellnum==101,monkey=='Bee') # just use some of the data for this test
 
-d<- filter(z,monkey=='Bee')
+# d<- filter(z,monkey=='Bee')
 
-d<- mutate(d,time=row_number())
+# d<- mutate(d,time=row_number())
 
-message('Smoothing Velocity...')
+# message('Smoothing Velocity...')
 #smooth out vergence velocity traces
 # d %>%
 #   mutate(g=floor(time/200000)) %>%
@@ -23,8 +23,8 @@ message('Smoothing Velocity...')
 #   d
 
 d %>%
-  mutate(g=floor(time/200000)) %>%
-  group_by(g) %>%
+  # mutate(g=floor(time/200000)) %>%
+  # group_by(g) %>%
   mutate(rev=parabolicdiff(rep,20),
          lev=parabolicdiff(lep,20),
          revV=parabolicdiff(repV,20),

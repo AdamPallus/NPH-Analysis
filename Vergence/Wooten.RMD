@@ -34,60 +34,130 @@ select<- dplyr::select
 ```{r quickload,echo=FALSE}
 
 o<- NULL
-t<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/WOOTEN/",
-               referencefile=o,
-               keeptarget = TRUE)
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/WOOTEN/",
+               referencefile=o)
 
 
 ```
 #Results
-```{r simple model INC}
+```{r basic plots}
 
+t %>%
+  group_by(neuron) %>%
+  mutate( rev=parabolicdiff(rep,10),
+          lev=parabolicdiff(lep,10),
+          verg.velocity=lev-rev,
+          # target.vergence=thp2-thp,
+          # target.vergence=as.vector(smooth(target.vergence,kind='3RS3R')),
+          # target.vergence.velocity=parabolicdiff(target.vergence,n=30),
+          sdf=spikedensity(rasters,15),
+          showrasters=replace(rasters,rasters==0,NA),
+          time=row_number(),
+          sdf20=lag(sdf,20))->
+  t
 
-t<- mutate(t,
-           rev=parabolicdiff(rep,20),
-           lev=parabolicdiff(lep,20),
-           verg.velocity=lev-rev,
-           target.vergence=thp2-thp,
-           # target.vergence=as.vector(smooth(target.vergence,kind='3RS3R')),
-           target.vergence.velocity=parabolicdiff(target.vergence,n=30),
-           sdf=spikedensity(rasters,45),
-           showrasters=replace(rasters,rasters==0,NA),
-           time=row_number(),
-           sdf20=lag(sdf,20))
-
-ggplot(filter(t,time>50000,time<100000))+
-  geom_line(aes(time,target.vergence))+
-  geom_line(aes(time,verg.angle),color='darkgreen')+
-  geom_point(aes(time,showrasters+15),shape='|')+
-  # geom_area(aes(time,sdf20),alpha=0.2)+
-  theme_bw()
-
-ggplot(filter(t,time>50000,time<100000))+
-  geom_line(aes(time,target.vergence.velocity))+
-  geom_line(aes(time,verg.velocity),color='darkblue')+
-    geom_point(aes(time,showrasters+15),shape='|')+
-  # geom_line(aes(time,sdf20-25),alpha=0.2)+
-  theme_bw()+
-  ylim(c(-25,25))
-
-ggplot(filter(t,time>55000,time<70000))+
-  geom_line(aes(time,target.vergence.velocity))+
-  geom_line(aes(time,verg.velocity),color='darkblue')+
-    geom_point(aes(time,showrasters+15),shape='|')+
-  # geom_line(aes(time,sdf20-25),alpha=0.2)+
-  theme_bw()+
-  ylim(c(-25,25))
-
-ggplot(filter(t,time>55000,time<70000))+
-  geom_line(aes(time,target.vergence.velocity))+
-  geom_line(aes(time,as.vector(sma(verg.velocity,order=40,silent='all')$fitted)),color='darkblue')+
-    geom_point(aes(time,showrasters+15),shape='|')+
-  # geom_line(aes(time,sdf20-25),alpha=0.2)+
-  theme_bw()+
-  ylim(c(-25,25))
+# ggplot(filter(t,time>50000,time<100000))+
+#   geom_line(aes(time,target.vergence))+
+#   geom_line(aes(time,verg.angle),color='darkgreen')+
+#   geom_point(aes(time,showrasters+15),shape='|')+
+#   # geom_area(aes(time,sdf20),alpha=0.2)+
+#   theme_bw()+
+#   facet_wrap(~neuron)
+# 
+# ggplot(filter(t,time>50000,time<100000))+
+#   geom_line(aes(time,target.vergence.velocity))+
+#   geom_line(aes(time,verg.velocity),color='darkblue')+
+#     geom_point(aes(time,showrasters+15),shape='|')+
+#   # geom_line(aes(time,sdf20-25),alpha=0.2)+
+#   theme_bw()+
+#   ylim(c(-25,25))+
+#   facet_wrap(~neuron)
+# 
+# ggplot(filter(t,time>55000,time<70000))+
+#   geom_line(aes(time,target.vergence.velocity))+
+#   geom_line(aes(time,verg.velocity),color='darkblue')+
+#     geom_point(aes(time,showrasters+15),shape='|')+
+#   # geom_line(aes(time,sdf20-25),alpha=0.2)+
+#   theme_bw()+
+#   ylim(c(-25,25))+
+#   facet_wrap(~neuron)
+# 
+# ggplot(filter(t,time>55000,time<70000))+
+#   geom_line(aes(time,target.vergence.velocity))+
+#   geom_line(aes(time,as.vector(sma(verg.velocity,order=40,silent='all')$fitted)),color='darkblue')+
+#     geom_point(aes(time,showrasters+15),shape='|')+
+#   # geom_line(aes(time,sdf20-25),alpha=0.2)+
+#   theme_bw()+
+#   ylim(c(-25,25))+
+#   facet_wrap(~neuron)
 
 # m<- lm(sdf20~verg.velocity+verg.angle,data=t)
 # summary(m)
+
+```
+
+```{r simple model}
+model.formula="sdf20~verg.angle+verg.velocity"
+model.formula="sdf20~verg.velocity"
+t %>%
+  group_by(neuron) %>%
+  do(mod=lm(model.formula,data=.))->
+  z
+
+z %>%
+  glance(mod) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  zg
+
+z %>%
+  tidy(mod)%>%
+  select(neuron,term,estimate) %>%
+  mutate(term=replace(term,term=='(Intercept)','b')) %>%
+  spread(term,estimate)->
+  zt
+
+zgz %>%
+  mutate(imp.verg.angle=calc.relimp(mod)$lmg[1],
+         imp.verg.velocity=calc.relimp(mod)$lmg[2])%>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)%>%
+  select(-mod)->
+  zz
+
+zz$r.squared=zg$r.squared
+
+qplot(imp.verg.angle,imp.verg.velocity,data=zz)+
+  geom_abline()+
+  xlim(0,1)+
+  ylim(0,1)+
+  xlab('Importance of Vergence Angle')+
+  ylab('Importance of Vergence Velocity')
+
+ggplot(aes(imp.verg.angle,imp.verg.velocity),data=zz)+
+  xlim(0,1)+
+  ylim(0,1)+
+  geom_text(aes(label=as.integer(cellnum)-100),alpha=0.2)+
+  geom_abline()
+
+```
+
+```{r exploreplot}
+
+ggplot(t)+
+  geom_line(aes(verg.angle,sdf20))+
+  facet_wrap(~neuron)
+
+
+ggplot(t)+
+  geom_line(aes(verg.velocity,sdf20))+
+  facet_wrap(~neuron)
+
+
+  group_by(neuron) %>%
+  mutate(predict.sdf=predict(.,newdata=z$mod[z$neuron==neuron]))->
+  tm
+
+for(i in 1:nrow(z)){
+  
+}
 
 ```

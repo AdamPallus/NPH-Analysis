@@ -14,7 +14,7 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
            lev=parabolicdiff(lep,parabolic_n),
            revV=parabolicdiff(repV,parabolic_n),
            levV=parabolicdiff(lepV,parabolic_n),
-           sdf=spikedensity(rasters,sd=30),
+           sdf=spikedensity(rasters,sd=15),
            sdf20=dplyr::lag(sdf,lagsdf),
            conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2)) ->
     x
@@ -24,7 +24,7 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
     group_by(sacnum) %>%
     mutate(verg.amp=last(verg.angle)-first(verg.angle),
            isconj=verg.amp<1,
-           saccadic=counter>saccadebuffer & counter<n()-saccadebuffer+20,
+           saccadic=counter>saccadebuffer & counter<n()-saccadebuffer, #+20,
            saccadic=replace(saccadic,!saccadic,NA),
            conj.h.vel=(lev+rev)/2,
            conj.v.vel=(levV+revV)/2,
@@ -52,18 +52,18 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
 }
 
 
-mod<- modelVV2(t,chosenCell='Bee-211',lagsdf=31,
+mod<- modelVV2(t,chosenCell='Bee-15',lagsdf=35,
                model.form='verg.velocity~sdf20+verg.angle',
                returnmodel = TRUE)
 
-x3<- modelVV2(t,chosenCell='Bee-211',lagsdf=31,
+x3<- modelVV2(t,chosenCell='Bee-33',lagsdf=31,
               model.form='verg.velocity~sdf20+verg.angle',
               saccadebuffer=10)
 
 
 bufferlength=200
 
-modelVV2(z,chosenCell='Bee-211',lagsdf=31,
+modelVV2(t,chosenCell='Bee-211',lagsdf=37,
               model.form='verg.velocity~sdf20+verg.angle',
               saccadebuffer=bufferlength) %>%
   group_by(sacnum) %>%
@@ -191,8 +191,8 @@ ggplot(filter(zp,abs(verg.amp)>0.5))+
 
 
 {
-  window=10500
-  window_size=1500
+  window=214750
+  window_size=1000
   d=filter(x3,time>=window,time<window+window_size)
   ggplot(d)+
     geom_point(aes(time,showrasters+30),shape='|')+
@@ -573,3 +573,27 @@ periodstoplot=as.array(c(203000,209000,228500,233000,243000,244500,249000,256500
 apply(periodstoplot,1,saveModelPlot,x=x3)
 
 saveModelPlot(x=x3,window=81000)
+
+goodsacs=unique(z$sacnum[abs(z$total.verg.amp)>4&z$r.amp>4])
+goodsacs=goodsacs[!is.na(goodsacs)]
+manipulate({
+  d=filter(z,sacnum==goodsacs[currentsac])
+  ggplot(d)+
+    geom_point(aes(time,showrasters+30),shape='|',size=4)+
+    # geom_point(aes(time,showenhance*verg.velocity),color='magenta')+
+    # geom_area(aes(time,sdf),color='black',fill='pink',alpha=1/10)+
+    # geom_line(aes(time,slowpredict),color='orange')+
+    geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
+    # geom_line(aes(time,predP/1000),color='darkgreen',linetype=2)+
+    geom_line(aes(time,predV),color='orange')+
+    # geom_line(aes(time,predV2),color='magenta')+
+    geom_line(aes(time,verg.velocity),color='darkblue')+
+    geom_area(aes(time,conj.velocity),alpha=1/3)+
+    geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
+    # geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
+    ylim(c(NA,150))+
+    geom_point(aes(time,saccadic*50))
+  # geom_line(aes(time,target.verg*10))
+  # geom_line(aes(time,(target.verg-verg.angle)*10),color='hotpink')
+},
+currentsac=slider(1,length(goodsacs),step=1,initial = 1))

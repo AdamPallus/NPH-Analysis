@@ -1,6 +1,5 @@
 #Bee-211----
-ChosenCell='Bee-211'
-gc<- filter(t,neuron==ChosenCell) #saved as a separate variable so it can be used later
+#Go to VergPreditionDoodle.r 
 z<-mutate(z,showrasters=replace(rasters,rasters<1,NA))
 
 
@@ -28,20 +27,43 @@ ggplot(d)+
   # geom_area(aes(time,sdf),alpha=1/2)+
   # geom_line(aes(time,lev-rev),color='blue',alpha=1)+
   # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
-  geom_line(aes(time,(lep-rep)),color='darkgreen',size=2)+
+  geom_line(aes(time,(lep-rep)),color='darkgreen',size=1)+
   # geom_point(aes(time,showrasters+50),shape='|')+
-  geom_line(aes(time,rep),color='red',size=2)+
-  geom_line(aes(time,lep),color='blue',size=2)+
-  geom_line(aes(time,(repV+lepV)/2),color='violet',size=2)+
+  geom_line(aes(time,rep),color='red',size=1)+
+  geom_line(aes(time,lep),color='blue',size=1)+
+  geom_line(aes(time,(repV+lepV)/2),color='violet',size=1)+
   # geom_line(aes(time,repV),color='red',linetype=1,size=2)+
   # geom_line(aes(time,lepV),color='blue',linetype=1,size=2)+
   # geom_line(aes(time,conj.velocity),color='hotpink')+
   # geom_line(aes(time,predV),color='orange')+
+  ylim(-35,35)+
   theme_minimal()
+
+
+ggplot(d)+
+  # geom_area(aes(time,sdf),alpha=1/2)+
+  # geom_line(aes(time,lev-rev),color='blue',alpha=1)+
+  # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
+  geom_line(aes(time,(lep-rep)-(lep-rep)[1]+5),color='darkgreen',size=1)+
+  # geom_point(aes(time,showrasters+50),shape='|')+
+  geom_line(aes(time,rep-rep[1]),color='red',size=1)+
+  geom_line(aes(time,lep-lep[1]),color='blue',size=1)+
+  geom_line(aes(time,((repV+lepV)/2)-((repV+lepV)/2)[1]-5),color='violet',size=1)+
+  geom_vline(xintercept=544535)+
+  geom_vline(xintercept = 544565)+
+  # geom_line(aes(time,repV),color='red',linetype=1,size=2)+
+  # geom_line(aes(time,lepV),color='blue',linetype=1,size=2)+
+  # geom_line(aes(time,conj.velocity),color='hotpink')+
+  # geom_line(aes(time,predV),color='orange')+
+  ylim(-10,10)+
+  theme_minimal()
+qplot(counter,conj.velocity,data=filter(d,sacnum==712))
 
 ggplot(d)+
   # geom_area(aes(time,sdf),alpha=1/2)+
   geom_line(aes(time,verg.velocity),color='blue',alpha=1)+
+  geom_vline(xintercept=544535)+
+  geom_vline(xintercept = 544565)+
   # geom_line(aes(time,enhance.velocity),size=2,color='darkblue')+
   # geom_line(aes(time,(lep-rep)*5+50),color='darkgreen')+
   # geom_point(aes(time,showrasters+50),shape='|')+
@@ -49,9 +71,9 @@ ggplot(d)+
   # geom_line(aes(time,lep+100),color='blue')+
   # geom_line(aes(time,repV+100),color='red',linetype=2)+
   # geom_line(aes(time,lepV+100),color='blue',linetype=2)+
-  geom_line(aes(time,conj.velocity),color='hotpink')+
+  # geom_line(aes(time,conj.velocity),color='hotpink')+
   geom_line(aes(time,predV),color='orange')+
-  ylim(-10,30)+
+  # ylim(-10,30)+
   theme_minimal()
 
 
