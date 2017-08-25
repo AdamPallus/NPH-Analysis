@@ -97,23 +97,30 @@ mean.waveforms %>%
   select(counter,trans.template,norm.trans.template) %>%
   group_by(counter) %>%
   summarize_each(funs(mean))%>%
+  mutate(norm.trans.template=norm.trans.template-norm.trans.template[20])->
+  mean.waveforms
+
+mean.waveforms%>%
   filter(counter<100,counter>20)->
     mean.waveforms
+
 qplot(counter,norm.trans.template,data=mean.waveforms)
 
 #now do it for real without the intermediate step
-zmp %>%
-  select(counter,verg.velocity) %>%
-  group_by(counter) %>%
-  summarize_each(funs(mean))%>%
-  rename(trans.template=verg.velocity)%>%
-  mutate(norm.trans.template=(trans.template-trans.template[1]), #make sure to start at zero velocity
-         norm.trans.template=norm.trans.template/min(norm.trans.template)*-1) %>%
-  filter(counter<125)->
-  mean.waveforms
+# zmp %>%
+#   select(counter,verg.velocity) %>%
+#   group_by(counter) %>%
+#   summarize_each(funs(mean))%>%
+#   rename(trans.template=verg.velocity)%>%
+#   mutate(norm.trans.template=(trans.template-trans.template[1]), #make sure to start at zero velocity
+#          norm.trans.template=norm.trans.template/min(norm.trans.template)*-1) %>%
+#   filter(counter<125)->
+#   mean.waveforms
 
 qplot(counter,norm.trans.template,data=mean.waveforms)
 
+
+zm<- filter(zm,cellnum<100)
 zm<- left_join(zm,mean.waveforms,by='counter')
 
 
@@ -164,9 +171,10 @@ manipulate(ggplot(filter(zmpp,sacnum==goodsacs[sac]))+
 #and calculate the vergence velocity prediction model and see how it does to compare the model
 #with the transients and with the transients removed
 
-b<- filter(zm,neuron=='Bee-211')
+b<- filter(zm,neuron=='Bee-27')
 
 b %>%
+  ungroup()%>%
   mutate(sdf20=lag(sdf,20),
          npk=predict(trans.mod,newdata=b),
          scaled.transient=norm.trans.template*npk*-1,
@@ -182,7 +190,7 @@ bb$sacnum<- NULL
 bb$counter<-NULL
 bufferlength=200
 bb %>%
-  modelVV2(chosenCell='Bee-211',lagsdf=31,
+  modelVV2(chosenCell='Bee-27',lagsdf=20,
          model.form='verg.velocity~sdf20+verg.angle',
          saccadebuffer=bufferlength) %>%
   group_by(sacnum) %>%
@@ -224,6 +232,9 @@ bb %>%
 
 goodsacs=unique(filter(bb,r.amp>3,verg.amp>4)$sacnum)
 
+goodsacs=unique(filter(bb,conj.H.Amp<1,conj.V.Amp>1,verg.amp>4)$sacnum)
+
+
 nsac=length(goodsacs)
 manipulate({
   bb.plot<-filter(bb,sacnum==goodsacs[sac])
@@ -237,6 +248,12 @@ manipulate({
     geom_line(aes(counter,predV),color='orange',size=1)+
     geom_point(aes(counter,showrasters+30),shape='|',size=3)+
     geom_area(aes(counter,conj.velocity),alpha=0.2)+
+    # geom_line(aes(counter,rep*10+100),color='red')+
+    # geom_line(aes(counter,lep*10+100),color='blue')+
+    # geom_line(aes(counter,(repV+repV)*5+100),color='purple')+
+    geom_line(aes(counter,rev),color='red')+
+    geom_line(aes(counter,lev),color='blue')+
+    geom_line(aes(counter,(revV+levV)/2),color='purple')+
     ylim(c(NA,150))+
     annotate('text',50,50,label='transient removed',color='hotpink')+
     annotate('text',50,45,label='predicted transient',color='purple')+

@@ -7,25 +7,25 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
   if (!('time' %in% names(x))){
     x<- mutate(x,time=row_number())
   }
-  parabolic_n<- 20
+  parabolic_n<- 10
   x %>%
     mutate(verg.velocity=parabolicdiff(lep-rep,parabolic_n),
            rev=parabolicdiff(rep,parabolic_n),
            lev=parabolicdiff(lep,parabolic_n),
            revV=parabolicdiff(repV,parabolic_n),
            levV=parabolicdiff(lepV,parabolic_n),
-           sdf=spikedensity(rasters,sd=15),
+           sdf=spikedensity(rasters,sd=10),
            sdf20=dplyr::lag(sdf,lagsdf),
            conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2)) ->
     x
-  
+  x<- mutate(x,saccadic=markSaccades(conj.velocity,buffer=15,threshold=20)>0)
   x<- joinsaccades(x,buffer=saccadebuffer,threshold=saccadethreshold)
   x %>%
     group_by(sacnum) %>%
     mutate(verg.amp=last(verg.angle)-first(verg.angle),
            isconj=verg.amp<1,
-           saccadic=counter>saccadebuffer & counter<n()-saccadebuffer, #+20,
-           saccadic=replace(saccadic,!saccadic,NA),
+           # saccadic=counter>saccadebuffer & counter<n()-saccadebuffer, #+20,
+           # saccadic=replace(saccadic,!saccadic,NA)
            conj.h.vel=(lev+rev)/2,
            conj.v.vel=(levV+revV)/2,
            instant.dir=atan2(conj.v.vel,conj.h.vel)*180/pi
@@ -33,11 +33,12 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
            # verg.error=verg.angle-target.verg
            )->
     x
+  
   xm<- group_by(x,time) %>% summarize_each(funs(first))
   # x<- mutate(x,saccadic=!is.na(sacnum))
-  mod<- lm(model.form,data=filter(xm,is.na(saccadic),verg.velocity>0))
+  mod<- lm(model.form,data=filter(xm,!saccadic,verg.velocity>0))
   # mod<- lm(model.form,data=filter(x,!saccadic))
-  # mod<- lm(model.form,data=filter(x,verg.velocity>0))
+  # mod<- lm(model.form,data=filter(xm,verg.velocity>0))
   
   # mod<-lm(model.form,data=xm)
   # mod<- lm(model.form,data=filter(x,!isconj))
@@ -52,8 +53,13 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
 }
 
 
-mod<- modelVV2(t,chosenCell='Bee-15',lagsdf=35,
+mod<- modelVV2(t,chosenCell='Bee-27',lagsdf=20,
                model.form='verg.velocity~sdf20+verg.angle',
+               returnmodel = TRUE)
+
+
+mod<- modelVV2(t,chosenCell='Bee-27',lagsdf=20,
+               model.form='sdf20~verg.velocity+verg.angle',
                returnmodel = TRUE)
 
 x3<- modelVV2(t,chosenCell='Bee-33',lagsdf=31,
@@ -63,8 +69,9 @@ x3<- modelVV2(t,chosenCell='Bee-33',lagsdf=31,
 
 bufferlength=200
 
-modelVV2(t,chosenCell='Bee-211',lagsdf=37,
+modelVV2(t,chosenCell='Bee-211',lagsdf=20,
               model.form='verg.velocity~sdf20+verg.angle',
+         # model.form='sdf20~verg.velocity+verg.angle',
               saccadebuffer=bufferlength) %>%
   group_by(sacnum) %>%
   mutate(saccade.dur=n()-2*bufferlength, 
@@ -104,29 +111,34 @@ modelVV2(t,chosenCell='Bee-211',lagsdf=37,
 #   mutate(target.verg=thp-thp2,
 #          verg.error=verg.angle-target.verg)->
 #   z
-window_size=1000
+window_size=4000
 manipulate({
   d=filter(z,time>=window,time<window+window_size)
   ggplot(d)+
     geom_point(aes(time,showrasters+30),shape='|')+
     # geom_point(aes(time,showenhance*verg.velocity),color='magenta')+
-    # geom_area(aes(time,sdf),color='black',fill='pink',alpha=1/10)+
+    # geom_line(aes(time,sdf-100),color='hotpink')+
     # geom_line(aes(time,slowpredict),color='orange')+
     geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
     # geom_line(aes(time,predP/1000),color='darkgreen',linetype=2)+
     geom_line(aes(time,predV),color='orange')+
     # geom_line(aes(time,predV2),color='magenta')+
     geom_line(aes(time,verg.velocity),color='darkblue')+
-    geom_area(aes(time,conj.velocity),alpha=1/3)+
-    geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
+    # geom_area(aes(time,conj.velocity),alpha=1/3)+
+    geom_line(aes(time,sdf),alpha=1/3)+
+    # geom_line(aes(time,rep*10+200),color='red')+
+    # geom_line(aes(time,lep*10+200),color='blue')+
+    # geom_line(aes(time,repV*10+300),color='red')+
+    # geom_line(aes(time,lepV*10+300),color='blue')+
+    # geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
     # geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
-    ylim(c(NA,150))+
+    # ylim(c(NA,150))+
     geom_point(aes(time,saccadic*50))
     # geom_line(aes(time,target.verg*10))
     # geom_line(aes(time,(target.verg-verg.angle)*10),color='hotpink')
   },
   window_size=slider(1000,5000,step=100,initial = 4000),
-  window=slider(window_size,max(z$time-window_size),step=1000))
+  window=slider(window_size,max(z$time-window_size),step=4000))
 
 zp<- summarize_each(z,funs(first))
 zp<-filter(zp,r.amp>3,predicted.verg.amp<100)

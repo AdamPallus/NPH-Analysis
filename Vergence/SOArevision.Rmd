@@ -25,8 +25,9 @@ source('Adamhelperfunctions.R')
 ```
 
 ```{r loaddata}
-t<- readRDS('SOA-NRTP.RDS')
-t<- filter(t,cellnum>100)
+# t<- readRDS('SOA-NRTP.RDS')
+# t<- filter(t,cellnum>100)
+t<- readRDS('SOA2017.RDS)
 ```
 
 ```{r measuresaccades}
