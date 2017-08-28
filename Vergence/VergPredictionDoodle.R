@@ -18,7 +18,7 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
            sdf20=dplyr::lag(sdf,lagsdf),
            conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2)) ->
     x
-  x<- mutate(x,saccadic=markSaccades(conj.velocity,buffer=15,threshold=20)>0)
+  x<- mutate(x,saccadic=markSaccades(conj.velocity,buffer=5,threshold=20)>0)
   x<- joinsaccades(x,buffer=saccadebuffer,threshold=saccadethreshold)
   x %>%
     group_by(sacnum) %>%
@@ -53,57 +53,58 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
 }
 
 
-mod<- modelVV2(t,chosenCell='Bee-27',lagsdf=20,
-               model.form='verg.velocity~sdf20+verg.angle',
-               returnmodel = TRUE)
-
-
-mod<- modelVV2(t,chosenCell='Bee-27',lagsdf=20,
-               model.form='sdf20~verg.velocity+verg.angle',
-               returnmodel = TRUE)
-
-x3<- modelVV2(t,chosenCell='Bee-33',lagsdf=31,
-              model.form='verg.velocity~sdf20+verg.angle',
-              saccadebuffer=10)
+# mod<- modelVV2(t,chosenCell='Bee-27',lagsdf=20,
+#                model.form='verg.velocity~sdf20+verg.angle',
+#                returnmodel = TRUE)
+# 
+# 
+# mod<- modelVV2(t,chosenCell='Bee-27',lagsdf=20,
+#                model.form='sdf20~verg.velocity+verg.angle',
+#                returnmodel = TRUE)
+# 
+# x3<- modelVV2(t,chosenCell='Bee-33',lagsdf=31,
+#               model.form='verg.velocity~sdf20+verg.angle',
+#               saccadebuffer=10)
 
 
 bufferlength=200
 
-modelVV2(t,chosenCell='Bee-211',lagsdf=20,
+modelVV2(t,chosenCell='Bee-113',lagsdf=20,
               model.form='verg.velocity~sdf20+verg.angle',
          # model.form='sdf20~verg.velocity+verg.angle',
               saccadebuffer=bufferlength) %>%
   group_by(sacnum) %>%
   mutate(saccade.dur=n()-2*bufferlength, 
-                saccade.end=saccade.dur+bufferlength,
-                peak.conj.velocity=maxabs(conj.velocity),
-                peak.R.H= maxabs(rev),
-                peak.R.V= maxabs(revV),
-                peak.L.H= maxabs(lev),
-                peak.L.V= maxabs(levV),
-                R.H.Amp=rep[saccade.end]-rep[bufferlength],
-                L.H.Amp=lep[saccade.end]-lep[bufferlength],
-                R.V.Amp=repV[saccade.end]-repV[bufferlength],
-                L.V.Amp=lepV[saccade.end]-lepV[bufferlength],
-                conj.H.Amp=(R.H.Amp+L.H.Amp)/2,
-                conj.V.Amp=(R.V.Amp+L.V.Amp)/2,
-                r.angle=atan2(R.V.Amp,R.H.Amp)*180/pi,
-                r.amp=sqrt(R.H.Amp^2+R.V.Amp^2),
-                vect.amp= (sqrt(R.H.Amp^2+R.V.Amp^2)+sqrt(L.H.Amp^2+L.V.Amp^2))/2,
-                maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
-                saccadic.verg.amp=verg.angle[saccade.end]-verg.angle[bufferlength],
-                total.verg.amp=sum(verg.velocity)/1000,
-                mean.verg.amp=mean(verg.angle[saccade.end:n()]-mean(verg.angle[1:bufferlength])),
-                peak.verg.velocity= maxabs(verg.velocity),
-                min.verg.trans = min(verg.velocity),
-                max.verg.trans = max(verg.velocity),
-                off.verg.velocity=min(abs(min.verg.trans),abs(max.verg.trans)),
-                min.verg.angle=min(verg.angle),
-                max.verg.angle=max(verg.angle),
-                max.verg.velocity=max(verg.velocity),
-                min.verg.velocity=min(verg.velocity),
-                initial.verg.angle=verg.angle[bufferlength],
-                predicted.verg.amp=sum(predV)/1000)->
+         saccade.end=saccade.dur+bufferlength,
+         peak.conj.velocity=maxabs(conj.velocity),
+         peak.R.H= maxabs(rev),
+         peak.R.V= maxabs(revV),
+         peak.L.H= maxabs(lev),
+         peak.L.V= maxabs(levV),
+         R.H.Amp=rep[saccade.end]-rep[bufferlength],
+         L.H.Amp=lep[saccade.end]-lep[bufferlength],
+         R.V.Amp=repV[saccade.end]-repV[bufferlength],
+         L.V.Amp=lepV[saccade.end]-lepV[bufferlength],
+         conj.H.Amp=(R.H.Amp+L.H.Amp)/2,
+         conj.V.Amp=(R.V.Amp+L.V.Amp)/2,
+         r.angle=atan2(R.V.Amp,R.H.Amp)*180/pi,
+         r.amp=sqrt(R.H.Amp^2+R.V.Amp^2),
+         vect.amp= (sqrt(R.H.Amp^2+R.V.Amp^2)+sqrt(L.H.Amp^2+L.V.Amp^2))/2,
+         maxamp=max(abs(R.H.Amp),abs(R.V.Amp),abs(L.H.Amp),abs(L.V.Amp)),
+         saccadic.verg.amp=verg.angle[saccade.end]-verg.angle[bufferlength],
+         total.verg.amp=sum(verg.velocity)/1000,
+         mean.verg.amp=mean(verg.angle[saccade.end:n()]-mean(verg.angle[1:bufferlength])),
+         peak.verg.velocity= maxabs(verg.velocity),
+         min.verg.trans = min(verg.velocity),
+         max.verg.trans = max(verg.velocity),
+         off.verg.velocity=min(abs(min.verg.trans),abs(max.verg.trans)),
+         min.verg.angle=min(verg.angle),
+         max.verg.angle=max(verg.angle),
+         max.verg.velocity=max(verg.velocity),
+         min.verg.velocity=min(verg.velocity),
+         initial.verg.angle=verg.angle[bufferlength],
+         predicted.verg.amp=sum(predV)/1000,
+         predicted.peak.verg.velocity=maxabs(predV))->
   z
 
 
@@ -114,6 +115,7 @@ modelVV2(t,chosenCell='Bee-211',lagsdf=20,
 window_size=4000
 manipulate({
   d=filter(z,time>=window,time<window+window_size)
+  d<- mutate(d,saccadic=replace(saccadic,!saccadic,NA))
   ggplot(d)+
     geom_point(aes(time,showrasters+30),shape='|')+
     # geom_point(aes(time,showenhance*verg.velocity),color='magenta')+
@@ -125,14 +127,14 @@ manipulate({
     # geom_line(aes(time,predV2),color='magenta')+
     geom_line(aes(time,verg.velocity),color='darkblue')+
     # geom_area(aes(time,conj.velocity),alpha=1/3)+
-    geom_line(aes(time,sdf),alpha=1/3)+
-    # geom_line(aes(time,rep*10+200),color='red')+
-    # geom_line(aes(time,lep*10+200),color='blue')+
-    # geom_line(aes(time,repV*10+300),color='red')+
+    # geom_line(aes(time,sdf),alpha=1/3)+
+    geom_line(aes(time,rep+50),color='red')+
+    geom_line(aes(time,lep+50),color='blue')+
+    geom_line(aes(time,repV+50),color='purple')+
     # geom_line(aes(time,lepV*10+300),color='blue')+
     # geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
     # geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
-    # ylim(c(NA,150))+
+    ylim(c(-25,NA))+
     geom_point(aes(time,saccadic*50))
     # geom_line(aes(time,target.verg*10))
     # geom_line(aes(time,(target.verg-verg.angle)*10),color='hotpink')
@@ -146,6 +148,13 @@ zp<-filter(zp,r.amp>3,predicted.verg.amp<100)
 qplot(verg.amp,predicted.verg.amp,data=zp)+geom_abline()
 
 qplot(verg.amp,predicted.verg.amp,data=zp,color=r.angle)+geom_abline()
+
+ggplot(filter(zp,verg.amp>0))+
+  # geom_point(aes(verg.amp,predicted.peak.verg.velocity),color='orange')+
+  # geom_point(aes(verg.amp,peak.verg.velocity),color='black')+
+  stat_smooth(aes(verg.amp,predicted.peak.verg.velocity),color='orange',method='lm')+
+  stat_smooth(aes(verg.amp,peak.verg.velocity),color='black',method='lm')+
+  ylim(c(0,200))
 
 
 zp$SaccadeDirection=as.factor(sign(zp$r.angle))
