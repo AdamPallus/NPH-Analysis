@@ -82,6 +82,15 @@ ggplot(zmp)+
   facet_wrap(~r.direction)
 
 zmp %>%
+  group_by(neuron,sacnum) %>%
+  mutate(verg.velocity=verg.velocity/min(verg.velocity)*-1)%>%
+ggplot()+
+  geom_line(aes(counter,verg.velocity,
+                group=interaction(neuron,sacnum)),
+            alpha=0.1)
+
+
+zmp %>%
   select(counter,r.direction,verg.velocity) %>%
   group_by(counter,r.direction) %>%
   summarize_each(funs(mean))%>%
@@ -91,7 +100,7 @@ zmp %>%
   mean.waveforms
 
 qplot(counter,norm.trans.template,color=r.direction,data=mean.waveforms)
-
+qplot(counter,trans.template,color=r.direction,data=mean.waveforms)
 mean.waveforms %>%
   ungroup() %>%
   select(counter,trans.template,norm.trans.template) %>%
@@ -120,7 +129,7 @@ qplot(counter,norm.trans.template,data=mean.waveforms)
 qplot(counter,norm.trans.template,data=mean.waveforms)
 
 
-zm<- filter(zm,cellnum<100)
+zm<- filter(zm,cellnum>100)
 zm<- left_join(zm,mean.waveforms,by='counter')
 
 
@@ -171,17 +180,16 @@ manipulate(ggplot(filter(zmpp,sacnum==goodsacs[sac]))+
 #and calculate the vergence velocity prediction model and see how it does to compare the model
 #with the transients and with the transients removed
 
-b<- filter(zm,neuron=='Bee-27')
+b<- filter(zm,neuron=='Bee-113')
 
 b %>%
   ungroup()%>%
-  mutate(sdf20=lag(sdf,20),
-         npk=predict(trans.mod,newdata=b),
+  mutate(sdf20=lag(sdf,20)) %>%
+  group_by(sacnum) %>%
+  mutate(npk=predict(trans.mod,newdata=.)[1],
          scaled.transient=norm.trans.template*npk*-1,
          scaled.transient=replace(scaled.transient,is.na(scaled.transient),0),
          notrans.verg.velocity=verg.velocity-scaled.transient,
-         saccadic=counter>20 & counter<n(),
-         saccadic=replace(saccadic,!saccadic,NA),
          showrasters=replace(rasters,rasters<1,NA))->
   b
 
@@ -190,7 +198,7 @@ bb$sacnum<- NULL
 bb$counter<-NULL
 bufferlength=200
 bb %>%
-  modelVV2(chosenCell='Bee-27',lagsdf=20,
+  modelVV2(chosenCell='Bee-113',lagsdf=20,
          model.form='verg.velocity~sdf20+verg.angle',
          saccadebuffer=bufferlength) %>%
   group_by(sacnum) %>%
@@ -247,13 +255,13 @@ manipulate({
     # geom_line(aes(counter,notrans.verg.velocity),color='hotpink',linetype=2)+
     geom_line(aes(counter,predV),color='orange',size=1)+
     geom_point(aes(counter,showrasters+30),shape='|',size=3)+
-    geom_area(aes(counter,conj.velocity),alpha=0.2)+
+    # geom_area(aes(counter,conj.velocity),alpha=0.2)+
     # geom_line(aes(counter,rep*10+100),color='red')+
     # geom_line(aes(counter,lep*10+100),color='blue')+
     # geom_line(aes(counter,(repV+repV)*5+100),color='purple')+
-    geom_line(aes(counter,rev),color='red')+
-    geom_line(aes(counter,lev),color='blue')+
-    geom_line(aes(counter,(revV+levV)/2),color='purple')+
+    # geom_line(aes(counter,rev),color='red')+
+    # geom_line(aes(counter,lev),color='blue')+
+    # geom_line(aes(counter,(revV+levV)/2),color='purple')+
     ylim(c(NA,150))+
     annotate('text',50,50,label='transient removed',color='hotpink')+
     annotate('text',50,45,label='predicted transient',color='purple')+
@@ -262,7 +270,8 @@ manipulate({
     annotate('text',50,30,label='predicted enhancement',color='magenta')+
     annotate('text',200,140,label='conjugate velocity')+
     annotate('text',150,100,label=paste(bb.plot$r.direction[1],'saccade',sep=' '))+
-    annotate('text',150,95,label=paste(round(bb.plot$r.angle[1]),'deg',sep=' '))
+    annotate('text',150,95,label=paste(round(bb.plot$r.angle[1]),'deg',sep=' '))+
+    annotate('text',100,-20,label=paste('sacnum=',sacnum,sep=''))
   # geom_label(x=150,y=100,aes(label=r.direction[1]))
 },
 sac=slider(1,nsac,step=1)

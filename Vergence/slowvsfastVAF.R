@@ -63,6 +63,20 @@ compareVAFcomplex<- function(x){
   
 }
 
+compareVAFvelocity<- function(x){
+  x<- mutate(x,sdf20=lag(sdf,20))
+  x<- mutate(x,saccadic=markSaccades(conj.velocity,buffer=4,threshold=30)>0)
+  # modfast=lm(sdf20~verg.angle+verg.velocity,data=filter(x,saccadic))
+  # modslow=lm(sdf20~verg.angle+verg.velocity,data=filter(x,!saccadic))
+  mod=lm(verg.velocity~sdf20+verg.angle,data=filter(x,!saccadic))
+  
+  result<- data.frame(fast=VAF(mod,filter(x,saccadic),'verg.velocity'),
+                      slow=VAF(mod,filter(x,!saccadic),'verg.velocity'),
+                      all=VAF(mod,x,'verg.velocity'))
+  result
+  
+}
+
 
 t<- readRDS('SOA-NRTP.RDS')
 t<- filter(t,cellnum>100,cellnum != 'Bee-109')
