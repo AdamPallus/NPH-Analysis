@@ -14,9 +14,9 @@ This app shows the activity of vergence-sensitive cells recorded in the supra-oc
 * In dark blue is the vergence velocity (difference in left eye velocity and right eye velocity)
 * In dark green is the vergence angle (left eye position minus right eye position)
 * If the show eye position box is checked:
-    + Left eye is blue, right eye is red
-    + Solid lines indicate horizontal 
-    + Dashed lines indicate vertical position
+     + Left eye is blue, right eye is red
+     + Solid lines indicate horizontal 
+     + Dashed lines indicate vertical position
 
 ```{r echo=FALSE} 
 library(knitr)

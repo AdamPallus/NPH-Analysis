@@ -1,0 +1,247 @@
+---
+title: "Gaze Shift Analysis"
+author: "Adam Pallus"
+output: 
+  html_document: 
+    keep_md: yes
+  pdf_document: 
+    highlight: espresso
+---
+#Introduction
+I wrote up a quick analysis in R that should demonstrate the possibilities of automating this process. I've included the source code in this document, but we could do the same kind of analysis in Matlab. I'm just currently using R more for this kind of stuff and I think it will take a few more lines of code to work with Matlab. 
+
+##Process:
+
+* load text file
+* take gaze, head and target position columns
+* calculate velocity by convolving with a parabola (smoothing)
+* identify when the target changes position 
+* break file into "trials" consisting of 200ms before target movement and 600ms after
+* mark gaze shifts using a two-threshold algorithm 
+* mark head movements using same algorithm with lower thresholds
+* Identify the "first" gaze shift that happens after target movement
+* measure onsets/offsets/durations etc
+* make plots
+
+```{r setup, include=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(knitr)
+library(tidyr)
+# library(broom)
+# library(grid)
+# library(relaimpo)
+# library(leaps)
+#library(data.table)
+# library(stringr)
+library(dplyr)
+library(cladoRcpp)
+select<-dplyr::select
+# source('joinsaccadesuniform.R')
+source('Adamhelperfunctions.R')
+source('markSaccadesDouble.R')
+markTagetMovements<-function(t,buffer=200,threshold=1000,saccade.length=1000){
+  
+  findSaccades<-function(ev,threshold=40){
+    mindur<- 1
+    i<-which(abs(ev)>threshold) #find all the times when speed > threshold
+    sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
+    sacon<-c(1,sacoff+1) #first saccade
+    sacoff<-c(sacoff,length(i)) #end of last saccade
+    saccade.onset<-i[sacon] #get actual times
+    saccade.offset<-i[sacoff] 
+    
+    return(data.frame(saccade.onset,saccade.offset))
+  }
+  
+  jsac<- function(stimes){
+    summary(stimes)
+    #input should be an array of length 2: c(onsettime,offsettime, saccade.number,saccade.dur)
+    df<- data.frame(time=stimes[[1]]:stimes[[2]])
+    df$sacnum<- stimes[[4]]
+    df$saccade.dur<- stimes[[3]]
+    return(df)
+    # return(stimes[[1]]:stimes[[2]])
+  }
+  
+  stimes<-findSaccades(t$target.velocity,threshold)
+  stimes %>%
+    mutate(dur=saccade.offset-saccade.onset,
+           s=row_number(),
+           saccade.onset=saccade.onset-buffer,
+           ###########HERE IS WHERE i MAKE SACCADES UNIFORM #######
+           saccade.offset=saccade.onset+saccade.length+2*buffer)->
+    stimes
+  
+  x<- as.data.frame(rbindlist(apply(stimes,1,jsac)))
+  x %>%
+    group_by(sacnum) %>%
+    mutate(counter=time-first(time)) ->
+    x
+  left_join(t,x,by='time')
+}
+
+```
+
+```{r load}
+samplerate<- 304.7508/1000
+h<- read.csv('HEADFREE.txt',sep="\t",header=FALSE)
+h<- select(h,-V9)
+names(h)<- c('G','GV','H','HV','E','EV','time','T')
+
+
+
+h %>% 
+  select(G,H,T) %>% #these are the only data we need 
+  mutate(G=replace(G,G==0,NA), #mark missing data as NA rather than 0
+         #G=na.approx(G,na.rm=FALSE),
+         Gv=parabolicdiff(G,7)*samplerate,
+         Hv=parabolicdiff(H,7)*samplerate,
+         target.velocity=parabolicdiff(T,7)*samplerate,
+         time=row_number(),
+         # gazeshifts=markSaccades(Gv,buffer=5,threshold=30),
+         gazeshifts=markSaccadesDouble(Gv,threshold1=100,threshold2=10),
+         headmovement=markSaccadesDouble(Hv,threshold1=10,threshold2=4),
+         headmovement=replace(headmovement,headmovement<0,0),
+         gazeshifts=replace(gazeshifts,gazeshifts<0,0)) %>%
+  markTagetMovements(buffer=200,threshold=200,saccade.length=500) ->
+  htest
+
+htest%>%
+  group_by(sacnum) %>%
+  mutate(firstshift=min(gazeshifts[counter>220&gazeshifts>0],na.rm=T),
+         gazeshifts=replace(gazeshifts,
+                            gazeshifts!=firstshift|is.na(firstshift),
+                            0),
+         gazeshifts=replace(gazeshifts,gazeshifts==0,NA),
+         headmovement=replace(headmovement,headmovement==0,NA),
+         counter=counter-200)->
+  hh
+```
+
+```{r measure}
+
+hh %>% 
+  group_by(sacnum) %>%
+  mutate(gvsd=round(sd(Gv[1:300])))->
+  hh
+
+hh %>% 
+  # filter(sacnum==10)%>%
+  group_by(sacnum) %>%
+  mutate(gaze.dur=length(counter[!is.na(gazeshifts)])) %>%
+  ungroup() %>%
+  filter(gaze.dur>1) ->
+  hint
+
+hint%>%
+  group_by(sacnum)%>%
+  summarize(gaze.onset=counter[!is.na(gazeshifts)][1],
+         gaze.offset=max(counter[!is.na(gazeshifts)]),
+         gaze.dur=gaze.offset-gaze.onset,
+         gaze.amp=G[counter==gaze.offset]-G[counter==gaze.onset],
+         IHP=H[counter==gaze.onset],
+         IGP=G[counter==gaze.onset],
+         IEP=IGP-IHP,
+         peak.gaze.velocity=maxabs(Gv[!is.na(gazeshifts)]),
+         peak.head.velocity=maxabs(Hv[100:n()])) %>%
+  filter(gaze.onset>0,gaze.onset<200)->
+  hp
+
+goodsacs=unique(hp$sacnum)
+```
+
+##Example plot
+Here is an example of a trial with the first gaze shift and head movement marked.
+Velocity is shown on the same plot as position scaled down by a factor of 10.
+
+```{r demoplot,echo=FALSE,warning=FALSE}
+ggplot(filter(hh,sacnum==31))+
+  geom_line(aes(counter,H),color='blue')+
+  # geom_line(aes(counter,Ef),color='red')+
+  geom_line(aes(counter,G),color='darkgreen')+
+  geom_line(aes(counter,T),size=2,alpha=0.5)+
+  geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+  # geom_line(aes(counter,EV/10),color='red')+
+  geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+  # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+  geom_point(aes(counter,sign(gazeshifts)*50))+
+  geom_point(aes(counter,sign(headmovement)*25),color='blue')+
+  annotate('text',x=-100,y=50,label='Target Position')+
+  annotate('text',x=500,y=20,label='Head Position')+
+  annotate('text',x=320,y=5,label='Head Velocity')+
+  annotate('text',x=270,y=40,label='Gaze Velocity')+
+  annotate('text',x=250,y=70,label='Gaze Position')+
+  annotate('text',x=125,y=55,label='First Gaze Shift')+
+  annotate('text',x=300,y=28,label='Head Movement')
+  
+
+```
+
+#Summary Figures
+Some simple summary figures
+
+```{r SummaryFigures,warning=FALSE}
+qplot(gaze.onset/samplerate,bins=30,data=hp)+xlab('Gaze Shift Latency (ms)')
+qplot(IEP,peak.head.velocity,data=hp)
+qplot(IEP,peak.gaze.velocity,data=hp)
+    
+```
+
+#All trials
+Next I just plot all of the trials that have a detectable gaze shift after the movement. As you can see, there are a lot of failed trials. More effort could be put into refining the algorithm to ignore gaze shifts that are too small or start too early or to reject trials with too much missing data. 
+
+```{r plotstuff, warning=FALSE}
+for(i in 1:length(unique(hh$sacnum))){
+  print(
+    ggplot(filter(hh,sacnum==i))+
+             geom_line(aes(counter,H),color='blue')+
+             # geom_line(aes(counter,Ef),color='red')+
+             geom_line(aes(counter,G),color='darkgreen')+
+             geom_line(aes(counter,T),size=2,alpha=0.5)+
+             geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+             # geom_line(aes(counter,EV/10),color='red')+
+             geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+             # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+             geom_point(aes(counter,sign(gazeshifts)*50))+
+             geom_point(aes(counter,sign(headmovement)*25),color='blue')
+  )
+}
+```
+
+
+```{r plotgod, warning=FALSE,include=FALSE}
+
+  print(
+    ggplot(filter(hh,sacnum==i))+
+             geom_line(aes(counter,H),color='blue')+
+             # geom_line(aes(counter,Ef),color='red')+
+             geom_line(aes(counter,G),color='darkgreen')+
+             geom_line(aes(counter,T),size=2,alpha=0.5)+
+             geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+             # geom_line(aes(counter,EV/10),color='red')+
+             geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+             # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+             # geom_text(x=0,y=60,aes(label=firstshift[1]))+
+             geom_point(aes(counter,sign(gazeshifts)*50))+
+             geom_point(aes(counter,sign(headmovement)*25),color='blue')
+  )
+
+manipulate(ggplot(filter(hh,sacnum==chosensac))+
+              geom_line(aes(counter,H),color='blue')+
+             # geom_line(aes(counter,Ef),color='red')+
+             geom_line(aes(counter,G),color='darkgreen')+
+             geom_line(aes(counter,T),size=2,alpha=0.5)+
+             geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+             # geom_line(aes(counter,EV/10),color='red')+
+             geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+             # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+             # geom_text(x=0,y=60,aes(label=firstshift[1]))+
+             geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen')+
+             geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2)
+           ,
+           chosensac=slider(1,length(unique(hh$sacnum))))
+}
+```
+
+
