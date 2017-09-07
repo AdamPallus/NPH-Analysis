@@ -39,7 +39,7 @@ library(cladoRcpp)
 select<-dplyr::select
 # source('joinsaccadesuniform.R')
 source('Adamhelperfunctions.R')
-source('markSaccadesDouble.R')
+source('markSaccadesDouble2.R')
 markTagetMovements<-function(t,buffer=200,threshold=1000,saccade.length=1000){
   
   findSaccades<-function(ev,threshold=40){
@@ -139,16 +139,22 @@ hint%>%
   summarize(gaze.onset=counter[!is.na(gazeshifts)][1],
          gaze.offset=max(counter[!is.na(gazeshifts)]),
          gaze.dur=gaze.offset-gaze.onset,
+         gaze.dur.ms=gaze.dur/samplerate,
          gaze.amp=G[counter==gaze.offset]-G[counter==gaze.onset],
          IHP=H[counter==gaze.onset],
          IGP=G[counter==gaze.onset],
          IEP=IGP-IHP,
          peak.gaze.velocity=maxabs(Gv[!is.na(gazeshifts)]),
-         peak.head.velocity=maxabs(Hv[100:n()])) %>%
+         peak.head.velocity=maxabs(Hv[100:n()]),
+         target.amp=T[200]-T[1],
+         head.contribution=H[counter==gaze.offset]-IHP,
+         eye.contribution=gaze.amp-head.contribution
+         ) %>%
   filter(gaze.onset>0,gaze.onset<200)->
   hp
 
 goodsacs=unique(hp$sacnum)
+goodsacs=unique(filter(hp,gaze.dur.ms>250)$sacnum)
 ```
 
 ##Example plot
@@ -173,7 +179,9 @@ ggplot(filter(hh,sacnum==31))+
   annotate('text',x=270,y=40,label='Gaze Velocity')+
   annotate('text',x=250,y=70,label='Gaze Position')+
   annotate('text',x=125,y=55,label='First Gaze Shift')+
-  annotate('text',x=300,y=28,label='Head Movement')
+  annotate('text',x=300,y=28,label='Head Movement')+
+  geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+  geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)
   
 
 ```
@@ -241,6 +249,23 @@ manipulate(ggplot(filter(hh,sacnum==chosensac))+
              geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2)
            ,
            chosensac=slider(1,length(unique(hh$sacnum))))
+
+#goodsacs only
+manipulate(ggplot(filter(hh,sacnum==goodsacs[chosensac]))+
+              geom_line(aes(counter,H),color='blue')+
+             # geom_line(aes(counter,Ef),color='red')+
+             geom_line(aes(counter,G),color='darkgreen')+
+             geom_line(aes(counter,T),size=2,alpha=0.5)+
+             geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+             # geom_line(aes(counter,EV/10),color='red')+
+             geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+             # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+             # geom_text(x=0,y=60,aes(label=firstshift[1]))+
+             geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen')+
+             geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2)
+           ,
+           chosensac=slider(1,length(goodsacs)))
+
 }
 ```
 
