@@ -144,6 +144,7 @@ hint%>%
          IHP=H[counter==gaze.onset],
          IGP=G[counter==gaze.onset],
          IEP=IGP-IHP,
+         IEPs=IEP*sign(gaze.amp), #positive number indicates eyes deviated in direction of saccade
          peak.gaze.velocity=maxabs(Gv[!is.na(gazeshifts)]),
          peak.head.velocity=maxabs(Hv[100:n()]),
          target.amp=T[200]-T[1],
@@ -155,6 +156,7 @@ hint%>%
 
 goodsacs=unique(hp$sacnum)
 goodsacs=unique(filter(hp,gaze.dur.ms>250)$sacnum)
+goodsacs=unique(filter(hp,gaze.dur.ms<200,IEPs>4))$sacnum
 ```
 
 ##Example plot
@@ -190,14 +192,48 @@ ggplot(filter(hh,sacnum==31))+
 Some simple summary figures
 
 ```{r SummaryFigures,warning=FALSE}
-qplot(gaze.onset/samplerate,bins=30,data=hp)+xlab('Gaze Shift Latency (ms)')
-qplot(IEP,peak.head.velocity,data=hp)
-qplot(IEP,peak.gaze.velocity,data=hp)
+
+hpp<- filter(hp,gaze.dur/samplerate<200)
+
+qplot(gaze.onset/samplerate,bins=30,data=hpp)+xlab('Gaze Shift Latency (ms)')
+qplot(IEP,peak.head.velocity,data=hpp)
+qplot(IEP,peak.gaze.velocity,data=hpp)
+
+ggplot(aes(gaze.dur/samplerate,abs(peak.gaze.velocity)),
+       data=hpp)+
+  geom_point()+
+  stat_smooth(method='lm',se=FALSE)+
+  xlab('Gaze Shift duration (ms)')+
+  ylab('Peak Gaze Velocity (deg/s)')
+
+ggplot(aes(gaze.amp,peak.gaze.velocity),data=hpp)+
+  geom_point()+
+  # stat_smooth(method='lm',se=FALSE)+
+  # ggtitle('Main Sequence')+
+  xlab('Gaze Shift Amplitude (deg)')+
+  ylab('Peak Gaze Velocity (deg/s)')
+
+ggplot(aes(abs(gaze.amp),abs(peak.gaze.velocity)),data=hpp)+
+  geom_point()+
+  stat_smooth(method='lm',se=FALSE)+
+  stat_smooth(color='red',se=FALSE)+
+  ggtitle('Main Sequence')+
+  xlab('Gaze Shift Amplitude (deg)')+
+  ylab('Peak Gaze Speed (deg/s)')
     
+ggplot(aes(abs(gaze.amp),head.contribution/gaze.amp),data=hpp)+
+  geom_point()
+
+ggplot(aes(IEPs,head.contribution),data=hpp)+
+  geom_point()
+
+qplot(abs(gaze.amp),abs(gaze.amp)-abs(head.contribution),color=IEP,data=hpp)+
+  geom_abline()
+
 ```
 
 #All trials
-Next I just plot all of the trials that have a detectable gaze shift after the movement. As you can see, there are a lot of failed trials. More effort could be put into refining the algorithm to ignore gaze shifts that are too small or start too early or to reject trials with too much missing data. 
+Next I just plot all of the trials that have a detectable gaze shift after the movement. As you can see, there are a lot of failed trials. More effort could be put into refining the algorithm to ignore gaze shifts that are too small or start too early or to reject trials with too much missing data.
 
 ```{r plotstuff, warning=FALSE}
 for(i in 1:length(unique(hh$sacnum))){
@@ -256,6 +292,7 @@ manipulate(ggplot(filter(hh,sacnum==goodsacs[chosensac]))+
              # geom_line(aes(counter,Ef),color='red')+
              geom_line(aes(counter,G),color='darkgreen')+
              geom_line(aes(counter,T),size=2,alpha=0.5)+
+             geom_line(aes(counter,G-H),color='orange')+
              geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
              # geom_line(aes(counter,EV/10),color='red')+
              geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
