@@ -25,10 +25,10 @@ t<- readRDS('SOA-NRTP.RDS')
 #############################
 ########OPTIONS##############
 # Cells.to.Plot = c(33)
-Cells.to.Plot=c('Bee-04','Bee-33','Bee-15') #,'Bee-112','Bee-211')
+# Cells.to.Plot=c('Bee-04','Bee-33','Bee-15') #,'Bee-112','Bee-211')
 # Cells.to.Plot=c('Kopachuck-106','Kopachuck-110','Kopachuck-122', 'Kopachuck-126','Kopachuck-127')
-# Cells.to.Plot=c('Bee-211','Bee-216')
-sample.saccades= FALSE
+Cells.to.Plot=c('Bee-211','Bee-216')
+sample.saccades= TRUE
 num.to.sample= 50
 Remove.Multiverg= FALSE
 #############################
@@ -90,7 +90,8 @@ d %>%
     verg.change=verg.angle-mean(verg.angle[1:50]),
     # verg.amp= last(verg.angle)-first(verg.angle),
     verg.amp= verg.angle[n()-bufferlength]-verg.angle[bufferlength],
-    showrasters=replace(rasters,rasters<1,NA))->
+    showrasters=replace(rasters,rasters<1,NA)) %>%
+  filter(r.amp>4)->
   p
 
 #This just gives a name to convergent and divergent saccades so the figure is automatically labled
@@ -110,10 +111,10 @@ if (Remove.Multiverg){
     p}
 
 p %>%  group_by(neuron) %>%
-  filter(#saccade.dur>80, #Removes any saccade shorter than 80ms
-    # abs(verg.amp)>4, #removes saccades with vergence change of less than 1.5 deg
-    # dur<800,
-    min.verg.angle> -5) %>% #removes trials with eye-coil problems (rare)
+  filter(saccade.dur>80, #Removes any saccade shorter than 80ms
+    abs(verg.amp)>2, #removes saccades with vergence change of less than 1.5 deg
+    saccade.dur<800,
+    min.verg.angle> -500) %>% #removes trials with eye-coil problems (rare)
   group_by(neuron,convergent) %>%
   
   mutate(n=n(),spiketimes=showrasters*counter) ->
@@ -163,7 +164,8 @@ ggplot(g) +
   # geom_freqpoly(aes(spiketimes,100*..ncount..),alpha=1,bins=40,color='darkred',size=1)+
   geom_point(aes(counter,showrasters* snum*5+110),shape='|',size=0.5,color='black')+
   # facet_grid(neuron~convergent,scales='free_y',space='free_y')+
-  facet_grid(convergent~neuron,scales='free_y',space='free_y')+
+  # facet_grid(convergent~neuron,scales='free_y',space='free_y')+
+  facet_wrap(~convergent)+
   # facet_wrap(~neuron,ncol=1)+
   # facet_wrap(~neuron,ncol=4,scales='free')+
   # facet_wrap(~neuron,ncol=4)+

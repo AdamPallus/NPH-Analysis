@@ -78,3 +78,11 @@ ggplot(blm)+
                
 ggplot(blm)+
   geom_density(aes(conj.V.Amp,color=monkey))
+
+
+
+zp %>%
+  select(neuron,mean.V,meanFR,mean.H,cor.pref.V,cor.pref.H) %>%
+  group_by(neuron) %>%
+  summarize_each(funs(first))->
+  zplot

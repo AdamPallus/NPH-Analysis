@@ -35,7 +35,7 @@ select<- dplyr::select
 # o<-readRDS('KopachuckINC.RDS')
 # o<-readRDS('KopaBeeINC.RDS')
 o<- NULL
-t<- loadnewcsv2(path="C:/Users/setup/Documents/GitHub/NPH-Analysis/data/",referencefile=o)
+t<- loadnewcsv2(path="C:/Users/setup/Documents/GitHub/NPH-Analysis/DataRaster/",referencefile=o)
 
 if (!is.null(t)){
   t<- rbind(o,t)
