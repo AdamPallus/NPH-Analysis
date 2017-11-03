@@ -36,6 +36,7 @@ select<- dplyr::select
 # o<-readRDS('KopaBeeINC.RDS')
 o<- NULL
 t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/DC/",referencefile=NULL)
 
 # if (!is.null(t)){
 #   t<- rbind(o,t)
@@ -680,9 +681,9 @@ ggplot(r,aes(rev,lev))+
   geom_point(aes(color=monkey))+
   geom_abline()+
   xlab('Importance of Right Eye Horizontal Velocity')+
-  ylab('Importance of Left Eye Horizontal Velocity')+
-  xlim(0,0.11)+
-  ylim(0,0.11)#+
+  ylab('Importance of Left Eye Horizontal Velocity')#+
+  # xlim(0,0.11)+
+  # ylim(0,0.11)#+
   # geom_point(data=filter(r,neuron=='Kopachuck-942'),size=4)
 
 ggplot(r,aes(repV,lepV))+

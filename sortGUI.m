@@ -1,5 +1,5 @@
 % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\Nucleus Prepositus Hypoglossi');
-[filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\NRTP Vergence');
+[filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\NRTP Vergence\Raw Data');
 % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\SOA from Mark');
 % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\INC Recording');
 

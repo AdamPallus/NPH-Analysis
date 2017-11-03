@@ -95,6 +95,18 @@ maxabs<- function(x){
   }
 }
 
+
+minabs<- function(x){
+  m1<-max(x,na.rm=T)
+  m2<-min(x,na.rm=T)
+  if (abs(m1)>abs(m2)) {
+    return(m2)
+  } else{
+    return(m1)
+  }
+}
+
+
 loadnewcsv<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Vergence/",
                       keeptarget=FALSE){
   require(stringr)
@@ -424,7 +436,7 @@ loadnewcsv2<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Verg
       
       
     }
-    t <-rbindlist(loadedfiles)
+    t <-rbindlist(loadedfiles,fill=TRUE)
     # t<- dplyr::select(t, -thp,-tvp,-time)
   }else{
     message('********NO NEW CELLS********')
@@ -446,7 +458,7 @@ loadnewcsv2<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Verg
 #after running this function, you can group_by(event) and measure the fixations or saccades as you wish
 
 
-markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5){
+markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5,maxreject=1000){
   
   require(dplyr)
   require(data.table) #for rbindlist - a fast version of do.call('rbind') that uses data.table
@@ -503,6 +515,7 @@ markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5){
     summarize(max.vel=max(abs(v)), #calculate max velocity
               dur=n()) %>% #calculate duration
     filter(max.vel>threshold1, #reject all saccades that fail to exceed the large threshold
+           max.vel<maxreject, #reject all saccades over the max threshold
            dur>min.dur)-> #reject all saccades that fail to exceed the minimum duration
     xm #xm is a summary which means it just lists the saccades and their measured values
   

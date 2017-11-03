@@ -1,12 +1,15 @@
-t<- readRDS('enhancemarked2.RDS')
-
+# t<- readRDS('enhancemarked2.RDS')
+t<- readRDS('SOA-NRTP.RDS')
+t<- filter(t,cellnum>100)
 # t %>% group_by(neuron) %>%
 #   do(dynamiclead(p=.,formula='verg.angle',seq(5,60,by=5))) ->
 #   t
 
 t %>%
   group_by(neuron) %>%
-  mutate(sdf20= lag(sdf,20)) ->
+  mutate(time=row_number(),
+         sdf20= lag(sdf,20),
+         near.response=cor(verg.angle,sdf)>0) ->
   t
 
 t %>% group_by(neuron) %>%
@@ -34,11 +37,19 @@ t %>%
   t
 
 t %>%
-  group_by(neuron,sacnum) %>%
   filter(abs(verg.amp)<25,r.amp>2) %>%
-  summarize(verg.amp=first(verg.amp),
+  group_by(neuron) %>%
+  mutate(sig.converg=cor.test(peak.verg.velocity[peak.verg.velocity>0],
+                              peak.FR[peak.verg.velocity>0])$p.value,
+         sig.diverg=cor.test(peak.verg.velocity[peak.verg.velocity<0],
+                             peak.FR[peak.verg.velocity<0])$p.value) %>%
+  group_by(neuron,sacnum) %>%
+  summarize(near.response=near.response[1],
+            verg.amp=first(verg.amp),
             peak.verg.velocity=first(peak.verg.velocity),
-            peak.FR=first(peak.FR))%>%
+            peak.FR=first(peak.FR),
+            sig.converg=first(sig.converg),
+            sig.diverg=first(sig.diverg))%>%
   filter(abs(peak.verg.velocity)<250,
          peak.FR>10) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
@@ -83,8 +94,15 @@ sp %>%
 spm %>%
   dplyr::select(neuron,term,estimate) %>%
   # filter(term != '(Intercept)') %>%
-  summarize(preferred.slope=maxabs(estimate[term != '(Intercept)']),
-            b=estimate[term=='(Intercept)']) %>%
+  summarize(max.slope=max(estimate[2:3]),
+            min.slope=min(estimate[2:3]),
+            b=estimate[1],
+            preferred.slope=maxabs(c(max.slope,min.slope)),
+            off.slope=minabs(c(max.slope,min.slope)))%>%
+  
+    # preferred.slope=maxabs(estimate[term != '(Intercept)']),
+            # off.slope=estimate[term != '(Intercept)',estimate!=preferred.slope],
+            # b=estimate[term=='(Intercept)']) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE) %>%
   mutate(preferred.direction=sign(preferred.slope))->
   spms
@@ -92,25 +110,107 @@ spm %>%
 
 ggplot(spms)+
   geom_point(aes(x=b,y=preferred.slope),alpha=0)+
-  geom_abline(aes(slope=abs(preferred.slope),intercept=b),size=1.5,alpha=1/2)+
+  geom_abline(aes(slope=abs(preferred.slope),intercept=b),size=0.5,alpha=1)+
+  coord_cartesian(ylim=c(0,500),xlim=c(0,150))+
+  theme_minimal()+
+  xlab('Peak Vergence Speed (deg/s) -- On Direction Saccades')+
+  ylab('Peak Firing Rate (spks/s)')
+
+# ggplot(spms)+
+#   geom_point(aes(x=b,y=preferred.slope),alpha=0)+
+#   geom_abline(aes(slope=preferred.slope,intercept=b,color=sign(preferred.slope)),size=0.5,alpha=1)+
+#   coord_cartesian(ylim=c(0,500),xlim=c(0,150))+
+#   theme_bw()+
+#   xlab('Peak Vergence Speed (deg/s) -- On Direction Saccades')+
+#   ylab('Peak Firing Rate (spks/s)')
+
+ggplot(spms)+
+  geom_point(aes(x=b,y=off.slope),alpha=0)+
+  geom_abline(aes(slope=off.slope*sign(preferred.slope),intercept=b),size=0.5,alpha=1)+
+  coord_cartesian(ylim=c(0,500),xlim=c(0,150))+
+  theme_minimal()+
+  xlab('Peak Vergence Speed (deg/s) -- Off Direction Saccades')+
+  ylab('Peak Firing Rate (spks/s)')
+
+ggplot(spms)+
+  geom_point(aes(x=b,y=off.slope),alpha=0)+
+  geom_abline(aes(slope=off.slope*sign(preferred.slope)*-1,intercept=b),size=0.5,alpha=1)+
+  coord_cartesian(ylim=c(0,500),xlim=c(-150,0))+
+  theme_minimal()+
+  xlab('Peak Vergence Speed (deg/s) -- Off Direction Saccades')+
+  ylab('Peak Firing Rate (spks/s)')
+
+ggplot(spms)+
+  geom_point(aes(x=b,y=off.slope),alpha=0)+
+  geom_abline(aes(slope=abs(off.slope),intercept=b),size=1,alpha=1)+
   coord_cartesian(ylim=c(0,500),xlim=c(0,150))+
   theme_bw()+
   xlab('Peak Vergence Speed (deg/s)')+
   ylab('Peak Firing Rate (spks/s)')
+
 
 ggsave('RefressionDemo.PDF',height=5,width=5)
 
-ggplot(spms)+
-  geom_point(aes(x=b,y=preferred.slope),alpha=0)+
-  geom_abline(aes(slope=abs(preferred.slope),intercept=b,color=rsq),size=1.5,alpha=1/2)+
-  scale_color_continuous(low='white',high='red')+
-  coord_cartesian(ylim=c(0,500),xlim=c(0,150))+
-  theme_bw()+
-  xlab('Peak Vergence Speed (deg/s)')+
-  ylab('Peak Firing Rate (spks/s)')
+#final versiodn: add off direction too for reviewer
+# sp <- mutate(sp,diverging=cor(peak.verg.velocity,peak.FR)<0)
+
+# sp <- mutate(sp,diverging=sign(cor(peak.verg.velocity,peak.FR)))
 
 
-  facet_wrap(~monkey)
+ggplot(aes(peak.verg.velocity,peak.FR,group=neuron),data=sp)+
+  stat_smooth(method='lm',se=FALSE,color='black',data=filter(sp,peak.verg.velocity>0))+
+  stat_smooth(method='lm',se=FALSE,color='black',data=filter(sp,peak.verg.velocity<0))+
+  facet_wrap(~near.response)
+
+ggplot(aes(peak.verg.velocity,peak.FR,group=neuron),data=sp)+
+  stat_smooth(method='lm',se=FALSE,color='black')+
+  facet_wrap(~near.response)+
+  theme_minimal()
+  
+
+ggplot(aes(peak.verg.velocity,peak.FR,group=neuron),data=filter(sp,!diverging,peak.verg.velocity>0))+
+  stat_smooth(method='lm',se=FALSE,color='black')+
+  theme_minimal()+
+  ylim(0,350)
+
+ggplot(aes(peak.verg.velocity,peak.FR,group=neuron),
+       data=filter(sp,!diverging,peak.verg.velocity<0))+
+  stat_smooth(method='lm',se=FALSE,color='black')+
+  theme_minimal()+
+  ylim(0,350)
+
+
+ggplot(aes(peak.verg.velocity,peak.FR,group=neuron),data=sp)+
+  stat_smooth(method='lm',se=FALSE,color='black',
+              data=filter(sp,!diverging,peak.verg.velocity>0))+ #on dir conv
+  stat_smooth(method='lm',se=FALSE,color='hotpink',
+              data=filter(sp,diverging,peak.verg.velocity<0))+ #on dir div
+  ylim(0,350)+
+  theme_minimal()
+  
+
+ggplot(aes(peak.verg.velocity,peak.FR,group=neuron),data=sp)+
+  stat_smooth(method='lm',se=FALSE,color='black',
+              data=filter(sp,!near.response,peak.verg.velocity<0))+ #off dir conv
+  stat_smooth(method='lm',se=FALSE,color='hotpink',
+              data=filter(sp,near.response,peak.verg.velocity>0))+ #off dir div
+  ylim(0,350)+
+  theme_minimal()
+
+ggplot(aes(peak.verg.velocity,peak.FR,group=neuron),data=sp)+
+  stat_smooth(method='lm',se=FALSE,aes(color=near.response),data=filter(sp,peak.verg.velocity<0))+
+  stat_smooth(method='lm',se=FALSE,aes(color=near.response),data=filter(sp,peak.verg.velocity>0))
+
+
+sp<- mutate(sp,peak.preferred.verg.velocity=peak.verg.velocity*diverging)
+
+ggplot(aes(peak.preferred.verg.velocity,peak.FR,group=neuron),data=sp)+
+  stat_smooth(method='lm',se=FALSE,color='black',data=filter(sp,peak.preferred.verg.velocity>0))+
+  
+
+ggplot(aes(peak.preferred.verg.velocity,peak.FR,group=neuron),data=sp)+
+  stat_smooth(method='lm',se=FALSE,color='black',data=filter(sp,peak.preferred.verg.velocity<0))
+
 #---- 
 #Use stat_smooth, but only plot on direction
 sp<-left_join(sp,select(spms,neuron,preferred.direction),by='neuron')

@@ -1,6 +1,7 @@
-s<- loadnewcsv(path="C:/Users/setup/Desktop/NRTP Vergence/INCstim/")
+s<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstim/")
 
 # s<- filter(t,neuron %in% c('Kopachuck-501','Kopachuck-502'))
+s<- filter(s,monkey=='DC')
 bufferlength=200
 s %>%
   group_by(neuron) %>%

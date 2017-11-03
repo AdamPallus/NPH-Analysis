@@ -1,20 +1,24 @@
 #Bee-211----
 #Go to VergPreditionDoodle.r 
-z<-mutate(z,showrasters=replace(rasters,rasters<1,NA))
+z<-mutate(zz,showrasters=replace(rasters,rasters<1,NA))
 
 d<- group_by(z,time) %>% summarize_each(funs(first))
+
+d<- mutate(d,verg.velocity.smooth=lev-rev)
 
 window_size=2000
 
 
 #Conjugate
 window=467500
+window=78000
+window=278600
 ggplot(filter(d,time>=window,time<window+window_size))+
   geom_line(aes(time,((lep-rep)-(lep-rep)[1])*5+15+150),color='darkgreen',size=1)+
   geom_line(aes(time,(rep-rep[1])*5+150),color='red',size=1)+
   geom_line(aes(time,(lep-lep[1])*5+150),color='blue',size=1)+
   geom_line(aes(time,(((repV+lepV)/2)-((repV+lepV)/2)[1])*5+150-15),color='violet',size=1)+
-  geom_line(aes(time,verg.velocity*2+100),color='blue',alpha=1)+
+  geom_line(aes(time,verg.velocity.smooth*2+100),color='blue',alpha=1)+
   geom_line(aes(time,predV*2+100),color='orange')+
   geom_area(aes(time,sdf/2),alpha=1)+
   geom_point(aes(time,showrasters+5),shape='|',color='lightgrey',size=3)+

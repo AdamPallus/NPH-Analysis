@@ -127,8 +127,8 @@ loadnewheadfree<- function(referencefile=NULL,path="~/kdata/"){
 
 ```{r load}
 samplerate<- 304.7508/1000
-path<- "C:/Users/User/Documents/GitHub/NPH-Analysis/Vergence/kdata/"
-
+# path<- "C:/Users/User/Documents/GitHub/NPH-Analysis/Vergence/kdata/"
+path<-"C:/Users/setup/Desktop/NRTP Vergence/kdata/"
 h<- loadnewheadfree(NULL,path)
 
 # h<- read.csv('HEADFREE.txt',sep="\t",header=FALSE)
@@ -201,7 +201,7 @@ hint%>%
          IEPs=IEP*sign(gaze.amp), #positive number indicates eyes deviated in direction of saccade
          peak.gaze.velocity=maxabs(Gv[!is.na(gazeshifts)]),
          peak.head.velocity=maxabs(Hv[100:n()]),
-         target.amp=T[200]-T[1],
+         target.amp=T[300]-T[1],
          head.contribution=H[counter==gaze.offset]-IHP,
          eye.contribution=gaze.amp-head.contribution
          ) %>%
@@ -218,7 +218,7 @@ Here is an example of a trial with the first gaze shift and head movement marked
 Velocity is shown on the same plot as position scaled down by a factor of 10.
 
 ```{r demoplot,echo=FALSE,warning=FALSE}
-ggplot(filter(hh,sacnum==31))+
+ggplot(filter(hh,sacnum==31,block=='A-01'))+
   geom_line(aes(counter,H),color='blue')+
   # geom_line(aes(counter,Ef),color='red')+
   geom_line(aes(counter,G),color='darkgreen')+
@@ -237,7 +237,8 @@ ggplot(filter(hh,sacnum==31))+
   annotate('text',x=125,y=55,label='First Gaze Shift')+
   annotate('text',x=300,y=28,label='Head Movement')+
   geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
-  geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)
+  geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+  geom_label(aes(label=T[300]-T[1]),x=100,y=50)
   
 
 ```
@@ -282,52 +283,128 @@ ggplot(aes(abs(gaze.amp),abs(peak.gaze.velocity)),data=hpp)+
   facet_wrap(~block)
     
 ggplot(aes(abs(gaze.amp),head.contribution/gaze.amp),data=hpp)+
-  geom_point()
+  geom_point()+facet_wrap(~block)
 
 ggplot(aes(IEPs,head.contribution),data=hpp)+
-  geom_point()
+  geom_point()+facet_wrap(~block)
 
 qplot(abs(gaze.amp),abs(gaze.amp)-abs(head.contribution),color=IEP,data=hpp)+
-  geom_abline()
+  geom_abline()+facet_wrap(~block)
 
 ```
 
 ```{r requestedplots}
+
+ggplot(hpp,aes(gaze.amp,color=block))+
+  geom_density()
+
+ggplot(hpp,aes(target.amp,color=block))+
+  geom_density()
 # 
 # a. comparison of pre and post mean Gaze peak velocity
 ggplot(hpp,aes(abs(gaze.amp),abs(peak.gaze.velocity),color=block))+
   geom_point()+
-  stat_smooth(method='lm')
+  stat_smooth(method='lm')+
+  xlab('Gaze shift amplitude (deg)')+
+  ylab('Peak gaze shift velocity (deg/s)')
 # b. comparison of pre and post mean Gaze latency
 ggplot(hpp,aes(abs(gaze.amp),gaze.onset/samplerate,color=block))+
   geom_point()+
-  stat_smooth(method='lm')
+  stat_smooth(method='lm')+
+  xlab('Gaze shift latency (ms)')+
+  ylab('Gaze shift amplitude (deg)')
+
 # c. comparison of pre and post mean primary Gaze gain
 ggplot(hpp,aes(abs(target.amp),abs(gaze.amp),color=block))+
   geom_point()+
   geom_abline()+
-  stat_smooth(method='lm')
+  stat_smooth(method='lm')+
+  xlab('target amplitude (deg)')+
+  ylab('Gaze shift amplitude (deg)')+
+  annotate('text',30,80,label='First saccade only; both directions')
 # 
 # d. comparison of pre and post mean Head peak velocity
 ggplot(hpp,aes(abs(gaze.amp),abs(peak.head.velocity),color=block))+
   geom_point()+
-  stat_smooth(method='lm')
+  stat_smooth(method='lm')+
+  xlab('Gaze shift amplitude (deg)')+
+  ylab('Peak head speed (deg/s)')
 # e.comparison of pre and post mean Head latency
 
 # f. comparison of pre and post mean head contribution to gaze\
 ggplot(hpp,aes(abs(gaze.amp),abs(head.contribution),color=block))+
   geom_point()+
-  stat_smooth(method='lm')
+  stat_smooth(method='lm')+
+  xlab('Gaze shift amplitude (deg)')+
+  ylab('Head Contribution (deg)')
+
+ggplot(filter(hpp,abs(head.contribution)<10),aes(abs(gaze.amp),abs(head.contribution),color=block))+
+  geom_point()+
+  stat_smooth(method='lm')+
+  xlab('Gaze shift amplitude (deg)')+
+  ylab('Head Contribution (deg)')+
+  ggtitle('Outliers removed')
+
 # g. comparison of pre and post mean head contribution gain
 # h. comparison of pre and post mean head total amp
+
 # i. comparison of pre and post mean head total amp gain
 # 
 # j. comparison of pre and post mean final eye position re: head
+```
 
-hpp <- mutate(hpp,amp.bins=cut(gaze.amp,breaks=c(0,10,20,30,40,50,60,70)))
+```{r boxplots}
+
+hpp <- mutate(hpp,amp.bins.right=cut(gaze.amp,breaks=c(0,10,20,30,40,50,60,70)))
+hpp <- mutate(hpp,amp.bins.left=cut(gaze.amp,breaks=c(0,-10,-20,-30,-40,-50,-60,-70)))
+hpp <- mutate(hpp,amp.bins=cut(gaze.amp,breaks=c(-70,-60,-50,-40,-30,-20,-10,0,10,20,30,40,50,60,70)))
+
+# hpp<-mutate(hpp,amp.bins=cut(gaze.amp,breaks=c(-75,-50,-25,-10,0,10,25,50,75)))
+# hpp<- mutate(hpp,amp.bins=cut(abs(gaze.amp),breaks=c(0,10,20,30,40,50,60,70)))
+# hpp <- mutate(hpp,amp.bins=cut(abs(target.amp),breaks=c(0,10,20,30,40,50,60,70)))
+
 
 ggplot(filter(hpp,!is.na(amp.bins)))+
-  geom_boxplot(aes(amp.bins,gaze.onset/samplerate,color=block))
+  geom_boxplot(aes(amp.bins,gaze.onset/samplerate,color=block))+
+  ylab('Gaze Shift Latency (ms)')+
+  xlab('Gaze shift amplitude bins (deg)')
+
+ggplot(filter(hpp,!is.na(amp.bins)))+
+  geom_boxplot(aes(amp.bins,head.contribution,color=block))+
+  ylab('Head Contribution (deg)')+
+  xlab('Gaze shift amplitude bins (deg)')
+
+ggplot(filter(hpp,!is.na(amp.bins.right)))+
+  geom_boxplot(aes(amp.bins.right,gaze.onset/samplerate,color=block))+
+  ylab('Gaze Shift Latency (ms)')+
+  xlab('Gaze shift amplitude bins (deg)')
+
+ggplot(filter(hpp,!is.na(amp.bins.right)))+
+  geom_boxplot(aes(amp.bins.right,head.contribution,color=block))+
+  ylab('Head Contribution (deg)')+
+  xlab('Gaze shift amplitude bins (deg)')
+
+ggplot(filter(hpp,!is.na(amp.bins.left)))+
+  geom_boxplot(aes(amp.bins.left,gaze.onset/samplerate,color=block))+
+  ylab('Gaze Shift Latency (ms)')+
+  xlab('Gaze shift amplitude bins (deg)')
+
+ggplot(filter(hpp,!is.na(amp.bins.left)))+
+  geom_boxplot(aes(amp.bins.left,head.contribution,color=block))+
+  ylab('Head Contribution (deg)')+
+  xlab('Gaze shift amplitude bins (deg)')
+
+# ggplot(filter(hpp))+
+#   geom_boxplot(aes(target.amp,gaze.onset/samplerate,color=block))
+# 
+# ggplot(filter(hpp))+
+#   geom_boxplot(aes(as.factor(target.amp),gaze.onset/samplerate,color=block))
+
+hpp %>%
+  filter(is.na(amp.bins)) %>%
+  group_by(block,amp.bins)%>%
+  summarize(n=n())->
+  tcount
 
 hpp %>%
   filter(!is.na(amp.bins)) %>%
@@ -335,8 +412,30 @@ hpp %>%
   do(g.onset=t.test(gaze.onset~block,data=.),
      hc=t.test(head.contribution~block,data=.))->
   hps
-  
 
+g.onset.t.test<- select(tidy(hps,g.onset),amp.bins,p.value)
+g.onset.t.test<- rename(g.onset.t.test,GS_Latency_p_value=p.value)
+h.contri.t.test<- select(tidy(hps,hc),amp.bins,p.value)
+h.contri.t.test<- rename(h.contri.t.test,H_Contribution_p_value=p.value)
+kable(g.onset.t.test)
+kable(h.contri.t.test)
+
+hpp %>%
+  ungroup()%>%
+  filter(!is.na(amp.bins)) %>%
+  do(g.onset=t.test(gaze.onset~block,data=.),
+     hc=t.test(head.contribution~block,data=.))->
+  hpsa
+
+
+ggplot(filter(hpp,!is.na(amp.bins)))+
+  geom_boxplot(aes(block,gaze.onset/samplerate,color=block))
+
+
+ggplot(filter(hpp,!is.na(amp.bins)))+
+  geom_boxplot(aes(block,abs(head.contribution),color=block))
+
+# t.test(head.contribution~block,data=hpp)
 ```
 #All trials
 Next I just plot all of the trials that have a detectable gaze shift after the movement. As you can see, there are a lot of failed trials. More effort could be put into refining the algorithm to ignore gaze shifts that are too small or start too early or to reject trials with too much missing data.

@@ -596,25 +596,30 @@ apply(periodstoplot,1,saveModelPlot,x=x3)
 saveModelPlot(x=x3,window=81000)
 
 goodsacs=unique(z$sacnum[abs(z$total.verg.amp)>4&z$r.amp>4])
+goodsacs=unique(filter(zz,abs(verg.amp)<1,r.amp>4)$sacnum)
 goodsacs=goodsacs[!is.na(goodsacs)]
 manipulate({
-  d=filter(z,sacnum==goodsacs[currentsac])
+  d=filter(zz,sacnum==goodsacs[currentsac])
+  d<- mutate(d,showrasters=replace(rasters,rasters<1,NA))
   ggplot(d)+
-    geom_point(aes(time,showrasters+30),shape='|',size=4)+
-    # geom_point(aes(time,showenhance*verg.velocity),color='magenta')+
-    # geom_area(aes(time,sdf),color='black',fill='pink',alpha=1/10)+
-    # geom_line(aes(time,slowpredict),color='orange')+
-    geom_line(aes(time,verg.angle*10+0),color='darkgreen')+
-    # geom_line(aes(time,predP/1000),color='darkgreen',linetype=2)+
-    geom_line(aes(time,predV),color='orange')+
-    # geom_line(aes(time,predV2),color='magenta')+
-    geom_line(aes(time,verg.velocity),color='darkblue')+
-    geom_area(aes(time,conj.velocity),alpha=1/3)+
-    geom_line(aes(time,cumsum(predV)/100+first(verg.angle)*10),color='orange',linetype=2)+
-    # geom_line(aes(time,verg.velocity-predV),color='red',linetype=2)
-    ylim(c(NA,150))+
-    geom_point(aes(time,saccadic*50))
-  # geom_line(aes(time,target.verg*10))
-  # geom_line(aes(time,(target.verg-verg.angle)*10),color='hotpink')
+    geom_line(aes(time,((lep-rep)-(lep-rep)[1])*5+15+150),color='darkgreen',size=1)+
+    geom_line(aes(time,(rep-rep[1])*5+150),color='red',size=1)+
+    geom_line(aes(time,(lep-lep[1])*5+150),color='blue',size=1)+
+    geom_line(aes(time,(((repV+lepV)/2)-((repV+lepV)/2)[1])*5+150-15),color='violet',size=1)+
+    geom_line(aes(time,verg.velocity*2+100),color='blue',alpha=1)+
+    geom_line(aes(time,predV*2+100),color='orange')+
+    geom_area(aes(time,sdf/2),alpha=1)+
+    geom_point(aes(time,showrasters+5),shape='|',color='lightgrey',size=3)+
+    # annotate('segment',x=window,xend=window,y=0,yend=50)+
+    # annotate('text',x=window,y=45,label='100 spk/s')+
+    # annotate('segment',x=window,xend=window,y=100,yend=120)+
+    # annotate('text',x=window,y=114,label='10 deg/s')+
+    # annotate('segment',x=window,xend=window,y=150,yend=175)+
+    # annotate('text',x=window,y=170,label='5 deg')+
+    # annotate('segment',x=window,xend=window+100,y=75,yend=75)+
+    # annotate('text',x=window,y=75,label='100 ms')+
+    theme_minimal()+
+    ylab('')
+  
 },
 currentsac=slider(1,length(goodsacs),step=1,initial = 1))

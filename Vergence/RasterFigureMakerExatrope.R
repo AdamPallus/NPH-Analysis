@@ -116,30 +116,30 @@ d %>%
 
 p %>%  group_by(neuron) %>%
   filter(saccade.dur>80, #Removes any saccade shorter than 80ms
-    # abs(verg.amp)>4, #removes saccades with vergence change of less than 1.5 deg
-    eyeswitch,
-    startingerror<window.size,
-    endingerror<window.size,
-    saccade.dur<800)%>% #,
-    #min.verg.angle> -5) %>% #removes trials with eye-coil problems (rare)
+         # abs(verg.amp)>4, #removes saccades with vergence change of less than 1.5 deg
+         eyeswitch,
+         startingerror<window.size,
+         endingerror<window.size,
+         saccade.dur<800)%>% #,
+  #min.verg.angle> -5) %>% #removes trials with eye-coil problems (rare)
   # group_by(neuron,convergent) %>%
   
   mutate(n=n(),spiketimes=showrasters*counter) ->
   gtemp
 
 
-  gtemp%>%
-    group_by(neuron,startingeye,sacnum) %>% 
-    summarize(dur=first(saccade.dur)) %>% 
-    arrange(desc(dur)) %>% #sorts by duration
-    mutate(snum=row_number()) %>% #re-numbers saccades in their new order for plotting purposes
-    left_join(gtemp,.)%>%
-    mutate(converging=verg.amp>0)->
-    g
+gtemp%>%
+  group_by(neuron,startingeye,sacnum) %>% 
+  summarize(dur=first(saccade.dur)) %>% 
+  arrange(desc(dur)) %>% #sorts by duration
+  mutate(snum=row_number()) %>% #re-numbers saccades in their new order for plotting purposes
+  left_join(gtemp,.)%>%
+  mutate(converging=verg.amp>0)->
+  g
 
 g$startingeye<- as.factor(g$startingeye)
 levels(g$startingeye)<- c('Left to Right', 'Right to Left')
-  
+
 
 ggplot(g) + 
   theme_bw()+ #Removes gray background 
