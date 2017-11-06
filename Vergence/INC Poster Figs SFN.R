@@ -192,6 +192,8 @@ t %>%
             mean.L.H=mean(lep),
             mean.R.V=mean(repV),
             mean.L.V=mean(lepV),
+            mean.T.V=mean(tvp),
+            mean.T.H=mean(thp),
             asleep=sd.conj.velocity>7.5 || dur>2000)->
   zp
 
@@ -236,7 +238,7 @@ ggplot(zp,aes(mean.H,meanFR,group=neuron))+
   scale_colour_manual(values=c('black','orange','hotpink'))+
   theme_minimal()+
   xlab('Mean Conjugate Horizontal Eye Position (deg)')+
-  ylab('Mean Firing Rate (spks/s)')#+
+  ylab('Mean Firing Rate (spks/s)')+
   # theme(legend.position="none")+
   ylim(0,NA)
 
@@ -272,6 +274,7 @@ ggplot(zp,aes(mean.H,meanFR,group=neuron))+
 zp %>%
   group_by(neuron) %>%
   do(mod=lm(meanFR~mean.V+mean.H,data=filter(.,!asleep,dur>100,meanFR>0)))->
+  # do(mod=lm(meanFR~mean.T.V+mean.T.H,data=filter(.,!asleep,dur>100,meanFR>0)))->
   zm
 
 zm %>%
@@ -285,6 +288,7 @@ zm %>%
   mutate(term=replace(term,term=='(Intercept)','b')) %>%
   spread(term,estimate)%>%
   mutate(dir.pref=atan2(mean.V,mean.H)*180/pi)->
+  # mutate(dir.pref=atan2(mean.T.V,mean.T.H)*180/pi)->
   zt
 
 zm %>%
@@ -299,6 +303,7 @@ zzm %>%
          mean.H.w=mean.H/(mean.V+mean.H),
          dir.pref=atan2(mean.V,mean.H)*180/pi)->
   zzm
+
 
 zt<-left_join(zt,zzm,by='neuron')
 
