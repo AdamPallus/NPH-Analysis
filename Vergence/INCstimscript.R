@@ -35,7 +35,31 @@ ggplot(sp,aes(group=stimes))+
   geom_line(aes(counter,lepVDIFF-20),color='blue',linetype=2)+
   facet_wrap(~neuron,ncol=3)
 
-ggsave('StimPlots.PDF',height=20,width=8)
+ggplot(sp,aes(group=stimes))+
+  # geom_point(aes(counter,showstim+100),shape='|')+
+  # geom_line(aes(counter,repDIFF),color='red')+
+  # geom_line(aes(counter,lepDIFF),color='blue')+
+  # geom_line(aes(counter,repVDIFF-20),color='red',linetype=2)+
+  # geom_line(aes(counter,lepVDIFF-20),color='blue',linetype=2)+
+  geom_line(aes(counter,lepDIFF-repDIFF+50),color='darkgreen')
+  facet_wrap(~neuron,ncol=3)
+
+ggplot(filter(sp,counter>200,counter<400))+
+  geom_line(aes(counter,lev-rev,group=stimes),color='darkblue')
+
+sp %>% 
+  group_by(neuron,stimes) %>%
+  summarize(peak.verg.velocity=maxabs(lev-rev),
+            initial.verg.velocity=mean(lev[100:200])-mean(rev[100:200]))->
+  spp
+
+qplot(data=spp,initial.verg.velocity>0,peak.verg.velocity,geom='boxplot')
+
+sp<- left_join(sp,spp)
+ggplot(filter(sp,counter>200,counter<400))+
+  geom_line(aes(counter,lev-rev,group=stimes,color=initial.verg.velocity<0))
+  
+# ggsave('StimPlots.PDF',height=20,width=8)
 
 sp %>%
   group_by(neuron,counter) %>%
@@ -61,7 +85,7 @@ ggplot(spm)+
   ylab('Position Change (deg)')+
   facet_wrap(~neuron,scale='free',ncol=2)
 
-  ggsave('INCstim.PDF',height=20,width=8)
+  # ggsave('INCstim.PDF',height=20,width=8)
   
   ggplot(spm)+
     geom_point(aes(counter,showstim*stimes-5),data=sp,shape='|')+

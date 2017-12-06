@@ -1,4 +1,4 @@
-
+source('markSaccadesDoubleDrift.R')
 modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
                     model.form='verg.velocity~sdf20+verg.angle',
                     lagsdf=31,returnmodel=FALSE){
@@ -18,7 +18,8 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
            sdf20=dplyr::lag(sdf,lagsdf),
            conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2)) ->
     x
-  x<- mutate(x,saccadic=markSaccades(conj.velocity,buffer=5,threshold=20)>0)
+  # x<- mutate(x,saccadic=markSaccades(conj.velocity,buffer=5,threshold=20)>0)
+  x<-  mutate(x,saccadic=!is.na(markSaccadesDoubleDrift(conj.velocity)))
   x<- joinsaccades(x,buffer=saccadebuffer,threshold=saccadethreshold)
   x %>%
     group_by(sacnum) %>%
@@ -67,9 +68,9 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
 #               saccadebuffer=10)
 
 
-bufferlength=200
+bufferlength=400
 
-modelVV2(t,chosenCell='Bee-113',lagsdf=20,
+modelVV2(t,chosenCell='Bee-01',lagsdf=20,
               model.form='verg.velocity~sdf20+verg.angle',
          # model.form='sdf20~verg.velocity+verg.angle',
               saccadebuffer=bufferlength) %>%
@@ -596,20 +597,30 @@ apply(periodstoplot,1,saveModelPlot,x=x3)
 saveModelPlot(x=x3,window=81000)
 
 goodsacs=unique(z$sacnum[abs(z$total.verg.amp)>4&z$r.amp>4])
-goodsacs=unique(filter(zz,abs(verg.amp)<1,r.amp>4)$sacnum)
+goodsacs=unique(filter(z,abs(verg.amp)<2,r.amp>4)$sacnum)
 goodsacs=goodsacs[!is.na(goodsacs)]
 manipulate({
-  d=filter(zz,sacnum==goodsacs[currentsac])
+  d=filter(z,sacnum==goodsacs[currentsac])
   d<- mutate(d,showrasters=replace(rasters,rasters<1,NA))
+  tvc=(d$lep-d$rep)[bufferlength+200]-(d$lep-d$rep)[bufferlength-100]
   ggplot(d)+
-    geom_line(aes(time,((lep-rep)-(lep-rep)[1])*5+15+150),color='darkgreen',size=1)+
+    # geom_line(aes(time,((lep-rep)-(lep-rep)[1])*5+15+150),color='darkgreen',size=1)+
+    # geom_line(aes(time,((thp2-thp)-(thp2-thp)[1])*5+15+150),color='darkgray',size=1)+
+    geom_area(aes(time,sdf/2),alpha=1)+
+    geom_line(aes(time,((lep-rep))*5+15+150),color='darkgreen',size=1)+
+    geom_hline(aes(yintercept=(lep-rep)[1]*5+15+150))+
+    geom_point(aes(time,saccadic*-10))+
+    geom_vline(aes(xintercept=time[1]+bufferlength+saccade.dur))+
+    # geom_line(aes(time,(thp-thp2)*5+15+150),color='darkgray',size=1)+
     geom_line(aes(time,(rep-rep[1])*5+150),color='red',size=1)+
     geom_line(aes(time,(lep-lep[1])*5+150),color='blue',size=1)+
     geom_line(aes(time,(((repV+lepV)/2)-((repV+lepV)/2)[1])*5+150-15),color='violet',size=1)+
     geom_line(aes(time,verg.velocity*2+100),color='blue',alpha=1)+
     geom_line(aes(time,predV*2+100),color='orange')+
-    geom_area(aes(time,sdf/2),alpha=1)+
     geom_point(aes(time,showrasters+5),shape='|',color='lightgrey',size=3)+
+    geom_text(aes(x=time[1]+100,label=paste('Saccadic Verg Change: ',round(verg.amp,3))),y=175)+
+    geom_text(aes(x=time[1]+350,label=paste('Total verg change: ',round(tvc,3))),y=175)+
+    geom_text(aes(x=time[1]+350,label=paste('Difference: ',round(tvc-verg.amp,3))),y=165)+
     # annotate('segment',x=window,xend=window,y=0,yend=50)+
     # annotate('text',x=window,y=45,label='100 spk/s')+
     # annotate('segment',x=window,xend=window,y=100,yend=120)+
