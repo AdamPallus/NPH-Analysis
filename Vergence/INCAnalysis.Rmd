@@ -1,0 +1,843 @@
+---
+title: "Analysis of INC in strabismus"
+author: "Adam Pallus"
+output:
+  pdf_document: default
+  html_document: default
+---
+#Introduction
+Previous work from our lab has shown that saccadic burst generators can have abnormal preferred directions in monkey models of infantile pattern strabismus. Additionally, microstimulation of the superior colliculus and saccadic burst generators can evoke disconjugate movements. This, along with behavioral evidence, suggests a neural origin of the "cross-talk" seen in pattern strabismus.
+
+The intersitial nucleus of cajal (INC) is the location of the vertical neural integrator for eye position. If abnormal signals are present in the burst generators, then these signals should be integrated by the INC. In this report, we assess the direction preference of INC neurons in strabismus and compare with the normal monkey. 
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
+```
+
+```{r,message=FALSE,echo=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(broom)
+# library(grid)
+library(relaimpo)
+library(leaps)
+library(stringr)
+library(cladoRcpp)
+library(boot)
+source('Adamhelperfunctions.R')
+select<- dplyr::select
+```
+
+```{r cacheloade,cache=TRUE,cache.lazy=FALSE}
+t<- readRDS('INCsaccadesmarked.RDS')
+```
+
+<!-- ```{r quickload,echo=FALSE,cache=FALSE} -->
+<!-- LoadFromFile<- TRUE -->
+
+<!-- if (LoadFromFile){ -->
+<!--   o<- readRDS('INCstrab.RDS') -->
+<!-- }else{ -->
+<!--   o<-NULL -->
+<!-- } -->
+
+<!-- t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o) -->
+
+
+<!-- t<- rbind(o,t) -->
+
+<!-- o<-NULL -->
+
+<!-- ``` -->
+
+<!-- ```{r mark saccades,cache=FALSE} -->
+<!-- #it would be really nice to fix this block so I don't have to use rbind at the end -->
+<!-- #the problem was that some of the non-DC cells were erroring when I tried to run it through -->
+<!-- #the blink detector...  -->
+<!-- #An idea would be to set up a little function called markBlinks that just checks to see -->
+<!-- #what the monkey is and just returns NA if it's not DC (or other visual tracking monkeys) -->
+<!-- t %>% -->
+<!--   filter(monkey=='DC') %>% -->
+<!--   group_by(neuron) %>% -->
+<!--   mutate(blinks=markSaccades(rep,buffer=80,threshold=70), -->
+<!--          # dsnum=markSaccadesDouble(conj.velocity,threshold1=30,threshold2=15), -->
+<!--          dsnum=markSaccadesDouble(replace(conj.velocity,blinks>0,150), -->
+<!--                                   threshold1=30,threshold2=15,maxreject=100000), -->
+<!--          sdf=spikedensity(rasters,10), -->
+<!--          sdf10=lag(sdf,10), -->
+<!--          conj.vert=(repV+lepV)/2, -->
+<!--          conj.vert.vel=(revV+levV)/2, -->
+<!--          conj.hor=(rep+lep)/2, -->
+<!--          conj.hor.v=(rev+lev)/2) -> -->
+<!--   tdc -->
+
+<!-- t %>% -->
+<!--   filter(monkey %in% c('Kopachuck','Bee')) %>% -->
+<!--   group_by(neuron) %>% -->
+<!--   mutate(dsnum=markSaccadesDouble(conj.velocity,threshold1=30,threshold2=15), -->
+<!--          sdf=spikedensity(rasters,10), -->
+<!--          sdf10=lag(sdf,10), -->
+<!--          conj.vert=(repV+lepV)/2, -->
+<!--          conj.vert.vel=(revV+levV)/2, -->
+<!--          conj.hor=(rep+lep)/2, -->
+<!--          conj.hor.v=(rev+lev)/2) -> -->
+<!--   tkb -->
+
+<!-- t<- rbind(select(tdc,-blinks),tkb) -->
+<!-- tdc<- NULL -->
+<!-- tkb<- NULL -->
+<!-- ``` -->
+
+```{r Measure_Fixations,cache=FALSE,cache=TRUE}
+t %>%
+  group_by(neuron)%>%
+  mutate(time=row_number()) %>%
+  filter(dsnum<0) %>% #fixations only
+  group_by(neuron,dsnum) %>%
+  summarize(sd.conj.velocity=sd(conj.velocity),
+            mean.conj.velocity=mean(conj.velocity),
+            spread=max(conj.velocity)-min(conj.velocity),
+            qrange=quantile(conj.velocity,0.975)-quantile(conj.velocity,0.025),
+            dur=n(),
+            starttime=first(time),
+            c2eyes=cor(repV,lepV),
+            meanFR=sum(rasters)/dur*1000,
+            mean.V=mean(conj.vert),
+            mean.H=mean(conj.hor),
+            mean.R.H=mean(rep),
+            mean.L.H=mean(lep),
+            mean.R.V=mean(repV),
+            mean.L.V=mean(lepV),
+            mean.T.V=mean(tvp),
+            mean.T.H=mean(thp),
+            sd.sdf=sd(sdf10),
+            asleep=sd.conj.velocity>7.5 || dur>2000)->
+  zp
+
+
+```
+
+```{r plotFunctions}
+
+compare2cells<- function(zp,zmc,c1,c2,maxEP=25,color1='black',color2='black'){
+  
+zp<- filter(zp,
+            neuron %in% c(c1,c2),
+            dur>200,
+            abs(mean.R.H)<maxEP,
+            abs(mean.L.H)<maxEP,
+            abs(mean.R.V)<maxEP,
+            abs(mean.L.V)<maxEP,
+            meanFR<500)
+  
+tab<-zmc %>%
+  filter(neuron %in% c(c1,c2)) %>%
+  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
+
+nV<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.V,meanFR),color=color1)+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  theme_minimal()+
+  ylab(paste(c1,'\nMean Firing Rate (spk/s)'))
+
+nH<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.H,meanFR),color=color2)+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('')+
+  theme_minimal()
+
+sV<-ggplot(zp %>% filter(neuron==c2))+
+  geom_point(aes(mean.V,meanFR),color=color1)+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Vertical Eye Position (deg)')+
+  ylab(paste(c2,'\nMean Firing Rate (spk/s)'))+
+  theme_minimal()
+
+sH<-ggplot(zp %>% filter(neuron==c2))+
+  geom_point(aes(mean.H,meanFR),color=color2)+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Horizontal Eye Position (deg)')+
+  ylab('')+
+  theme_minimal()
+
+dir.imp<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp),color='black')+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction preference\nusing relative importance')
+
+dir.slope<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.slope,xend=dir.pref.slope),color='black')+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction Preference\nusing slopes')
+
+# print(multiplot(nV,sV,dir.slope,nH,sH,dir.imp,cols=2))
+
+return(list(nV,sV,dir.slope,nH,sH,dir.imp))
+
+}
+
+```
+```{r Fixation_Analysis,cache=FALSE}
+#In this chunk, we calculate direction preferences for each  neuron based on the measured fixations
+conj.measureCell<- function(x,maxEP=25){
+  #Remove bad fixations that are too short or are outside of the normal range of eye movements
+  # x<- filter(x,dur>200,abs(mean.R.H)<50,abs(mean.L.H)<50)
+  x<- filter(x,dur>200,abs(mean.R.H)<maxEP,abs(mean.L.H)<maxEP)
+  
+  #calculate using mean eye position:
+  mH<-lm(meanFR~mean.H,data=x)
+  mV<-lm(meanFR~mean.V,data=x)
+  mHV<-lm(meanFR~mean.H+mean.R.V,data=x)
+  
+  H.p=anova(mH)$'Pr(>F)'[1]
+  V.p<- anova(mV)$'Pr(>F)'[1]
+  H<-as.numeric(coef(mHV)[2])
+  V<-as.numeric(coef(mHV)[3]) 
+  
+  #calculate direction preference based on relative slopes from multiple regression model
+  dir.pref.slope<-as.numeric(atan2(V,H))*180/pi
+
+  #calculate direction preference based on relative importance of each factor in multiple regression model  
+  b=as.numeric(calc.relimp(mHV)$lmg)
+  dir.pref.imp<- atan2(b[2]*sign(V),b[1]*sign(H))*180/pi
+  
+  any.sig=V.p<0.001 | H.p <0.001
+  
+  R2<- summary(mHV)$r.squared
+  
+  H.R2<- summary(mH)$r.squared #conj horizontal fit only
+  V.R2<- summary(mV)$r.squared #conj vertical fit only
+  
+  d<-data.frame(neuron=unique(x$neuron),
+                any.sig,
+                H.p,V.p,H,V,dir.pref.imp,dir.pref.slope,
+                R2,H.R2,V.R2)
+                
+}
+measureCell<-function(x){
+  #Remove bad fixations that are too short or are outside of the normal range of eye movements
+  x<- filter(x,dur>200,abs(mean.R.H)<50,abs(mean.L.H)<50)
+  
+  #calculate linear regression models on horizontal, vertical and combined
+  #calculate each eye separately 
+  mRH<-lm(meanFR~mean.R.H,data=x)
+  mLH<-lm(meanFR~mean.L.H,data=x)
+  mRV<-lm(meanFR~mean.R.V,data=x)
+  mLV<-lm(meanFR~mean.L.V,data=x)
+  mRHV<-lm(meanFR~mean.R.H+mean.R.V,data=x)
+  mLHV<-lm(meanFR~mean.L.H+mean.L.V,data=x)
+  
+  #calculate using mean eye position:
+  mH<-lm(meanFR~mean.H,data=x)
+  mV<-lm(meanFR~mean.V,data=x)
+  mHV<-lm(meanFR~mean.H+mean.R.V,data=x)
+
+  
+  #Summarize desired information about models
+  RH.p=anova(mRH)$'Pr(>F)'[1]
+  LH.p=anova(mLH)$'Pr(>F)'[1]
+  LV.p<- anova(mLV)$'Pr(>F)'[1]
+  RV.p<- anova(mRV)$'Pr(>F)'[1]
+  RH<-as.numeric(coef(mRHV)[2])
+  RV<-as.numeric(coef(mRHV)[3]) 
+  LH<-as.numeric(coef(mLHV)[2])
+  LV<-as.numeric(coef(mLHV)[3])  
+  
+  H.p=anova(mH)$'Pr(>F)'[1]
+  V.p<- anova(mV)$'Pr(>F)'[1]
+  H<-as.numeric(coef(mHV)[2])
+  V<-as.numeric(coef(mHV)[3]) 
+
+  
+  
+  #two methods to calculate direction preferences:
+
+  #calculate direction preference using slopes of regression lines
+  dir.pref.R<-as.numeric(atan2(RV,RH))*180/pi
+  dir.pref.L<-as.numeric(atan2(LV,LH))*180/pi
+  
+  #calculate direction preference using relative importance of horizontal and vertical
+  br=as.numeric(calc.relimp(mRHV)$lmg)
+  bl=as.numeric(calc.relimp(mLHV)$lmg)
+  dir.imp.R<- atan2(br[2]*sign(RV),br[1]*sign(RH))*180/pi
+  dir.imp.L<- atan2(bl[2]*sign(LV),bl[1]*sign(LH))*180/pi
+  
+  any.sig=RV.p<0.001 | LV.p<0.001| LH.p <0.001| RH.p<0.001
+  R2R<-summary(mRHV)$r.squared
+  R2L<- summary(mLHV)$r.squared
+  R2<- summary(mHV)$r.squared
+  H.R2<- summary(mH)$r.squared #conj horizontal fit only
+  V.R2<- summary(mV)$r.squared #conj vertical fit only
+  
+  #Calculate RMSE - compare with R-squared?
+  # rmseR=sqrt(c(crossprod(mRHV$residuals))/mRHV$df.residual)
+  # rmseL=sqrt(c(crossprod(mLHV$residuals))/mLHV$df.residual)
+  rmseR=summary(mRHV)$sigma
+  rmseL=summary(mLHV)$sigma
+  
+  #Calculate relationship between firing rate and standard deviation
+  msd=lm(sd.sdf~meanFR,data=x)
+  sd.int=as.numeric(coef(msd)[1])
+  sd.slope=as.numeric(coef(msd)[2])
+  
+  #This data frame that I am returning is getting kind of big. 
+  #I plan to remove the unused measurements once I am past the exploratory phase
+  d<-data.frame(neuron=unique(x$neuron),
+                RH=RH,RV=RV,LH=LH,LV=LV,dir.pref.R=dir.pref.R,dir.pref.L=dir.pref.L,
+                RH.p=RH.p,LH.p=LH.p,RV.p=RV.p,LV.p=LV.p,any.sig=any.sig,
+                H.p=H.p,V.p=V.p,H=H,V=V,
+                R2R,R2L,dir.imp.R,dir.imp.L,R2=R2,
+                rmseR=rmseR,rmseL=rmseL,sd.int,sd.slope)
+}
+zp %>%
+  group_by(neuron) %>%
+  do(measureCell(.)) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  zm
+
+zp %>%
+  group_by(neuron) %>%
+  do(conj.measureCell(.)) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  zmc
+
+```
+
+#Results
+
+##Fixation Analysis
+A significant challenge in comparing the activity of INC neurons between normal and strabismic animals is the variety of neuronal types present in the normal INC. So-called irregular cells have been identified with lower firing rates and less consistent firing rates. Some of these cells may be burst neurons that become tonically active when the animals are drowsy. Others may have activity related to the position or movement of the head. Fukushima (1990a) described pitch cells with higher coefficients of variation (standard deviation divided by mean of firing rate) and lower mean firing rates in cats. Because our animals did not move their heads.
+
+###Note about regression
+Even though we are using a simple linear regression analysis on this dataset, we still must make several choices regarding the regression. For each cell, we can compare the firing rate to the Right eye, the Left eye or the cyclopean (mean) eye position. Further, we can regress horizontal and vertical using individual lines (FR ~ H or FR ~ V), or we can use multiple regression to fit the line that includes both horizontal and vertical eye position (FR ~ H + V). 
+
+In the following plot, notice that when we plot firing rate as a function of horizontal eye position for the first cell from the normal animal, the firing rate actually reflects the vertical eye position, which makes the plot reflect the radial spread of target locations. If there is any bias in the presentation of targets, it will appear that the cell has a sensitivity to horizontal eye position. This is especially important for analyzing the data from the strabismic animals as they did not always look equally at targets in all locations. For this reason, considering both horizontal and vertical eye position at the same time is an essential test for the cell's preferred direction. 
+
+
+```{r RegularCells,fig.height=7,fig.width=6}
+Ncell<- 'Bee-106'
+Scell<- 'DC-902'
+
+maxEP<- 25
+zp<- filter(zp,
+            dur>200,
+            abs(mean.R.H)<maxEP,
+            abs(mean.L.H)<maxEP,
+            abs(mean.R.V)<maxEP,
+            abs(mean.L.V)<maxEP,
+            meanFR<500)
+
+tab<-zmc %>%
+  filter(neuron %in% c(Ncell,Scell)) %>%
+  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
+
+nV<-ggplot(zp %>% filter(neuron==Ncell))+
+  geom_point(aes(mean.V,meanFR),color='purple')+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('Normal\nMean Firing Rate (spk/s)')
+
+nH<-ggplot(zp %>% filter(neuron==Ncell))+
+  geom_point(aes(mean.H,meanFR),color='orange')+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('')
+
+sV<-ggplot(zp %>% filter(neuron==Scell))+
+  geom_point(aes(mean.V,meanFR),color='purple')+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Vertical Eye Position (deg)')+
+  ylab('Exotrope\nMean Firing Rate (spk/s)')
+
+sH<-ggplot(zp %>% filter(neuron==Scell))+
+  geom_point(aes(mean.H,meanFR),color='orange')+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Horizontal Eye Position (deg)')+
+  ylab('')
+
+
+dir.imp<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=neuron))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction preference\nusing relative importance')
+
+dir.slope<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.slope,xend=dir.pref.slope,color=neuron))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction Preference\nusing slopes')
+
+multiplot(nV,sV,dir.slope,nH,sH,dir.imp,cols=2)
+
+kable(tab,digits=2)
+
+```
+
+Above are examples of regular vertical burst tonic cells from a normal animal and an exotrope. 
+
+
+
+```{r Irregular,fig.height=7,fig.width=6}
+Ncell<- 'Bee-118'
+Scell<- 'DC-910'
+
+tab<-zmc %>%
+  filter(neuron %in% c(Ncell,Scell)) %>%
+  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
+
+nV<-ggplot(zp %>% filter(neuron==Ncell))+
+  geom_point(aes(mean.V,meanFR),color='purple')+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('Normal\nMean Firing Rate (spk/s)')
+
+nH<-ggplot(zp %>% filter(neuron==Ncell))+
+  geom_point(aes(mean.H,meanFR),color='orange')+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('')
+
+sV<-ggplot(zp %>% filter(neuron==Scell))+
+  geom_point(aes(mean.V,meanFR),color='purple')+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Vertical Eye Position (deg)')+
+  ylab('Exotrope\nMean Firing Rate (spk/s)')
+
+sH<-ggplot(zp %>% filter(neuron==Scell))+
+  geom_point(aes(mean.H,meanFR),color='orange')+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Horizontal Eye Position (deg)')+
+  ylab('')
+
+dir.imp<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=neuron))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction preference\nusing relative importance')
+
+dir.slope<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.slope,xend=dir.pref.slope,color=neuron))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction Preference\nusing slopes')
+
+multiplot(nV,sV,dir.slope,nH,sH,dir.imp,cols=2)
+
+kable(tab,digits=2)
+
+```
+
+Example irregular cells.
+
+Now let's plot the direction preferences for all the cells using this method:
+
+```{r DirectionPlots,fig.height=9}
+
+ggplot(zmc)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=1)+
+  xlab('Direction preference\nusing relative importance')
+
+```
+
+But some of these cells do not have a detectable sensitivity to eye position. Using a threshold of p<0.001, we remove 18/83 of these cells:
+
+```{r DirectionPlotsSignificant,fig.height=9}
+
+ggplot(zmc %>% filter(any.sig))+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=1)+
+  xlab('Direction preference\nusing relative importance')
+
+```
+
+
+There appears to be a negative correlation between abnormal direction preference and goodness of fit. 
+
+```{r DirPrefR2}
+
+ggplot(zmc %>% filter(any.sig))+
+  geom_point(aes(90-abs(dir.pref.imp),R2,color=monkey),size=2)+
+  theme_minimal()+
+  xlab('Direction preference away from vertical')
+
+```
+
+
+Let's scale these lines by the goodness of fit:
+
+```{r DirectionPlotsScaled,fig.height=9}
+
+ggplot(zmc %>% filter(any.sig))+
+  geom_segment(aes(y=0,yend=R2,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=1)+
+  xlab('Direction preference\nusing relative importance')
+
+```
+
+Let's look at some of the cells with abnormal direction preferences. First I'll make the same plots as above. Then I will look into the differences in interspike intervals. 
+
+```{r weirdcells,fig.height=7}
+W1<-'Bee-118'
+W2<-'DC-915'
+
+
+tab<-zmc %>%
+  filter(neuron %in% c(W1,W2)) %>%
+  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
+
+nV<-ggplot(zp %>% filter(neuron==W1))+
+  geom_point(aes(mean.V,meanFR),color='purple')+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('Normal\nMean Firing Rate (spk/s)')
+
+nH<-ggplot(zp %>% filter(neuron==W1))+
+  geom_point(aes(mean.H,meanFR),color='orange')+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('')
+
+sV<-ggplot(zp %>% filter(neuron==W2))+
+  geom_point(aes(mean.V,meanFR),color='purple')+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Vertical Eye Position (deg)')+
+  ylab('Exotrope\nMean Firing Rate (spk/s)')
+
+sH<-ggplot(zp %>% filter(neuron==W2))+
+  geom_point(aes(mean.H,meanFR),color='orange')+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Horizontal Eye Position (deg)')+
+  ylab('')
+
+dir.imp<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=neuron))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction preference\nusing relative importance')
+
+dir.slope<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.slope,xend=dir.pref.slope,color=neuron))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction Preference\nusing slopes')
+
+multiplot(nV,sV,dir.slope,nH,sH,dir.imp,cols=2)
+
+kable(tab,digits=2)
+
+```
+
+What is the source of thid additional variabilty? In the normal animals, there have been "pitch cells" described that respond to movements of the head, and "irregular" cells that seem to not encode spontaneous eye movements but do respond to visual tracking. It's difficult to say how those cell types might related to the strabismic animal simply because I don't have recordings of those cell types from a normal animal using the same setup to be able to compare. I can only look at the figures and tables plotted in published works, but those data are limited. I'll have to go through Mark's notes from Bee's recordings to see if he describes any more abnormal cells than the couple in the dataset. 
+
+
+```{r CV}
+plotCells<- c('Bee-106','DC-902','Bee-118','DC-915')
+toPlot<-list()
+for (i in seq_along(plotCells)){
+  zp %>%
+    filter(neuron==plotCells[i],meanFR>1) %>%
+    ggplot()+
+    geom_point(aes(mean.V,sd.sdf/meanFR))+
+    ggtitle(plotCells[i])->
+    toPlot[[i]]
+}
+
+multiplot(plotlist=toPlot,cols=2)
+
+
+zp %>%
+  filter(neuron %in% plotCells,meanFR>1,abs(mean.V)<5) ->
+  forCVplot
+
+forCVplot %>%
+  group_by(neuron) %>%
+  summarize(mean.CV=mean(sd.sdf/meanFR,na.rm=T),
+            mean.FR=mean(meanFR,na.rm=T))->
+  cvmeans
+
+forCVplot %>%
+  ggplot()+
+  geom_point(aes(mean.V,sd.sdf/meanFR))+
+  facet_wrap(~neuron,ncol=2)+
+  geom_hline(aes(yintercept = mean.CV),data=cvmeans)
+
+kable(cvmeans,digits = 2)
+
+```
+
+![FukushimaCatCV](catCV.png)
+
+Above is the figure from Fukushima et al 1991. These data are from cats.
+
+###CV plots
+
+```{r CVall}
+
+zp %>%
+  filter(meanFR>1,abs(mean.V)<5) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE) %>%
+  group_by(neuron,monkey) %>%
+  summarize(mean.CV=mean(sd.sdf/meanFR,na.rm=T),
+            mean.FR=mean(meanFR,na.rm=T))->
+  cvmeans
+
+zmc %>%
+  select(neuron,R2) %>%
+  left_join(cvmeans,.,by='neuron')->
+  cvmeans
+
+ggplot(cvmeans)+
+  geom_point(aes(mean.CV,mean.FR,color=monkey,size=R2),alpha=0.5)+
+  xlim(0,2)+
+  ylim(0,150)+
+  scale_x_log10() 
+
+cvmeans %>%
+  filter(mean.CV>0) %>%
+  arrange(mean.CV) %>%
+  select(-monkey) %>%
+  kable(digits=2)
+
+```
+
+To examine what is happening here, let's look at the two cells from the normal animal that have the highest and lowest mean CV. 
+
+```{r HighestandLowestCV,fig.height=7}
+
+multiplot(plotlist=compare2cells(zp,zmc,'Bee-123','Bee-124'),cols=2)
+
+```
+
+As you can see from this plot, the explanation for the extremely low firing rate and high CV for the first cell is that the cell does not begin to encode vertical eye position until the eyes are above the central position. Why weren't any cells of this type described in previous papers?
+
+We will have to take x-intercept into account for this analysis. Do the previous studies define the "primary position in the orbits" differently depending on the firing rate of the cells? 
+
+###low CV cells in strabismus
+
+```{r LowCVstrabismus,fig.height=7}
+
+multiplot(plotlist=compare2cells(zp,zmc,'Kopachuck-907','Kopachuck-943'),cols=2)
+
+```
+<!-- ```{r plotting} -->
+
+<!-- zm %>%  -->
+<!--   select(neuron,monkey,cellnum,R2R,R2L,dir.pref.R,dir.pref.L) %>%  -->
+<!--   mutate(r.skew=90-abs(dir.pref.R), -->
+<!--          l.skew=90-abs(dir.pref.L), -->
+<!--          m.skew=90-abs((dir.pref.R+dir.pref.L)/2))-> -->
+<!--   skew -->
+
+<!-- ggplot(skew)+ -->
+<!--   geom_point(aes(m.skew,R2R)) -->
+
+<!-- ggplot(skew)+ -->
+<!--   geom_point(aes(m.skew,R2R))+ -->
+<!--   geom_point(aes(l.skew,R2L),color='blue')+ -->
+<!--   geom_point(aes(r.skew,R2R),color='red') -->
+
+<!-- ggplot(skew)+ -->
+<!--   geom_point(aes(abs(m.skew),R2R))+ -->
+<!--   stat_smooth(aes(abs(m.skew),R2R),se=FALSE) -->
+
+<!-- zp<- filter(zp,dur>200,abs(mean.R.H)<50,abs(mean.L.H)<50,abs(mean.R.V)<50,abs(mean.L.V)<50,meanFR<500) -->
+
+<!-- chosenCell='DC-915' -->
+
+<!-- zm %>% filter(neuron==chosenCell) %>% select(neuron,R2R,R2L,dir.pref.R,dir.pref.L) %>% kable() -->
+
+
+<!-- ggplot(zp %>% filter(neuron==chosenCell))+ -->
+<!--   geom_point(aes(mean.R.H,meanFR),color='red')+ -->
+<!--   geom_point(aes(mean.L.H,meanFR),color='blue') -->
+
+<!-- ggplot(zp %>% filter(neuron==chosenCell))+ -->
+<!--   geom_point(aes(mean.R.V,meanFR),color='red')+ -->
+<!--   geom_point(aes(mean.L.V,meanFR),color='blue') -->
+
+<!-- ggplot(zp %>% filter(neuron==chosenCell))+ -->
+<!--   geom_point(aes(mean.V,meanFR),color='purple')+ -->
+<!--   geom_point(aes(mean.H,meanFR),color='orange')+ -->
+<!--   stat_smooth(aes(mean.V,meanFR),color='purple',method='lm')+ -->
+<!--   stat_smooth(aes(mean.H,meanFR),color='orange',method='lm') -->
+
+<!-- ggplot(zm %>% filter(neuron==chosenCell,any.sig))+ -->
+<!--   geom_segment(aes(y=0,yend=1,x=dir.pref.R,xend=dir.pref.R),color='red')+ -->
+<!--   geom_segment(aes(y=0,yend=1,x=dir.pref.L,xend=dir.pref.L),color='blue')+ -->
+<!--   scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+ -->
+<!--   coord_polar(start=pi/2,direction=-1)+ -->
+<!--   facet_wrap(~monkey)+ -->
+<!--   theme_minimal() -->
+
+<!-- ggplot(zm %>% filter(neuron==chosenCell))+ -->
+<!--   geom_segment(aes(y=0,yend=1,x=dir.pref.R,xend=dir.pref.R),color='red')+ -->
+<!--   geom_segment(aes(y=0,yend=1,x=dir.pref.L,xend=dir.pref.L),color='blue')+ -->
+<!--   scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+ -->
+<!--   coord_polar(start=pi/2,direction=-1)+ -->
+<!--   facet_wrap(~monkey)+ -->
+<!--   theme_minimal() -->
+
+
+<!-- zp %>% filter(neuron==chosenCell) %>% lm(meanFR~mean.R.V+mean.R.H,data=.) -> m -->
+
+<!-- zp %>% filter(neuron==chosenCell) %>% mutate(pFR=predict(m,newdata=.))-> -->
+<!--   zpp -->
+
+<!-- qplot(mean.V,pFR,data=zpp)+geom_point(aes(mean.V,meanFR),color='hotpink') -->
+<!-- qplot(mean.H,pFR,data=zpp)+geom_point(aes(mean.H,meanFR),color='hotpink') -->
+<!-- ``` -->
+
+<!-- ```{r multiplot} -->
+<!-- for (chosenCell in unique(zp$neuron)){ -->
+<!--   print( -->
+<!-- ggplot(zp %>% filter(neuron==chosenCell))+ -->
+<!--   geom_point(aes(mean.V,meanFR),color='purple')+ -->
+<!--   geom_point(aes(mean.H,meanFR),color='orange')+ -->
+<!--   stat_smooth(aes(mean.V,meanFR),color='purple',method='lm')+ -->
+<!--   stat_smooth(aes(mean.H,meanFR),color='orange',method='lm')+ -->
+<!--   ggtitle(chosenCell) -->
+<!-- )} -->
+<!-- ``` -->
+
+<!-- ```{r boxplots} -->
+<!-- #Analysis -->
+<!-- # """ -->
+<!-- # Based on the above plots and careful examination of the data, it seems that the most significant -->
+<!-- # difference between the normal INC cells and those found in strabismus is simply the goodness of the -->
+<!-- # position have such varied mean firing rates. -->
+<!-- # """ -->
+<!-- #Bee-118 - oblique direction cell from a normal animal -->
+<!-- #Bee-110 - perfect vertical (down) cell  -->
+
+<!-- zp %>% -->
+<!--   group_by(neuron) %>% -->
+<!--   mutate(bin.R.V=cut(mean.R.V,seq(-25,25,by=10)))-> -->
+<!--   zp -->
+
+<!-- for (chosenCell in unique(zp$neuron)){ -->
+<!--   print(   -->
+<!-- zp %>% -->
+<!--   filter(neuron==chosenCell, -->
+<!--          !is.na(bin.R.V)) %>% -->
+<!--   # filter(neuron %in% c('Bee-110','Bee-118'), -->
+<!--   # filter(neuron %in% c('DC-912','DC-915'), -->
+<!--   #        bin.R.V=='(-5,5]') %>% -->
+<!--   ggplot()+ -->
+<!--   geom_boxplot(aes(bin.R.V,meanFR,color=neuron))#+ -->
+<!--   # geom_point(aes(mean.R.V,meanFR,color=neuron)) -->
+<!-- )} -->
+<!-- ``` -->
+
+<!-- ```{r irregular} -->
+<!-- #This chunk I will use to estimate the standard deviation of the firing rate during fixation. -->
+<!-- #The hypothesis is that the irregular cells have more variability of the ISI -->
+<!-- #Cells where there are missing spikes seem to show reduced variability at higher firing rates -->
+<!-- #so just fit a linear model and look at the intercept and the  -->
+<!-- slope -->
+<!-- ``` -->
+
+<!-- ```{r unfinished} -->
+<!-- chosenCell='Bee-108' -->
+<!-- t %>%  -->
+<!--   filter(neuron==chosenCell) %>% -->
+<!--   left_join(filter(zp,neuron==chosenCell),by='dsnum') -> -->
+<!--   tplot -->
+
+<!-- tplot %>% -->
+<!--   group_by(dsnum) %>% -->
+<!--   mutate(counter=row_number(), -->
+<!--          dur=n(), -->
+<!--          sd.sdf=sd(sdf10))-> -->
+<!--   tplot -->
+
+<!-- tplot%>% -->
+<!--   filter(dsnum<0)%>% -->
+<!--   # filter(dur<2000,dsnum<0,max(rep)<75)%>% -->
+<!--   ggplot()+ -->
+<!--   geom_line(aes(counter,rep,group=dsnum))+ -->
+<!--   geom_line(aes(counter,repV,group=dsnum))+ -->
+<!--   ggtitle('Eye position during identified fixations- a test of the algorithm') -->
+
+
+<!-- tplot %>% -->
+<!--   mutate(showrasters=replace(rasters,rasters<1,NA)) %>% -->
+<!--   filter(dsnum<0,dur<1000,dur>200,bin.R.V=='(-5,5]')%>% -->
+<!--   ggplot()+ -->
+<!--   geom_point(aes(counter,showrasters*meanFR,color=as.factor(dsnum)),shape='|')+ -->
+<!--   theme_minimal()+ -->
+<!--   ggtitle('Spike rasters during fixations within 5 degrees of centered vertically')+ -->
+<!--   theme(legend.position='none')+ -->
+<!--   xlab(chosenCell) -->
+
+<!-- tplot %>% -->
+<!--   filter(dsnum<0) %>% -->
+<!--   group_by(dsnum) %>% -->
+<!--   summarize_each(funs(first))-> -->
+<!--   stplot -->
+
+<!-- qplot(meanFR, sd.sdf,data=stplot) -->
+
+<!-- ggplot(zm,aes(sd.slope,R2R))+ -->
+<!--   geom_text(aes(label=neuron),data=filter(zmm,abs(sd.slope)>0.15))+ -->
+<!--   geom_point(size=3,aes(color=abs(90-abs(dir.imp.R)))) -->
+
+
+
+<!-- #The ultimate goal here is to try to identify what the unexplained variance is caused by -->
+
+<!-- #This may be a goal that needs to be abandoned. If the other variance is due to factors that we don't record, such as body position, torsion, etc, then we will just have to call them irregular cells.  -->
+
+<!-- #King et al 1981 suggests that irregular cells are related to eye position during pursuit but not spontaneous movement. I wonder why.  -->
+
+<!-- ``` -->
+
+<!-- ```{r CV} -->
+
+<!-- for (chosenCell in unique(zp$neuron)){ -->
+<!--   print(   -->
+<!--     zp %>% -->
+<!--       filter(neuron==chosenCell,meanFR>1) %>% -->
+<!--       ggplot()+ -->
+<!--       geom_point(aes(mean.V,sd.sdf/meanFR))+ -->
+<!--       ggtitle(chosenCell) -->
+<!--   )} -->
+<!-- ``` -->

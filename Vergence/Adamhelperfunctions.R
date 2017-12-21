@@ -445,21 +445,18 @@ loadnewcsv2<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Verg
   return(t)
 }
 
-#This function is an R implementation of a two-threshold event marker
-#The algorithm works like this: Find all the times when velocity is above the high threshold
-#Extend this out until velocity is below the lower threshold
-
-#in practice, I'm identifying all the times that the saccades cross the low threshold and then rejecting 
-#any that don't meet the higher threshold
-#I'm also rejecting events that are below a certain duration
-
-#this algorithm also assigns positive ID numbers to the saccades and 
-#negative ID numbers to the non-saccades (fixations?)
-#after running this function, you can group_by(event) and measure the fixations or saccades as you wish
-
-
 markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5,maxreject=1000){
+  #This function is an R implementation of a two-threshold event marker
+  #The algorithm works like this: Find all the times when velocity is above the high threshold
+  #Extend this out until velocity is below the lower threshold
   
+  #in practice, I'm identifying all the times that the saccades cross the low threshold and then rejecting 
+  #any that don't meet the higher threshold
+  #I'm also rejecting events that are below a certain duration
+  
+  #this algorithm also assigns positive ID numbers to the saccades and 
+  #negative ID numbers to the non-saccades (fixations?)
+  #after running this function, you can group_by(event) and measure the fixations or saccades as you wish
   require(dplyr)
   require(data.table) #for rbindlist - a fast version of do.call('rbind') that uses data.table
   datalength<-length(v)
@@ -567,17 +564,18 @@ markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5,maxreject
   
 }
 
-# Multiple plot function
-#http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
-# - cols:   Number of columns in layout
-# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
-#
-# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
-# then plot 1 will go in the upper left, 2 will go in the upper right, and
-# 3 will go all the way across the bottom.
-#
+
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  # Multiple plot function
+  #http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
+  # ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+  # - cols:   Number of columns in layout
+  # - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+  #
+  # If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+  # then plot 1 will go in the upper left, 2 will go in the upper right, and
+  # 3 will go all the way across the bottom.
+  #
   library(grid)
   
   # Make a list from the ... arguments and plotlist
