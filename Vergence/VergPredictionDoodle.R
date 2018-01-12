@@ -7,7 +7,7 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
   if (!('time' %in% names(x))){
     x<- mutate(x,time=row_number())
   }
-  parabolic_n<- 10
+  parabolic_n<- 15
   x %>%
     mutate(verg.velocity=parabolicdiff(lep-rep,parabolic_n),
            rev=parabolicdiff(rep,parabolic_n),
@@ -70,7 +70,7 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
 
 bufferlength=400
 
-modelVV2(t,chosenCell='Bee-01',lagsdf=20,
+modelVV2(t,chosenCell='Bee-33',lagsdf=30,
               model.form='verg.velocity~sdf20+verg.angle',
          # model.form='sdf20~verg.velocity+verg.angle',
               saccadebuffer=bufferlength) %>%

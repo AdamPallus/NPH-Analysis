@@ -190,6 +190,7 @@ return(list(nV,sV,dir.slope,nH,sH,dir.imp))
 }
 
 ```
+
 ```{r Fixation_Analysis,cache=FALSE}
 #In this chunk, we calculate direction preferences for each  neuron based on the measured fixations
 conj.measureCell<- function(x,maxEP=25){
