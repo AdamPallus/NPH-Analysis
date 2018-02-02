@@ -7,19 +7,20 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
   if (!('time' %in% names(x))){
     x<- mutate(x,time=row_number())
   }
-  parabolic_n<- 15
+  parabolic_n<- 20
   x %>%
     mutate(verg.velocity=parabolicdiff(lep-rep,parabolic_n),
            rev=parabolicdiff(rep,parabolic_n),
            lev=parabolicdiff(lep,parabolic_n),
            revV=parabolicdiff(repV,parabolic_n),
            levV=parabolicdiff(lepV,parabolic_n),
-           sdf=spikedensity(rasters,sd=10),
+           sdf=spikedensity(rasters,sd=25),
            sdf20=dplyr::lag(sdf,lagsdf),
            conj.velocity=sqrt(((rev+lev)/2)^2+((revV+levV)/2)^2)) ->
     x
   # x<- mutate(x,saccadic=markSaccades(conj.velocity,buffer=5,threshold=20)>0)
-  x<-  mutate(x,saccadic=!is.na(markSaccadesDoubleDrift(conj.velocity)))
+    x<-  mutate(x,saccadic=!is.na(markSaccadesDoubleDrift(conj.velocity)))
+    
   x<- joinsaccades(x,buffer=saccadebuffer,threshold=saccadethreshold)
   x %>%
     group_by(sacnum) %>%
@@ -35,11 +36,26 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
            )->
     x
   
-  xm<- group_by(x,time) %>% summarize_each(funs(first))
+  xm<- group_by(x,time) %>% summarize_all(funs(first))
   # x<- mutate(x,saccadic=!is.na(sacnum))
-  mod<- lm(model.form,data=filter(xm,!saccadic,verg.velocity>0))
+  
+  ###############
+  ##Make sure to uncomment this line to make future figures!
+  ##############
+  #Note: For divergence cells, you want to show the model diverging movements,
+  #so you can't use velocity >0. I used velocity > 0 for cell that didn't fire at all
+  #when the eyes were diverging. They would fire 0 spikes whether it was -5 or -50 deg/s, 
+  #so trying to train a linear model with that only made the fit worse.
+  
+  #Depending on the firing rate of the cell, you might be able to model other movements.
+  #For the cell patos 102 (from 9.09.2013), I was using from -30 to 8 deg/s
+  
+  #It might be worth trying to remove the pre and post saccadic vergence to model just slowverg
+  
+                mod<- lm(model.form,data=filter(xm,!saccadic,verg.velocity>0))
   # mod<- lm(model.form,data=filter(x,!saccadic))
   # mod<- lm(model.form,data=filter(xm,verg.velocity>0))
+  # mod<- lm(model.form,data=filter(xm,!saccadic,verg.velocity<8,verg.velocity> -30))
   
   # mod<-lm(model.form,data=xm)
   # mod<- lm(model.form,data=filter(x,!isconj))
@@ -70,7 +86,7 @@ modelVV2<- function(t,chosenCell='Bee-113',saccadebuffer=20,saccadethreshold=30,
 
 bufferlength=400
 
-modelVV2(t,chosenCell='Bee-33',lagsdf=30,
+modelVV2(ttest,chosenCell='Patos-105',lagsdf=20,
               model.form='verg.velocity~sdf20+verg.angle',
          # model.form='sdf20~verg.velocity+verg.angle',
               saccadebuffer=bufferlength) %>%

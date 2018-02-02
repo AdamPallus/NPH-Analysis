@@ -1,0 +1,220 @@
+---
+title: "Gaze Shifts"
+author: "Adam"
+date: "January 26, 2018"
+output: 
+html_document: 
+self_contained: no
+runtime: shiny
+---
+
+* Thick gray line is target position.
+* Green line is gaze position.
+* Blue line is head position.
+* Dashed green line is gaze velocity (plotted 1/10th scale)
+* Dashed blue line is head velocity (plotted 1/10th scale)  
+     + The highlighted segments of the gaze and head velocity traces are the identified movements.
+     + The first eye-saccade and head movement that occur after the target moves is marked on the velocity trace.
+     + Additional saccades and head movements are marked with horizontal lines
+     + Trials where there is missing data within the first 1000 ms of the target's movement are labeled
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
+
+```{r,message=FALSE}
+
+```{r setup, include=FALSE,message=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(knitr)
+library(tidyr)
+library(manipulate)
+# library(broom)
+# library(grid)
+# library(relaimpo)
+# library(leaps)
+#library(data.table)
+# library(stringr)
+library(dplyr)
+library(cladoRcpp)
+select<-dplyr::select
+# source('joinsaccadesuniform.R')
+source('Adamhelperfunctions.R')
+source('markSaccadesDouble2.R')
+markTagetMovements<-function(t,buffer=200,threshold=1000,saccade.length=1000){
+  
+  findSaccades<-function(ev,threshold=40){
+    mindur<- 1
+    i<-which(abs(ev)>threshold) #find all the times when speed > threshold
+    sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
+    sacon<-c(1,sacoff+1) #first saccade
+    sacoff<-c(sacoff,length(i)) #end of last saccade
+    saccade.onset<-i[sacon] #get actual times
+    saccade.offset<-i[sacoff] 
+    
+    return(data.frame(saccade.onset,saccade.offset))
+  }
+  
+  jsac<- function(stimes){
+    summary(stimes)
+    #input should be an array of length 2: c(onsettime,offsettime, saccade.number,saccade.dur)
+    df<- data.frame(time=stimes[[1]]:stimes[[2]])
+    df$sacnum<- stimes[[4]]
+    df$saccade.dur<- stimes[[3]]
+    return(df)
+    # return(stimes[[1]]:stimes[[2]])
+  }
+  
+  stimes<-findSaccades(t$target.velocity,threshold)
+  stimes %>%
+    mutate(dur=saccade.offset-saccade.onset,
+           s=row_number(),
+           saccade.onset=saccade.onset-buffer,
+           ###########HERE IS WHERE i MAKE SACCADES UNIFORM #######
+           saccade.offset=saccade.onset+saccade.length+2*buffer)->
+    stimes
+  
+  x<- as.data.frame(rbindlist(apply(stimes,1,jsac)))
+  x %>%
+    group_by(sacnum) %>%
+    mutate(counter=time-first(time)) ->
+    x
+  left_join(t,x,by='time')
+}
+
+loadnewheadfree<- function(filename){
+  h<- read.csv(filename,sep='\t',header=FALSE)
+  h<- select(h,-V9)
+  
+  names(h)<- c('G','GV','H','HV','E','EV','time','T','block','subject','blocknum')
+  
+  h %>% 
+    # filter(block=='A-02')%>%
+    select(G,H,T,block) %>% #these are the only data we need 
+    group_by(block) %>%
+    mutate(G=replace(G,G==0,NA), #mark missing data as NA rather than 0
+           #G=na.approx(G,na.rm=FALSE),
+           time=row_number(),
+           Gv=parabolicdiff(G,7)*samplerate, #calculate velocity
+           Hv=parabolicdiff(H,7)*samplerate,
+           target.velocity=parabolicdiff(T,7)*samplerate,
+           # gazeshifts=markSaccades(Gv,buffer=5,threshold=30),
+           gazeshifts=markSaccadesDouble(Gv,threshold1=100,threshold2=10),
+           headmovement=markSaccadesDouble(Hv,threshold1=10,threshold2=4),
+           #algorithm marks non-movements (fixations) as negative so remove them
+           headmovement=replace(headmovement,headmovement<0,0), 
+           gazeshifts=replace(gazeshifts,gazeshifts<0,0)) ->
+    htesta
+  
+  htesta%>%
+    # filter(block=='A-02')%>%
+    group_by(block) %>%
+    #identify movements and mark 200ms before and 500ms after each movement as "sacnum"
+    do(markTagetMovements(t=.,buffer=200,threshold=200,saccade.length=500)) ->
+    htest
+  
+  htest%>%
+    filter(!is.na(sacnum))%>% #get rid of all data that isn't part of the marked target movement periods
+    group_by(block,sacnum) %>% #look at each target movement individually
+    #time of first gaze shift - we want to ignore gaze shifts that start before the target actually moved
+    mutate(firstshift=min(gazeshifts[counter>220&gazeshifts>0],na.rm=T), 
+           firsthead=min(headmovement[counter>220&headmovement>0],na.rm=T),
+           primarygazeshifts=replace(gazeshifts,
+                                     gazeshifts!=firstshift|is.na(firstshift),
+                                     0), #the first "eye saccade" we're calling the primary gaze shift
+           primaryheadmovement=replace(headmovement,
+                                       headmovement!=firsthead|is.na(firsthead),
+                                       0),
+           #for easier analysis/plotting, use NA rather than 0 for non-movements 
+           gazeshifts=replace(gazeshifts,gazeshifts==0,NA),
+           primarygazeshifts=replace(primarygazeshifts,primarygazeshifts==0,NA),
+           headmovement=replace(headmovement,headmovement==0,NA),
+           primaryheadmovement=replace(primaryheadmovement,primaryheadmovement==0,NA),
+           counter=counter-200,
+           tcounter=round(counter/samplerate))->
+    hh
+}
+```
+
+
+
+
+```{R SHINYTRY, warning=FALSE}
+#In order to make the shiny app load fast, I'm just saving the output. See BoostrapSaccades.Rmd for the actual analysis.
+# z<-readRDS(file="Bee13forshiny.RDS")
+# hh<- readRDS('knightdemo.RDS')
+hh<- readRDS('knightdemo2.RDS')
+
+plotTrial<- function(hh){
+  # cat(hh$blinktrial[1])
+  gp<- ggplot(hh)+
+    geom_line(aes(tcounter,H),color='blue')+
+    # geom_line(aes(tcounter,Ef),color='red')+
+    geom_line(aes(tcounter,G),color='darkgreen')+
+    geom_line(aes(tcounter,T),size=2,alpha=0.5)+
+    geom_line(aes(tcounter,Hv/10),color='blue',linetype=2)+
+    # geom_line(aes(tcounter,EV/10),color='red')+
+    geom_line(aes(tcounter,Gv/10),color='darkgreen',linetype=2)+
+    # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+    geom_point(aes(tcounter,sign(gazeshifts)*50),color='darkgreen')+
+    geom_point(aes(tcounter,sign(headmovement)*25),color='blue')+
+    geom_line(aes(tcounter,sign(primarygazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+    # geom_line(aes(tcounter,sign(gazeshifts)*Gv/10),size=2,color='yellow',alpha=0.5)+
+    geom_line(aes(tcounter,sign(primaryheadmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+    xlab('Time (ms)')
+    
+    # geom_line(aes(tcounter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+    blink<- hh$blinktrial[1]
+    if(blink | is.na(blink)){
+      gp<-gp+geom_label(x=0,y=0,label='BLINK INTERRUPTED')
+    }
+    gp
+    
+}
+
+
+inputPanel(
+  
+  selectInput(inputId= 'blockChoice',
+              label='Choose block:',
+              choices=list('A-01','A-02')),
+  
+  sliderInput("TrialChoice", label = "Select a movement:",
+              min=1,
+              max=length(unique(hh$sacnum)),
+              value=1,
+              step=1)
+  
+
+)
+
+renderPlot({
+  
+    chosentrial<-input$TrialChoice
+    blockchoice<- input$blockChoice
+    
+    plotTrial(filter(hh,sacnum==chosentrial,block==blockchoice))
+    # 
+    # ggplot(filter(hh,sacnum==chosentrial))+
+    #           geom_line(aes(counter,H),color='blue')+
+    #          # geom_line(aes(counter,Ef),color='red')+
+    #          geom_line(aes(counter,G),color='darkgreen')+
+    #          geom_line(aes(counter,T),size=2,alpha=0.5)+
+    #          geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+    #          # geom_line(aes(counter,EV/10),color='red')+
+    #          geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+    #          # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+    #          # geom_text(x=0,y=60,aes(label=firstshift[1]))+
+    #          geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+    #          geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+    #   theme_minimal()
+
+})
+
+```
+
+
+

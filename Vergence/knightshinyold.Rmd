@@ -1,0 +1,114 @@
+---
+title: "Gaze Shifts"
+author: "Adam"
+date: "January 26, 2018"
+output: 
+html_document: 
+self_contained: no
+runtime: shiny
+---
+
+* Counter is in sample time. Multiply by samplerate/1000 to convert to ms. 
+* Thick gray line is target position.
+* Green line is gaze position.
+* Blue line is head position.
+* Dashed green line is gaze velocity (plotted 1/10th scale)
+* Dashed blue line is head velocity (plotted 1/10th scale)  
+     + The highlighted segments of the gaze and head velocity traces are the identified movements.
+     + Only the first gaze shift that occurs after the target moves is marked.
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE)
+```
+
+```{r,message=FALSE}
+
+library(ggplot2)
+library(dplyr)
+#library(knitr)
+#library(tidyr)
+#library(broom)
+#library(grid)
+# library(relaimpo)
+# library(leaps)
+#library(data.table)
+
+```
+
+
+```{R SHINYTRY, warning=FALSE}
+#In order to make the shiny app load fast, I'm just saving the output. See BoostrapSaccades.Rmd for the actual analysis.
+# z<-readRDS(file="Bee13forshiny.RDS")
+# hh<- readRDS('knightdemo.RDS')
+hh<- readRDS('knightdemo2.RDS')
+
+plotTrial<- function(hh){
+  # cat(hh$blinktrial[1])
+  gp<- ggplot(hh)+
+    geom_line(aes(counter,H),color='blue')+
+    # geom_line(aes(counter,Ef),color='red')+
+    geom_line(aes(counter,G),color='darkgreen')+
+    geom_line(aes(counter,T),size=2,alpha=0.5)+
+    geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+    # geom_line(aes(counter,EV/10),color='red')+
+    geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+    # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+    geom_point(aes(counter,sign(gazeshifts)*50),color='darkgreen')+
+    geom_point(aes(counter,sign(headmovement)*25),color='blue')+
+    geom_line(aes(counter,sign(primarygazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+    # geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='yellow',alpha=0.5)+
+    geom_line(aes(counter,sign(primaryheadmovement)*Hv/10),color='blue',size=2,alpha=0.5)
+  # geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+  blink<- hh$blinktrial[1]
+  if(blink | is.na(blink)){
+    gp<-gp+geom_label(x=0,y=0,label='BLINK INTERRUPTED')
+  }
+  gp
+  
+}
+
+
+inputPanel(
+  
+  selectInput(inputId= 'blockChoice',
+              label='Choose block:',
+              choices=list('A-01','A-02')),
+  
+  sliderInput("TrialChoice", label = "Select a movement:",
+              min=1,
+              max=length(unique(hh$sacnum)),
+              value=1,
+              step=1)
+  
+
+)
+
+renderPlot({
+  
+    chosentrial<-input$TrialChoice
+    blockchoice<- input$blockChoice
+    
+    plotTrial(filter(hh,sacnum==chosentrial,block==blockchoice))
+    # 
+    # ggplot(filter(hh,sacnum==chosentrial))+
+    #           geom_line(aes(counter,H),color='blue')+
+    #          # geom_line(aes(counter,Ef),color='red')+
+    #          geom_line(aes(counter,G),color='darkgreen')+
+    #          geom_line(aes(counter,T),size=2,alpha=0.5)+
+    #          geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+    #          # geom_line(aes(counter,EV/10),color='red')+
+    #          geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+    #          # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+    #          # geom_text(x=0,y=60,aes(label=firstshift[1]))+
+    #          geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+    #          geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+    #   theme_minimal()
+
+})
+
+```
+
+
+

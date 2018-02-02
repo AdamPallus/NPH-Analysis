@@ -16,7 +16,11 @@ t %>%
             conj.H.Amp=(R.H.Amp+L.H.Amp)/2,
             conj.V.Amp=(R.V.Amp+L.V.Amp)/2,
             peak.conj.velocity=maxabs(conj.velocity),
+            peak.H.Velocity=maxabs((rev+lev)/2),
+            peak.V.Velocity=maxabs((revV+levV)/2),
+            peakFR=max(sdf10),
             nspk=sum(rasters),
+            avgFR=nspk/dur,
             r.amp=sqrt(conj.H.Amp^2+conj.V.Amp^2),
 
             asleep=sd.conj.velocity>7.5 || dur>2000) %>%
@@ -28,6 +32,7 @@ t<- left_join(t,select(zsp,neuron,dsnum,sacID),by=c('neuron','dsnum'))
 
 
 qplot(dur,sd.verg.velocity,data=zsp)
+
 
 goodsacs=filter(zsp,R.V.Amp*L.V.Amp<0,r.amp>4,dur<200)$sacID
 
@@ -73,11 +78,62 @@ burst %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
   blm
 
+burst %>%
+  group_by(neuron) %>%
+  do(tidy(lm(peakFR~peak.H.Velocity+peak.V.Velocity,data=.))) %>%
+  mutate(term=replace(term,term=='(Intercept)','b')) %>%
+  select(term,estimate) %>%
+  spread(term,estimate) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  bvellm
+
+burst %>%
+  group_by(neuron,dsnum) %>%
+  filter(abs(peak.V.Velocity)<1000,
+         abs(peak.H.Velocity)<1000) %>%
+  summarize(
+            peakFR=first(peakFR),
+            peak.V.Velocity=first(peak.V.Velocity),
+            peak.H.Velocity=first(peak.H.Velocity),
+            avgFR=first(avgFR)*1000) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  bvellmplot
+
+ver.plot<-bvellmplot%>%
+  ggplot()+
+  geom_point(aes(peak.V.Velocity,avgFR,color=monkey),alpha=0.1)+
+  stat_smooth(aes(peak.V.Velocity,avgFR,group=neuron),color='black',method='lm',se = FALSE)+
+  facet_wrap(~monkey)+
+  ylim(0,NA)
+
+hor.plot<-bvellmplot%>%
+  ggplot()+
+  geom_point(aes(peak.H.Velocity,avgFR,color=monkey),alpha=0.1)+
+  stat_smooth(aes(peak.H.Velocity,avgFR,group=neuron),color='black',method='lm',se = FALSE)+
+  facet_wrap(~monkey)+
+  ylim(0,NA)
+
+multiplot(ver.plot,hor.plot)
+
 ggplot(blm)+
   geom_histogram(aes(conj.H.Amp,fill=monkey),position='dodge')
+
+ggplot(blm)+
+  geom_density(aes(conj.H.Amp,color=monkey))
+
+blm %>%
+  ggplot()+
+  geom_point(aes(abs(conj.H.Amp),abs(conj.V.Amp),color=monkey))+
+  geom_abline()
                
+summary(aov(conj.H.Amp~monkey,data=blm))
+
 ggplot(blm)+
   geom_density(aes(conj.V.Amp,color=monkey))
+
+ggplot(bvellm)+
+  geom_point(aes(abs(peak.H.Velocity),abs(peak.V.Velocity)))+
+  geom_abline()
 
 
 

@@ -1,21 +1,3 @@
----
-title: "Slow Regard"
-author: "Adam"
-date: "January, 2018"
-output: 
-html_document: 
-self_contained: no
-runtime: shiny
----
-
-
-```{r echo=FALSE} 
-library(knitr)
-opts_chunk$set(echo=FALSE)
-```
-
-```{r,message=FALSE}
-
 library(ggplot2)
 library(dplyr)
 library(keras)
@@ -23,28 +5,17 @@ library(readr)
 library(stringr)
 library(purrr)
 library(tokenizers)
-
-#library(knitr)
-#library(tidyr)
-#library(broom)
-#library(grid)
-# library(relaimpo)
-# library(leaps)
-#library(data.table)
-
-```
+library(shiny)
 
 
-```{R SHINYTRY, warning=FALSE}
+
+
+
 model<- load_model_hdf5('C:/Users/setup/Dropbox/deeplearning/slowregard1/SlowRegard1.hd5')
 text<- readRDS('C:/Users/setup/Dropbox/deeplearning/slowregard1/slowregard1text.RDS')
 chars<- readRDS('C:/Users/setup/Dropbox/deeplearning/slowregard1/slowregard1chars.RDS')
 
 
-```
-
-
-```{r predict}
 maxlen<-20
 sample_mod <- function(preds, temperature = 1){
   preds <- log(preds)/temperature
@@ -93,42 +64,24 @@ for(i in 1:poem_length){
   
 }
 
-```
+library(shiny)
 
-```{r}
-
-
-inputPanel(
-  
-  sliderInput("TrialChoice", label = "Select a movement:",
-              min=1,
-              max=length(unique(hh$sacnum)),
-              value=1,
-              step=1)
-  
-
+# Define UI ----
+ui <- fluidPage(
+  titlePanel('Slow Regard of Deep Learning'),
+  mainPanel(
+    tags$style(type="text/css", "#Output_text {white-space: pre-wrap;}"),
+    textOutput("Output_text")
+  )
 )
 
-renderPlot({
+# Define server logic ----
+server <- function(input, output) {
   
-    chosentrial<-input$TrialChoice
-    ggplot(filter(hh,sacnum==chosentrial))+
-              geom_line(aes(counter,H),color='blue')+
-             # geom_line(aes(counter,Ef),color='red')+
-             geom_line(aes(counter,G),color='darkgreen')+
-             geom_line(aes(counter,T),size=2,alpha=0.5)+
-             geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
-             # geom_line(aes(counter,EV/10),color='red')+
-             geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
-             # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
-             # geom_text(x=0,y=60,aes(label=firstshift[1]))+
-             geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
-             geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
-      theme_minimal()
+  output$Output_text <- renderText({ 
+   generated
+  })
+}
 
-})
-
-```
-
-
-
+# Run the app ----
+shinyApp(ui = ui, server = server)

@@ -24,7 +24,7 @@ I wrote up a quick analysis in R that should demonstrate the possibilities of au
 * make plots
 
 ```{r setup, include=FALSE,message=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(knitr)
 library(tidyr)
@@ -118,7 +118,7 @@ loadnewheadfree<- function(referencefile=NULL,path="~/kdata/"){
     t <-rbindlist(loadedfiles)
     # t<- dplyr::select(t, -thp,-tvp,-time)
   }else{
-    message('********NO NEW CELLS********')
+    message('********NO NEW DATA********')
     t<-NULL
   }
   return(t)
@@ -144,42 +144,55 @@ h %>%
   mutate(G=replace(G,G==0,NA), #mark missing data as NA rather than 0
          #G=na.approx(G,na.rm=FALSE),
          time=row_number(),
-         Gv=parabolicdiff(G,7)*samplerate,
+         Gv=parabolicdiff(G,7)*samplerate, #calculate velocity
          Hv=parabolicdiff(H,7)*samplerate,
          target.velocity=parabolicdiff(T,7)*samplerate,
          # gazeshifts=markSaccades(Gv,buffer=5,threshold=30),
          gazeshifts=markSaccadesDouble(Gv,threshold1=100,threshold2=10),
          headmovement=markSaccadesDouble(Hv,threshold1=10,threshold2=4),
-         headmovement=replace(headmovement,headmovement<0,0),
+         #algorithm marks non-movements (fixations) as negative so remove them
+         headmovement=replace(headmovement,headmovement<0,0), 
          gazeshifts=replace(gazeshifts,gazeshifts<0,0)) ->
   htesta
 
 htesta%>%
   # filter(block=='A-02')%>%
   group_by(block) %>%
+  #identify movements and mark 200ms before and 500ms after each movement as "sacnum"
   do(markTagetMovements(t=.,buffer=200,threshold=200,saccade.length=500)) ->
   htest
 
 htest%>%
-  filter(!is.na(sacnum))%>%
-  group_by(block,sacnum) %>%
-  mutate(firstshift=min(gazeshifts[counter>220&gazeshifts>0],na.rm=T),
-         gazeshifts=replace(gazeshifts,
+  filter(!is.na(sacnum))%>% #get rid of all data that isn't part of the marked target movement periods
+  group_by(block,sacnum) %>% #look at each target movement individually
+  #time of first gaze shift - we want to ignore gaze shifts that start before the target actually moved
+  mutate(firstshift=min(gazeshifts[counter>220&gazeshifts>0],na.rm=T), 
+         firsthead=min(headmovement[counter>220&headmovement>0],na.rm=T),
+         primarygazeshifts=replace(gazeshifts,
                             gazeshifts!=firstshift|is.na(firstshift),
-                            0),
+                            0), #the first "eye saccade" we're calling the primary gaze shift
+         primaryheadmovement=replace(headmovement,
+                                      headmovement!=firsthead|is.na(firsthead),
+                                      0),
+         #for easier analysis/plotting, use NA rather than 0 for non-movements 
          gazeshifts=replace(gazeshifts,gazeshifts==0,NA),
+         primarygazeshifts=replace(primarygazeshifts,primarygazeshifts==0,NA),
          headmovement=replace(headmovement,headmovement==0,NA),
-         counter=counter-200)->
+         primaryheadmovement=replace(primaryheadmovement,primaryheadmovement==0,NA),
+         counter=counter-200,
+         tcounter=round(counter/samplerate))->
   hh
 ```
 
 ```{r measure}
 
-hh %>% 
-  group_by(block,sacnum) %>%
-  mutate(gvsd=round(sd(Gv[1:300])))->
-  hh
+# hh %>% 
+#   group_by(block,sacnum) %>%
+#   mutate(gvsd=round(sd(Gv[1:300])))->
+#   hh
 
+#this block just gets rid of all trials where there is no detected gaze shift
+#I did this as a separate block to avoid errors in the larger measurement 
 hh %>% 
   # filter(sacnum==10)%>%
   group_by(block,sacnum) %>%
@@ -190,11 +203,15 @@ hh %>%
 
 hint%>%
   group_by(block,sacnum)%>%
-  summarize(gaze.onset=counter[!is.na(gazeshifts)][1],
-         gaze.offset=max(counter[!is.na(gazeshifts)]),
+  #We're going to measure the trial now and just report the measurements in the data frame "hp"
+  summarize(blinktrial=any(is.na(G[counter>0&counter<300])),
+            gaze.onset=counter[!is.na(primarygazeshifts)][1],
+         gaze.offset=max(counter[!is.na(primarygazeshifts)]),
+         total.gaze.offset=max(counter[!is.na(gazeshifts)]),
          gaze.dur=gaze.offset-gaze.onset,
          gaze.dur.ms=gaze.dur/samplerate,
          gaze.amp=G[counter==gaze.offset]-G[counter==gaze.onset],
+         total.gaze.amp=G[counter==total.gaze.offset]-G[counter==gaze.onset],
          IHP=H[counter==gaze.onset],
          IGP=G[counter==gaze.onset],
          IEP=IGP-IHP,
@@ -205,8 +222,10 @@ hint%>%
          head.contribution=H[counter==gaze.offset]-IHP,
          eye.contribution=gaze.amp-head.contribution
          ) %>%
+  #junk any trials where there is no gaze shift within 200 samples (~650ms) of target movement
   filter(gaze.onset>0,gaze.onset<200)->
   hp
+hh <- left_join(hh,hp) #add mesurements back to original data file
 
 goodsacs=unique(hp$sacnum)
 goodsacs=unique(filter(hp,gaze.dur.ms>250)$sacnum)
@@ -218,6 +237,63 @@ Here is an example of a trial with the first gaze shift and head movement marked
 Velocity is shown on the same plot as position scaled down by a factor of 10.
 
 ```{r demoplot,echo=FALSE,warning=FALSE}
+
+plotTrial<- function(hh){
+  # cat(hh$blinktrial[1])
+  gp<- ggplot(hh)+
+    geom_line(aes(counter,H),color='blue')+
+    # geom_line(aes(counter,Ef),color='red')+
+    geom_line(aes(counter,G),color='darkgreen')+
+    geom_line(aes(counter,T),size=2,alpha=0.5)+
+    geom_line(aes(counter,Hv/10),color='blue',linetype=2)+
+    # geom_line(aes(counter,EV/10),color='red')+
+    geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
+    # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+    geom_point(aes(counter,sign(gazeshifts)*50),color='darkgreen')+
+    geom_point(aes(counter,sign(headmovement)*25),color='blue')+
+    geom_line(aes(counter,sign(primarygazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+    # geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='yellow',alpha=0.5)+
+    geom_line(aes(counter,sign(primaryheadmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+    xlab('Time (ms)')+
+    
+  # geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+  blink<- hh$blinktrial[1]
+  if(blink | is.na(blink)){
+    gp<-gp+geom_label(x=0,y=0,label='BLINK INTERRUPTED')
+  }
+  gp
+  
+}
+
+plotTrial<- function(hh){
+  # cat(hh$blinktrial[1])
+  gp<- ggplot(hh)+
+    geom_line(aes(tcounter,H),color='blue')+
+    # geom_line(aes(tcounter,Ef),color='red')+
+    geom_line(aes(tcounter,G),color='darkgreen')+
+    geom_line(aes(tcounter,T),size=2,alpha=0.5)+
+    geom_line(aes(tcounter,Hv/10),color='blue',linetype=2)+
+    # geom_line(aes(tcounter,EV/10),color='red')+
+    geom_line(aes(tcounter,Gv/10),color='darkgreen',linetype=2)+
+    # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
+    geom_point(aes(tcounter,sign(gazeshifts)*50),color='darkgreen')+
+    geom_point(aes(tcounter,sign(headmovement)*25),color='blue')+
+    geom_line(aes(tcounter,sign(primarygazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+    # geom_line(aes(tcounter,sign(gazeshifts)*Gv/10),size=2,color='yellow',alpha=0.5)+
+    geom_line(aes(tcounter,sign(primaryheadmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+    xlab('Time (ms)')
+    
+    # geom_line(aes(tcounter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+    blink<- hh$blinktrial[1]
+    if(blink | is.na(blink)){
+      gp<-gp+geom_label(x=0,y=0,label='BLINK INTERRUPTED')
+    }
+    gp
+    
+}
+
+plotTrial(filter(hh,sacnum==31,block=='A-01'))
+
 ggplot(filter(hh,sacnum==31,block=='A-01'))+
   geom_line(aes(counter,H),color='blue')+
   # geom_line(aes(counter,Ef),color='red')+
@@ -227,7 +303,7 @@ ggplot(filter(hh,sacnum==31,block=='A-01'))+
   # geom_line(aes(counter,EV/10),color='red')+
   geom_line(aes(counter,Gv/10),color='darkgreen',linetype=2)+
   # geom_text(x=0,y=50,aes(label=round(sd(Gv),2)))+
-  geom_point(aes(counter,sign(gazeshifts)*50))+
+  geom_point(aes(counter,sign(gazeshifts)*50),color='darkgreen')+
   geom_point(aes(counter,sign(headmovement)*25),color='blue')+
   annotate('text',x=-100,y=50,label='Target Position')+
   annotate('text',x=500,y=20,label='Head Position')+
@@ -236,9 +312,19 @@ ggplot(filter(hh,sacnum==31,block=='A-01'))+
   annotate('text',x=250,y=70,label='Gaze Position')+
   annotate('text',x=125,y=55,label='First Gaze Shift')+
   annotate('text',x=300,y=28,label='Head Movement')+
-  geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
-  geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
-  geom_label(aes(label=T[300]-T[1]),x=100,y=50)
+  geom_line(aes(counter,sign(primarygazeshifts)*Gv/10),size=2,color='darkgreen',alpha=0.5)+
+  # geom_line(aes(counter,sign(gazeshifts)*Gv/10),size=2,color='yellow',alpha=0.5)+
+  geom_line(aes(counter,sign(primaryheadmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+  # geom_line(aes(counter,sign(headmovement)*Hv/10),color='blue',size=2,alpha=0.5)+
+  geom_label(aes(label=paste0('Target Amplitude: ',T[300]-T[1]),x=0,y=-50))+
+  geom_label(aes(label=paste0('Total Gaze Amplitude: ',total.gaze.amp),x=0,y=-60))
+
+library(manipulate)
+manipulate(plotTrial(filter(hh,sacnum==trialchoice,block==blockchoice)),
+           trialchoice=slider(1,max = max(hh$sacnum),step=1),
+           blockchoice=picker('A-01','A-02'))
+                            
+plotTrial(filter(hh,sacnum==31,block=='A-01'))
   
 
 ```
@@ -250,7 +336,7 @@ Some simple summary figures
 
 hpp<- filter(hp,gaze.dur/samplerate<400)
 
-qplot(gaze.onset/samplerate,bins=30,data=hpp)+
+qplot(gaze.onset/samplerate,bins=30,data=hpp,fill=blinktrial,position='dodge')+
   xlab('Gaze Shift Latency (ms)')+
   facet_wrap(~block)
 
