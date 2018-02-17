@@ -1,0 +1,12 @@
+name: gazedemo2
+title: gazedemo2
+username:
+account: adampallus
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 262991
+bundleId: 1194949
+url: https://adampallus.shinyapps.io/gazedemo2/
+when: 1516999794.32423
+asMultiple: FALSE
+asStatic: FALSE

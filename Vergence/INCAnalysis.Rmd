@@ -2,8 +2,8 @@
 title: "Analysis of INC in strabismus"
 author: "Adam Pallus"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 #Introduction
 Previous work from our lab has shown that saccadic burst generators can have abnormal preferred directions in monkey models of infantile pattern strabismus. Additionally, microstimulation of the superior colliculus and saccadic burst generators can evoke disconjugate movements. This, along with behavioral evidence, suggests a neural origin of the "cross-talk" seen in pattern strabismus.
@@ -16,7 +16,7 @@ library(knitr)
 opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
 ```
 
-```{r,message=FALSE,echo=FALSE}
+```{r,message=FALSE,echo=TRUE}
 
 library(ggplot2)
 library(dplyr)
@@ -35,65 +35,118 @@ select<- dplyr::select
 
 <!-- ```{r cacheloade,cache=TRUE,cache.lazy=FALSE} -->
 ```{r load,cache=FALSE}
- t<- readRDS('INCsaccadesmarked.RDS')
+
+#skip some of the initial analysis by loading a file with a data frame of partially measured data.
+#The analysis code to create this saved file from the raw data is commented out below
+ # t<- readRDS('INCsaccadesmarked.RDS')
+ t<- readRDS('INCsaccadesmarkedBI.RDS') 
+
+#note: I haven't fully tested whether the code chunks below actually will recreate this file
+
 # t<-NULL
 ```
 
-<!-- # ```{r quickload,echo=FALSE,cache=TRUE,cache.lazy=FALSE} -->
-<!-- # LoadFromFile<- TRUE -->
-<!-- #  -->
-<!-- # if (LoadFromFile){ -->
-<!-- #   o<- readRDS('INCstrab.RDS') -->
-<!-- # }else{ -->
-<!-- #   o<-NULL -->
-<!-- # } -->
-<!-- #  -->
-<!-- # t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o) -->
-<!-- #  -->
-<!-- #  -->
-<!-- # t<- rbind(o,t) -->
-<!-- #  -->
-<!-- # o<-NULL -->
-<!-- #  -->
-<!-- # ``` -->
+```{r quickload,echo=FALSE,cache=FALSE,cache.lazy=FALSE}
+LoadFromFile<- TRUE
 
-<!-- ```{r mark saccades,cache=FALSE} -->
-<!-- #it would be really nice to fix this block so I don't have to use rbind at the end -->
-<!-- #the problem was that some of the non-DC cells were erroring when I tried to run it through -->
-<!-- #the blink detector... -->
-<!-- #An idea would be to set up a little function called markBlinks that just checks to see -->
-<!-- #what the monkey is and just returns NA if it's not DC (or other visual tracking monkeys) -->
-<!-- t %>% -->
-<!--   filter(monkey=='DC') %>% -->
-<!--   group_by(neuron) %>% -->
-<!--   mutate(blinks=markSaccades(rep,buffer=80,threshold=70), -->
-<!--          # dsnum=markSaccadesDouble(conj.velocity,threshold1=30,threshold2=15), -->
-<!--          dsnum=markSaccadesDouble(replace(conj.velocity,blinks>0,150), -->
-<!--                                   threshold1=30,threshold2=15,maxreject=100000), -->
-<!--          sdf=spikedensity(rasters,10), -->
-<!--          sdf10=lag(sdf,10), -->
-<!--          conj.vert=(repV+lepV)/2, -->
-<!--          conj.vert.vel=(revV+levV)/2, -->
-<!--          conj.hor=(rep+lep)/2, -->
-<!--          conj.hor.v=(rev+lev)/2) -> -->
-<!--   tdc -->
+if (LoadFromFile){
+  o<- readRDS('INCstrab.RDS')
+}else{
+  o<-NULL
+}
 
-<!-- t %>% -->
-<!--   filter(monkey %in% c('Kopachuck','Bee')) %>% -->
-<!--   group_by(neuron) %>% -->
-<!--   mutate(dsnum=markSaccadesDouble(conj.velocity,threshold1=30,threshold2=15), -->
-<!--          sdf=spikedensity(rasters,10), -->
-<!--          sdf10=lag(sdf,10), -->
-<!--          conj.vert=(repV+lepV)/2, -->
-<!--          conj.vert.vel=(revV+levV)/2, -->
-<!--          conj.hor=(rep+lep)/2, -->
-<!--          conj.hor.v=(rev+lev)/2) -> -->
-<!--   tkb -->
+#loads all the .csv files in the specified folder, assigns a neuron name to each based 
+#on the file name and then binds them all into one data frame. 
+#if a reference file is given, then it only loads new data files
 
-<!-- t<- rbind(select(tdc,-blinks),tkb) -->
-<!-- tdc<- NULL -->
-<!-- tkb<- NULL -->
-<!-- ``` -->
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
+
+t<- rbind(o,t)
+
+o<-NULL
+
+```
+
+```{r mark saccades,cache=FALSE}
+
+measureSaccadesINC<-function(t){
+  # I set up a check because I want to apply blink removal only for data files 
+  #that come from visual eye tracking. There were errors when I tried to run normal 
+  #data through it, possibly since it didn't find any periods where the eye postiion 
+  #matched the criteria for a blink. I could edit my markSaccades function to handle
+  #what to do if there are no saccades found in the entire file, or make a separate 
+  #"markblinks" function, but this works well.
+  if (t$monkey[1]=='DC'){ 
+    t%>%
+      mutate(blinks=markSaccades(rep,buffer=80,threshold=70), 
+             #we put an 80ms buffer around each detected blink
+             #then we force the velocity to be above threshold for the detected blinks
+             #This causes all blinks to be marked as saccades, which means they are not
+             #included in any fixation analyses
+             #When analyzing blinks, remember to omit saccades where the eye postions are extreme
+             dsnum=markSaccadesDouble(replace(conj.velocity,blinks>0,150),
+                                      threshold1=30,threshold2=15,maxreject=100000),
+             sdf=spikedensity(rasters,10),
+             sdf10=lag(sdf,10),
+             conj.vert=(repV+lepV)/2,
+             conj.vert.vel=(revV+levV)/2,
+             conj.hor=(rep+lep)/2,
+             conj.hor.v=(rev+lev)/2) %>%
+      select(-blinks)->
+      t
+  }else{
+    t %>%
+      mutate(dsnum=markSaccadesDouble(conj.velocity,threshold1=30,threshold2=15),
+              sdf=spikedensity(rasters,10),
+              sdf10=lag(sdf,10),
+              conj.vert=(repV+lepV)/2,
+              conj.vert.vel=(revV+levV)/2,
+              conj.hor=(rep+lep)/2,
+              conj.hor.v=(rev+lev)/2) ->
+      t
+  }
+  t
+}
+
+expandSaccades<- function(tt,buffer=80){
+  #this little function adds a new grouping variable
+  #so that we can analyze what happens after saccades
+  #without losing our ability to just grab the saccades with group_by
+  #This way we can group_by(dsnum) to get juts the saccades
+  #or group_by(dsnum_extended) to get the saccade plus some period after 
+  
+  maxtime<- max(tt$time)
+  tt %>%
+    filter(dsnum>0) %>%
+    group_by(dsnum) %>%
+    summarize(saccade.end=last(time),
+              saccade.start=first(time)) %>%
+    filter(saccade.end+buffer<maxtime) %>%
+    mutate(saccade.end=saccade.end+80)-> 
+    tcount
+  
+tcount$saccade.end<-tcount$saccade.end+buffer
+
+jsac<- function(stimes){
+  df<- data.frame(time=stimes[['saccade.start']]:stimes[['saccade.end']],
+                  dsnum_extended=stimes[['dsnum']])
+  return(df)
+}
+
+x<-rbindlist(apply(tcount,1,jsac))
+
+tt<- left_join(tt,x,by='time')
+
+}
+
+t %>%
+  group_by(neuron) %>%
+  do(expandSaccades(.,buffer=80))->
+  t
+
+# saveRDS(t,'INCsaccadesmarked.RDS')
+
+```
 
 ```{r Measure_Fixations}
 t %>%
@@ -754,17 +807,62 @@ plotsaccades<-function(bvelplot,cellname,plotColor='blue'){
 #             #for the eye tracker, whenever there is a blink it puts in values > 60. Reject those.
 #             maxep=max(abs(rep),abs(lep),abs(repV),abs(lepV)))->
 #   zp
-t %>%
-  group_by(neuron)%>%
-  mutate(time=row_number()) %>%
-  filter(dsnum>0) %>% #saccades
-  group_by(neuron,dsnum) %>%
-  summarize(sd.conj.velocity=sd(conj.velocity),
+
+
+# t %>%
+#   group_by(neuron)%>%
+#   mutate(time=row_number()) %>%
+#   filter(dsnum>0) %>% #saccades
+#   group_by(neuron,dsnum) %>%
+#   summarize(sd.conj.velocity=sd(conj.velocity),
+#             mean.conj.velocity=mean(conj.velocity),
+#             sd.verg.velocity=sd(verg.velocity),
+#             spread=max(conj.velocity)-min(conj.velocity),
+#             qrange=quantile(conj.velocity,0.975)-quantile(conj.velocity,0.025),
+#             dur=n(),
+#             R.H.Amp=last(rep)-first(rep),
+#             R.V.Amp=last(repV)-first(repV),
+#             L.H.Amp=last(lep)-first(lep),
+#             L.V.Amp=last(lepV)-first(lepV),
+#             disjunctiveH=sign(R.H.Amp*L.H.Amp)<0,
+#             disjunctiveV=sign(R.V.Amp*L.V.Amp)<0,
+#             conj.H.Amp=(R.H.Amp+L.H.Amp)/2,
+#             conj.V.Amp=(R.V.Amp+L.V.Amp)/2,
+#             peak.conj.velocity=maxabs(conj.velocity),
+#             peak.H.Velocity=maxabs((rev+lev)/2),
+#             peak.V.Velocity=maxabs((revV+levV)/2),
+#             peak.RH.Velocity=maxabs(rev),
+#             peak.RV.Velocity=maxabs(revV),
+#             peak.LH.Velocity=maxabs(lev),
+#             peak.LV.Velocity=maxabs(levV),
+#             peakFR=max(sdf10),
+#             post.saccade= first(post.saccade),
+#             nspk=sum(rasters),
+#             avgFR=nspk/dur*1000,
+#             r.amp=sqrt(conj.H.Amp^2+conj.V.Amp^2),
+#             asleep=sd.conj.velocity>7.5 || dur>2000,
+#             post.saccade=first(post.saccade),
+#             burst.index= peak.during.saccade-post.saccade)%>%
+#   ungroup() %>%
+#   mutate(sacID=row_number())->
+#   zsp
+
+t%>% 
+  filter(dsnum>0) %>%
+  group_by(monkey,neuron,dsnum_extended) %>%
+  filter(n()>80,n()<300) %>%
+  summarize(dur=n(),
+            dsnum=first(dsnum),
+            peak.during.saccade=max(sdf10[1:(n()-80)]),
+            post.saccade=mean(sdf10[(n()-50):n()]),
+            burst.index= peak.during.saccade-post.saccade,
+            conj.vert=first(conj.vert),
+            upward=conj.vert>0,
+            sd.conj.velocity=sd(conj.velocity),
             mean.conj.velocity=mean(conj.velocity),
             sd.verg.velocity=sd(verg.velocity),
             spread=max(conj.velocity)-min(conj.velocity),
             qrange=quantile(conj.velocity,0.975)-quantile(conj.velocity,0.025),
-            dur=n(),
             R.H.Amp=last(rep)-first(rep),
             R.V.Amp=last(repV)-first(repV),
             L.H.Amp=last(lep)-first(lep),
@@ -776,15 +874,16 @@ t %>%
             peak.conj.velocity=maxabs(conj.velocity),
             peak.H.Velocity=maxabs((rev+lev)/2),
             peak.V.Velocity=maxabs((revV+levV)/2),
+            peak.RH.Velocity=maxabs(rev),
+            peak.RV.Velocity=maxabs(revV),
+            peak.LH.Velocity=maxabs(lev),
+            peak.LV.Velocity=maxabs(levV),
             peakFR=max(sdf10),
             nspk=sum(rasters),
             avgFR=nspk/dur*1000,
             r.amp=sqrt(conj.H.Amp^2+conj.V.Amp^2),
-            asleep=sd.conj.velocity>7.5 || dur>2000) %>%
-  ungroup() %>%
-  mutate(sacID=row_number())->
+            asleep=sd.conj.velocity>7.5 || dur>2000) ->
   zsp
-
 
 ```
 
@@ -806,7 +905,9 @@ burst %>%
                     L.V.Amp,
                     avgFR,
                     disjunctiveH,
-                    disjunctiveV),
+                    disjunctiveV,
+                    burst.index,
+                    post.saccade),
                funs(first)) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
   bvelplot
@@ -828,8 +929,8 @@ burst %>%
 
 ver.plot<-bvelplot%>%
   ggplot()+
-  geom_point(aes(peak.V.Velocity,avgFR,color=monkey),alpha=0.1)+
-  stat_smooth(aes(peak.V.Velocity,avgFR,group=neuron),color='black',method='lm',se = FALSE)+
+  geom_point(aes(peak.V.Velocity,peakFR-post.saccade,color=monkey),alpha=0.1)+
+  stat_smooth(aes(peak.V.Velocity,peakFR-post.saccade,group=neuron),color='black',method='lm',se = FALSE)+
   facet_wrap(~monkey)+
   ylim(0,NA)+
   xlab('Peak Vertical Eye Velocity (deg/s)')+
@@ -838,8 +939,8 @@ ver.plot<-bvelplot%>%
 
 hor.plot<-bvelplot%>%
   ggplot()+
-  geom_point(aes(peak.H.Velocity,avgFR,color=monkey),alpha=0.1)+
-  stat_smooth(aes(peak.H.Velocity,avgFR,group=neuron),color='black',method='lm',se = FALSE)+
+  geom_point(aes(peak.H.Velocity,peakFR-post.saccade,color=monkey),alpha=0.1)+
+  stat_smooth(aes(peak.H.Velocity,peakFR-post.saccade,group=neuron),color='black',method='lm',se = FALSE)+
   facet_wrap(~monkey)+
   ylim(0,NA)+
   xlab('Peak Horizontal Eye Velocity (deg/s)')+
@@ -896,7 +997,7 @@ multiplot(plotlist=show1cell(zp,zmc,'Kopachuck-905',color1='purple'),cols=2)
 
 This cell has very little sensitivity to eye position during fixation. It appears that it is a single example of a burst neuron. Burst neurons without tonic activity have been reported from this area before, but we haven't typically encountered many of them. It is also intereting that this cell prefers leftward saccades rather than upward or downard cells, as would be expected for this area. perhaps this is an abnormality related to the strabismus. 
 
-```{r saccade_analysis}
+```{r saccade_analysis,warning=FALSE}
 #The next step here will be to analyze the preferred direction based on the burst. There should be some effort to distinguish burst-tonic cells from tonic-only or burst-only cells. I'm not sure that we have any burst only cells in this collection, but the algorithm should be able to distinguish them if they should exist. I think I have the code written already to do a lot of this...
 
 #There should be some effort to assess for the possiblity of monocular - bring in some of the analysis I did on the disjunctive saccades. 
@@ -906,6 +1007,7 @@ measureCellSaccades<-function(x){
   #first I'm just going to make this for the conjugate then I'll come back 
   #and add monocular models if needed
 
+  #Conjugate
   mburst<-lm(peakFR~peak.H.Velocity+peak.V.Velocity,data=x)
   V<-coef(mburst)[['peak.V.Velocity']]
   H<-coef(mburst)[['peak.H.Velocity']]
@@ -916,11 +1018,32 @@ measureCellSaccades<-function(x){
   
   R2<-summary(mburst)$r.squared
   
+  #Right Eye
+  mburst<-lm(peakFR~peak.RH.Velocity+peak.RV.Velocity,data=x)
+  VR<-coef(mburst)[['peak.RV.Velocity']]
+  HR<-coef(mburst)[['peak.RH.Velocity']]
   
-  #This data frame that I am returning is getting kind of big. 
-  #I plan to remove the unused measurements once I am past the exploratory phase
+  #calculate direction preference using relative importance of horizontal and vertical
+  br=as.numeric(calc.relimp(mburst)$lmg)
+  dir.imp.R<- atan2(br[2]*sign(VR),br[1]*sign(HR))*180/pi
+  
+  R2R<-summary(mburst)$r.squared
+  
+  #Left Eye
+  mburst<-lm(peakFR~peak.LH.Velocity+peak.LV.Velocity,data=x)
+  VL<-coef(mburst)[['peak.LV.Velocity']]
+  HL<-coef(mburst)[['peak.LH.Velocity']]
+  
+  #calculate direction preference using relative importance of horizontal and vertical
+  br=as.numeric(calc.relimp(mburst)$lmg)
+  dir.imp.L<- atan2(br[2]*sign(VL),br[1]*sign(HL))*180/pi
+  
+  R2L<-summary(mburst)$r.squared
+
   d<-data.frame(neuron=x$neuron[1],
-                dir.imp=dir.imp,R2=R2)
+                dir.imp=dir.imp,R2=R2,
+                dir.imp.R=dir.imp.R,R2R=R2R,
+                dir.imp.L=dir.imp.L,R2L=R2L)
 }
 
 burst %>%
@@ -956,13 +1079,36 @@ ggplot(bsummary)+
 
 It appears that the results are very similar to the directions obtained by analysis during fixations. The main exception is that the $R^2$ values are lower for many cells since only a minority show a distinguishable burst. Notice that the odd strongly horizontal cell from Kopachuck appears in this plot as well, verifying that our methods are reasonable.
 
+###Burst Index
+
+The "Burst index" has been used to quantify the strength of the burst component of burst-tonic cells. To calculate the burst index we subtract the tonic firing rate after the saccade from the peak firing rate during the saccade. Cells that do not burst will have a small burst index, while cells that pause during saccades will have a negative burst index. Since cells may burst or pause only for saccades of certain directions or amplitudes, we will have to analyze burst index as a function of saccade metrics.
+
+```{r burstindex}
+
+pvert<-burst %>%
+  filter(abs(conj.V.Amp)>5,abs(conj.V.Amp)<40)%>%
+  ggplot()+
+  stat_smooth(aes(conj.V.Amp,peak.during.saccade-post.saccade,group=neuron),method='lm',se=FALSE)+
+  facet_wrap(~monkey)
+
+phor<-burst %>%
+  filter(abs(conj.H.Amp)>5,abs(conj.H.Amp)<40)%>%
+  ggplot()+
+  stat_smooth(aes(conj.H.Amp,peak.during.saccade-post.saccade,group=neuron),method='lm',se=FALSE)+
+  facet_wrap(~monkey)
+
+multiplot(pvert,phor,cols=1)
+
+
+```
+
 \pagebreak
 
 ##Monocular analysis
 
 ```{r Monocular1}
 bvelplot%>%
-  filter(disjunctive) %>%
+  filter(disjunctiveH) %>%
   ggplot()+
   geom_point(aes(peak.V.Velocity,avgFR,color=monkey),alpha=0.1)+
   stat_smooth(aes(peak.V.Velocity,avgFR,group=neuron),color='black',method='lm',se = FALSE)+
@@ -991,6 +1137,80 @@ filter(bm,abs(a-b)>0.15)
 
 ```
 
+
+One explanation for the disjunctive eye movements evoked by stimulation is that when we stimulate, we only activate a portion of the neurons in the area. However, if all of the cells are conjugate, then this explanation will work for movements with abnormal directions, but doesn't explain disconjugate movements. For this explanation to work for disconjugate movements, we would predict that the cells should have different preferences for left or right eyes... Could this also show up as a difference in the weights for the two eyes? Like there are some cells that are strongly right eye and strongly left eye. This would probably show up in the $R^2$ for the fit. 
+
+```{r MonocularDirectionpref,fig.height=6,fig.width=6}
+
+bsummary %>%
+  mutate(r.skew=90-abs(dir.imp.R), 
+         l.skew=90-abs(dir.imp.L)) ->
+  bsummary
+
+skew.plot.full<- ggplot(bsummary) +
+  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
+  geom_abline()+
+  ggtitle('Showing cells where left or right eye are skewed less than 20')
+
+
+skew.plot.zoom<- ggplot(bsummary %>% filter(abs(r.skew)<25 | abs(l.skew)<25)) +
+  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
+  geom_abline()
+
+skew.plot.zoom2<- ggplot(bsummary %>% filter(abs(r.skew)<25, abs(l.skew)<25)) +
+  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
+  geom_abline()+
+  ggtitle('Showing cells where both left and right eye are skewed less than 20')
+
+multiplot(skew.plot.full,skew.plot.zoom,skew.plot.zoom2)
+
+ggplot(bsummary)+
+  geom_point(aes(R2R,R2L,color=monkey))+
+  geom_abline()
+
+```
+
+
+
+Given how poorly the DC cells fit for the saccadic fits, should we be doing this for the static fixation analysis instead/in addition? Perhaps that will be the next thing to do.
+```{r MonocularFixationDirectionpref,fig.height=6,fig.width=6}
+
+zm %>%
+  mutate(r.skew=90-abs(dir.imp.R), 
+         l.skew=90-abs(dir.imp.L)) ->
+  zm
+
+skew.plot.full<- ggplot(zm) +
+  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
+  geom_abline()+
+  ggtitle('Showing cells where left or right eye are skewed less than 20')
+
+skew.plot.full
+
+skew.plot<- ggplot(zm) +
+  geom_point(aes(r.skew,l.skew,color=monkey),size=3)+
+  geom_abline()+
+  ggtitle('Showing cells where left or right eye are skewed less than 20')
+
+skew.plot
+
+# ggplotly(skew.plot.full)
+# skew.plot.zoom<- ggplot(zm %>% filter(abs(r.skew)<25 | abs(l.skew)<25)) +
+#   geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
+#   geom_abline()
+# 
+# skew.plot.zoom2<- ggplot(zm %>% filter(abs(r.skew)<25, abs(l.skew)<25)) +
+#   geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
+#   geom_abline()+
+#   ggtitle('Showing cells where both left and right eye are skewed less than 20')
+# 
+# multiplot(skew.plot.full,skew.plot.zoom,skew.plot.zoom2)
+
+ggplot(zm)+
+  geom_point(aes(R2R,R2L,color=monkey))+
+  geom_abline()
+
+```
 
 <!-- #OLD STUFF -->
 <!-- ```{r plotting} -->

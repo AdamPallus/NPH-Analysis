@@ -1,0 +1,12 @@
+name: slowregardwriter
+title: SlowRegardWriter
+username:
+account: adampallus
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 257483
+bundleId: 1179159
+url: https://adampallus.shinyapps.io/slowregardwriter/
+when: 1516152897.80555
+asMultiple: FALSE
+asStatic: FALSE

@@ -11,8 +11,13 @@ end
 b=load([filepath filename]);
 b.filepath=filepath;
 b.filename=filename;
-data={b.Unit.values};
 
+if isfield(b,'Unit')
+    data={b.Unit.values};
+else
+    savecsv
+    return
+end
 
 f=figure;
 f.Position=[680 767 197 331];

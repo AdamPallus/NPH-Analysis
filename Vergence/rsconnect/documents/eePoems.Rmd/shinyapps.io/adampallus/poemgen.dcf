@@ -1,0 +1,13 @@
+name: poemgen
+title: poemgen
+username:
+account: adampallus
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 258635
+bundleId: 1184024
+url: https://adampallus.shinyapps.io/poemgen/
+when: 1516415355.06471
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: slowregard1chars.RDS|slowregard1text.RDS|SlowRegard1.hd5
