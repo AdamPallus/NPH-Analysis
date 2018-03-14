@@ -1,6 +1,7 @@
 function b=spikesort(~,~)
 
 h=evalin('base','handles');
+b=evalin('base','b');
 data=evalin('base','data');
 
 threshold=str2double(h.thresh.String);
@@ -9,6 +10,14 @@ flip=0; %in case of fibers with positive spikes- use negative threshold
 if threshold<0
     flip=1;
 end
+
+if flip
+%     data={b.Unit.values*-1};
+%     assignin('base','data',data)
+    data{1}=data{1}*-1;
+    threshold=threshold*-1;
+end
+
 if abs(threshold) < 1 || abs(threshold) >10
     display('Invalid Threshold. Using default of 3.3');
     threshold=3.3;
@@ -31,9 +40,9 @@ if extrafilter
     data=data2;
 end
 
-if flip
-    data{1}=data{1}*-1;
-end
+% if flip
+%     data{1}=data{1}*-1;
+% end
 
 spikes = ss_default_params(Fs,'thresh',threshold);
 spikes = ss_detect(data,spikes);

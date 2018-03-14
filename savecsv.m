@@ -15,15 +15,19 @@ else
     savelocation=questdlg(sprintf('No unit channel\nSave .csv to same folder?'),'Save?');
 end
 
-exa= strcmp(questdlg('Are these data from an Exotrope?','EXO?','No','Yes','No'),'Yes');
+monkey=strtok(b.filename,'_');
+%Exotropes: Patos, Pilchuck 
+exa= strcmp(questdlg(['Is ',monkey,' an Exotrope?'],'EXO?','No','Yes','No'),'Yes');
 
 if strcmp(savespikes,'Yes')
     b.spikes=evalin('base','spikes');
     save([b.filepath, b.filename(1:end-4), '-sorted.mat'],'-struct','b')
 end
-%create spike density function
-% [sdf, rasters]=makesdf(b,20);
 
+if hasspikes
+    %create spike density function
+    [sdf, rasters]=makesdf(b,20);
+end
 %Determine which channel is the right eye:
 try
     verg=b.H_Eye2.values-b.H_Eye.values;
@@ -62,9 +66,13 @@ lepV=conv(lepV,hamming,'same');
 
 thp=b.H_Targ.values; %horizontal target position
 tvp=b.V_Targ.values; %vertical target position
-thp2=b.H2_Targ.values; %horizontal target position
-tvp2=b.V2_Targ.values; %vertical target position
-
+if isfield(b,'H2_Targ')
+    thp2=b.H2_Targ.values; %horizontal target position
+    tvp2=b.V2_Targ.values; %vertical target position
+else
+    thp2=thp;
+    tvp2=tvp;
+end
 trimlength=min(length(rep),length(lep));
 
 if length(rep) ~= length(lep)
@@ -83,7 +91,7 @@ end
 %     sdf=sdf(1:trimlength);
 % end
 
-if length(tvp)>trimlength
+if length(tvp)>trimlength || length(thp2)> trimlength
     thp=thp(1:trimlength);
     tvp=tvp(1:trimlength);
     thp2=thp2(1:trimlength);

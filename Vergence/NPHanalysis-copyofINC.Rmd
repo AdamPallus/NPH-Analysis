@@ -1,5 +1,5 @@
 ---
-title: "Analysis of INC in strabismus"
+title: "Analysis of NPH in strabismus"
 author: "Adam Pallus"
 output:
   pdf_document: default
@@ -73,7 +73,7 @@ measureSaccadesINC<-function(t){
   #matched the criteria for a blink. I could edit my markSaccades function to handle
   #what to do if there are no saccades found in the entire file, or make a separate 
   #"markblinks" function, but this works well.
-  if (t$monkey[1]=='DC'){ 
+  if (t$monkey[1]=='PATOS'){ 
     t%>%
       mutate(blinks=markSaccades(rep,buffer=80,threshold=70), 
              #we put an 80ms buffer around each detected blink
@@ -456,6 +456,9 @@ zp %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
   zmc
 
+zmc<- filter(zmc,!neuron %in% c('Bee-10','Bee-82','Bee-81','Bee-12'))
+zm<- filter(zm,!neuron %in% c('Bee-10','Bee-82','Bee-81','Bee-12'))
+
 ```
 
 
@@ -473,8 +476,8 @@ A significant challenge in comparing the activity of INC neurons between normal 
 ###Regular Cells
 
 ```{r RegularCells,fig.height=7,fig.width=6}
-Ncell<- 'Bee-106'
-Scell<- 'DC-902'
+Ncell<- 'Bee-05'
+Scell<- 'Patos-01'
 
 maxEP<- 25
 zp<- filter(zp,
@@ -602,6 +605,58 @@ multiplot(ggplot(zmc %>% filter(any.sig))+
           ,cols=2
 )
 ```
+```{r}
+multiplot(ggplot(zm %>% filter(any.sig))+
+            geom_segment(aes(y=0,yend=1,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
+            scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+            coord_polar(start=pi/2,direction=-1)+
+            theme_minimal()+
+            theme(legend.position='none')+
+            facet_wrap(~monkey,ncol=1)+
+            xlab('Direction preference\nusing relative importance\nRight Eye Data Only')+
+            ylab('')+
+            theme(axis.text.y=element_blank())
+            
+          ,
+          ggplot(zm %>% filter(any.sig))+
+            geom_segment(aes(y=0,yend=R2R,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
+            scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+            coord_polar(start=pi/2,direction=-1)+
+            theme_minimal()+
+            theme(legend.position='none')+
+            facet_wrap(~monkey,ncol=1)+
+            xlab('Direction preference\nusing relative importance')+
+            ylab(bquote(~R^2))
+          ,cols=2
+)
+```
+```{r}
+multiplot(ggplot(zm %>% filter(any.sig))+
+            geom_segment(aes(y=0,yend=1,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
+            scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+            coord_polar(start=pi/2,direction=-1)+
+            theme_minimal()+
+            theme(legend.position='none')+
+            facet_wrap(~monkey,ncol=1)+
+            xlab('Direction preference\nusing relative importance\nLeft Eye Data Only')+
+            ylab('')+
+            theme(axis.text.y=element_blank())
+            
+          ,
+          ggplot(zm %>% filter(any.sig))+
+            geom_segment(aes(y=0,yend=R2L,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
+            scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+            coord_polar(start=pi/2,direction=-1)+
+            theme_minimal()+
+            theme(legend.position='none')+
+            facet_wrap(~monkey,ncol=1)+
+            xlab('Direction preference\nusing relative importance')+
+            ylab(bquote(~R^2))
+          ,cols=2
+)
+```
+
+
 
 ####Abnormal Direction Preferences
 Let's look at some of the cells with abnormal direction preferences. First I'll make the same plots as above. Then I will look into the differences in interspike intervals. 

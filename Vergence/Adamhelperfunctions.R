@@ -445,7 +445,8 @@ loadnewcsv2<- function(referencefile=NULL,path="C:/Users/setup/Desktop/NRTP Verg
   return(t)
 }
 
-markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5,maxreject=1000){
+markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5,maxreject=1000,
+                              driftcorrect=FALSE,markFixations=TRUE){
   #This function is an R implementation of a two-threshold event marker
   #The algorithm works like this: Find all the times when velocity is above the high threshold
   #Extend this out until velocity is below the lower threshold
@@ -507,6 +508,14 @@ markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5,maxreject
   #each saccade is identified by it's unique marker "event" that comes from df$event<- stimes[[4]] above 
   xx<- left_join(v,x,by='time')
   
+  if (driftcorrect){
+    xx %>%
+      ungroup() %>%
+      mutate(acc=parabolicdiff(v,7)) %>%
+      mutate(event=replace(event,abs(v)<100 & abs(acc)<10000,NA)) ->
+      xx
+  }
+  
   xx %>%
     group_by(event) %>% #This means we analyze each saccade individually
     summarize(max.vel=max(abs(v)), #calculate max velocity
@@ -521,46 +530,50 @@ markSaccadesDouble<- function(v, threshold1=60,threshold2=20,min.dur=5,maxreject
     dplyr::select(time,event) -> #All we need is the time and the eventID
     g
   
-  #this next part goes through and assigns an ID to all the non-saccade portions of the data
-  stimes2<- filter(stimes,s %in% unique(xm$event))
-  
-  ftimes<-data.frame(fix.onset=c(1,stimes2$event.offset+1),
-                     fix.offset=c(stimes2$event.onset-1,datalength))
-  
-  ftimes %>%
-    filter(fix.onset>0,fix.offset>0)%>%
-    mutate(dur=fix.offset-fix.onset,
-           s=row_number()) %>%
-    filter(fix.onset<datalength)->
-    ftimes
-  
-  f<-rbindlist(apply(ftimes,1,jsac))
-  
-  f<- select(f,-event.dur)
-  
-  #the code below isn't very elegant, but it just combines the fixations and saccades
-  #and assigns negative IDs to the fixations and positive IDs to the saccades
-  f$issaccade=FALSE 
-  g$issaccade=TRUE
-  fg<-rbind(f,g)
-  fg<- arrange(fg,time)
-  
-  fg$event[!fg$issaccade]=fg$event[!fg$issaccade]*-1
-  
-  #This is a debugging message in case the result isn't the correct length
-  #we have to return a vector of the same length as the input
-  if (length(fg$event)!=datalength){
-    message('FAIL')
-    message(length(fg$event))
-    message(datalength)
-    # message(paste('FAILED: ',length(fg$event,datalength,sep='-')))
+  if (markFixations){
+    #this next part goes through and assigns an ID to all the non-saccade portions of the data
+    stimes2<- filter(stimes,s %in% unique(xm$event))
+    
+    ftimes<-data.frame(fix.onset=c(1,stimes2$event.offset+1),
+                       fix.offset=c(stimes2$event.onset-1,datalength))
+    
+    ftimes %>%
+      filter(fix.onset>0,fix.offset>0)%>%
+      mutate(dur=fix.offset-fix.onset,
+             s=row_number()) %>%
+      filter(fix.onset<datalength)->
+      ftimes
+    
+    f<-rbindlist(apply(ftimes,1,jsac))
+    
+    f<- select(f,-event.dur)
+    
+    #the code below isn't very elegant, but it just combines the fixations and saccades
+    #and assigns negative IDs to the fixations and positive IDs to the saccades
+    f$issaccade=FALSE 
+    g$issaccade=TRUE
+    fg<-rbind(f,g)
+    fg<- arrange(fg,time)
+    
+    fg$event[!fg$issaccade]=fg$event[!fg$issaccade]*-1
+    
+    #This is a debugging message in case the result isn't the correct length
+    #we have to return a vector of the same length as the input
+    if (length(fg$event)!=datalength){
+      message('FAIL')
+      message(length(fg$event))
+      message(datalength)
+      # message(paste('FAILED: ',length(fg$event,datalength,sep='-')))
+    }
+    else{
+      # message('SUCCESS')
+    }
+    
+    fg$event #return just an array of the IDs of saccades and fixations
+  }else{
+    g<- left_join(select(xx,time),g,by='time')
+    return(g$event)
   }
-  else{
-    # message('SUCCESS')
-  }
-  
-  fg$event #return just an array of the IDs of saccades and fixations
-  
   
 }
 

@@ -68,3 +68,6 @@ html
 *.eps
 .Rproj.user
 Vergence/KopachuckINC Wed Sep 13
+
+#notebook files
+*.nb.html
