@@ -1,0 +1,174 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\hypersetup{unicode=true,
+            pdftitle={Bootstrapping SOA in Strabismus},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\newcommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+  \title{Bootstrapping SOA in Strabismus}
+  \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+  \author{}
+  \preauthor{}\postauthor{}
+  \date{}
+  \predate{}\postdate{}
+
+
+\begin{document}
+\maketitle
+
+\section{Introduction}\label{introduction}
+
+We are trying to determine if SOA cells in strabismus are sensitive to
+vergence velocity. We fit a linear model that predicts firing rate based
+on the vergence angle, the vergence velocity and the vertical position
+of the eyes. The vertical position term was included to account for
+pattern strabismus, which is not encoded by SOA neurons according to
+previous work.
+
+\section{Results}\label{results}
+
+\subsection{Slow Vergence Movements}\label{slow-vergence-movements}
+
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/slow-1.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/slow-2.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/slow-3.pdf}
+
+\subsubsection{Significance Summary}\label{significance-summary}
+
+We analyzed 58 cells and found that 19 (33\%) had significant
+sensitivity to both vergence velocity and vergence position. A total of
+34 (59\%) cells showed significant sensitivity to vergence angle during
+slow vergence, while 29 cells showed significant sensitivity to vergence
+velocity. It seems likely that we would get a better estimate of
+position sensitivity by analyzing the firing rates of neurons during
+fixation.
+
+There is a huge outlier in QT-103. It has very strong sensitivity to
+vergence angle, but a negative sensitivity to vergence velocity. I'm not
+sure what this means or if it is a real effect. It would suggest that
+the cell pauses during convergence movements but fires more when the
+eyes are converged, which is strange behavior.
+QT\_2012\_08\_21\_1104\_Radial\_Dump\_AllSOAanalysis\_EyeSpec.csv
+
+\subsection{Saccades with either eye viewing (no eye switching) includes
+normal}\label{saccades-with-either-eye-viewing-no-eye-switching-includes-normal}
+
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades both and normal-1.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades both and normal-2.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades both and normal-3.pdf}
+
+\subsection{Saccades with either eye viewing (no eye
+switching)}\label{saccades-with-either-eye-viewing-no-eye-switching}
+
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades both-1.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades both-2.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades both-3.pdf}
+
+\subsubsection{Significance Summary}\label{significance-summary-1}
+
+We analyzed 62 cells that had sufficiently many saccades without eye
+switches and found that 11 (18\%) had significant sensitivity to both
+vergence velocity and vergence position. A total of 32 (52\%) cells
+showed significant sensitivity to vergence angle during these saccades,
+while 16 cells showed significant sensitivity to vergence velocity.
+
+\subsection{Saccades with the LEFT eye viewing (no eye
+switching)}\label{saccades-with-the-left-eye-viewing-no-eye-switching}
+
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades LEFT-1.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades LEFT-2.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades LEFT-3.pdf}
+
+\subsubsection{Significance Summary}\label{significance-summary-2}
+
+We analyzed 36 cells that had sufficiently many saccades with the left
+eye viewing and found that 2 (6\%) had significant sensitivity to both
+vergence velocity and vergence position. A total of 11 (31\%) cells
+showed significant sensitivity to vergence angle during these saccades,
+while 7 cells showed significant sensitivity to vergence velocity.
+
+\subsection{Saccades with the RIGHT eye viewing (no eye
+switching)}\label{saccades-with-the-right-eye-viewing-no-eye-switching}
+
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades RIGHT-1.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades RIGHT-2.pdf}
+\includegraphics{BootstrapSOAstrabismusReportPDF_files/figure-latex/saccades RIGHT-3.pdf}
+
+\subsubsection{Significance Summary}\label{significance-summary-3}
+
+We analyzed 45 cells that had sufficiently many saccades with the right
+eye viewing and found that 1 (2\%) had significant sensitivity to both
+vergence velocity and vergence position. A total of 5 (11\%) cells
+showed significant sensitivity to vergence angle during these saccades,
+while 7 cells showed significant sensitivity to vergence velocity.
+
+
+\end{document}

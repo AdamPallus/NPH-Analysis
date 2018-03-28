@@ -1,7 +1,8 @@
 ---
 title: "Bootstrapping SOA in Strabismus"
 output:
-  pdf_document: default
+  pdf_document: 
+    keep_tex: yes
   html_document:
     df_print: paged
 ---
@@ -83,7 +84,7 @@ signif.velocity<-unique(filter(ciplot,(verg.velocity.low*verg.velocity.high)>0)$
 signif.both<- unique(filter(ciplot,(verg.angle.low*verg.angle.high)>0 & (verg.velocity.low*verg.velocity.high)>0)$neuron)
 
 
-ggplotly(
+
 ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   geom_errorbar(aes(ymin=verg.angle.low,ymax=verg.angle.high),size=0.5,width=0)+
   geom_errorbarh(aes(xmin=verg.velocity.low,xmax=verg.velocity.high),height=0,size=0.5)+
@@ -96,9 +97,9 @@ ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('All cells')+
   annotate('text',-2,5,label=paste0('n = ',nrow(ciplot)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.both) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -113,9 +114,9 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant position and velocity sensitivity')+
   annotate('text',-2,5,label=paste0('n = ',length(signif.both)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.velocity) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -130,7 +131,7 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant position and velocity sensitivity')+
   annotate('text',-2,5,label=paste0('n = ',length(signif.velocity)))
-)
+
 
 
 ```
@@ -153,7 +154,7 @@ signif.velocity<-unique(filter(ciplot,(verg.velocity.low*verg.velocity.high)>0)$
 signif.both<- unique(filter(ciplot,(verg.angle.low*verg.angle.high)>0 & (verg.velocity.low*verg.velocity.high)>0)$neuron)
 
 
-ggplotly(
+
 ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   geom_errorbar(aes(ymin=verg.angle.low,ymax=verg.angle.high),size=0.5,width=0,alpha=0.5)+
   geom_errorbarh(aes(xmin=verg.velocity.low,xmax=verg.velocity.high),height=0,size=0.5,alpha=0.5)+
@@ -166,9 +167,8 @@ ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('All cells')+
   annotate('text',-2,5,label=paste0('n = ',nrow(ciplot)))
-)
 
-ggplotly(
+
   ciplot %>%
     filter(neuron %in% signif.both) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -183,9 +183,9 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant position AND velocity sensitivity')+
   annotate('text',-0.3,0,label=paste0('n = ',length(signif.both)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.velocity) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -200,7 +200,7 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant velocity sensitivity')+
   annotate('text',-0.5,-10,label=paste0('n = ',length(signif.velocity)))
-)
+
 
 
 ```
@@ -216,7 +216,7 @@ signif.velocity<-unique(filter(ciplot,(verg.velocity.low*verg.velocity.high)>0)$
 signif.both<- unique(filter(ciplot,(verg.angle.low*verg.angle.high)>0 & (verg.velocity.low*verg.velocity.high)>0)$neuron)
 
 
-ggplotly(
+
 ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   geom_errorbar(aes(ymin=verg.angle.low,ymax=verg.angle.high),size=0.5,width=0)+
   geom_errorbarh(aes(xmin=verg.velocity.low,xmax=verg.velocity.high),height=0,size=0.5)+
@@ -229,9 +229,9 @@ ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('All cells')+
   annotate('text',-2,5,label=paste0('n = ',nrow(ciplot)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.both) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -246,9 +246,9 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant position AND velocity sensitivity')+
   annotate('text',-0.3,0,label=paste0('n = ',length(signif.both)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.velocity) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -263,7 +263,7 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant velocity sensitivity')+
   annotate('text',-0.5,-10,label=paste0('n = ',length(signif.velocity)))
-)
+
 
 
 ```
@@ -283,7 +283,7 @@ signif.velocity<-unique(filter(ciplot,(verg.velocity.low*verg.velocity.high)>0)$
 signif.both<- unique(filter(ciplot,(verg.angle.low*verg.angle.high)>0 & (verg.velocity.low*verg.velocity.high)>0)$neuron)
 
 
-ggplotly(
+
 ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   geom_errorbar(aes(ymin=verg.angle.low,ymax=verg.angle.high),size=0.5,width=0)+
   geom_errorbarh(aes(xmin=verg.velocity.low,xmax=verg.velocity.high),height=0,size=0.5)+
@@ -296,9 +296,8 @@ ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('All cells')+
   annotate('text',-.5,-10,label=paste0('n = ',nrow(ciplot)))
-)
 
-ggplotly(
+
   ciplot %>%
     filter(neuron %in% signif.both) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -313,9 +312,9 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant position AND velocity sensitivity')+
   annotate('text',-0.1,2,label=paste0('n = ',length(signif.both)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.velocity) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -330,7 +329,7 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant velocity sensitivity')+
   annotate('text',0.25,10,label=paste0('n = ',length(signif.velocity)))
-)
+
 
 
 ```
@@ -351,7 +350,7 @@ signif.velocity<-unique(filter(ciplot,(verg.velocity.low*verg.velocity.high)>0)$
 signif.both<- unique(filter(ciplot,(verg.angle.low*verg.angle.high)>0 & (verg.velocity.low*verg.velocity.high)>0)$neuron)
 
 
-ggplotly(
+
 ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   geom_errorbar(aes(ymin=verg.angle.low,ymax=verg.angle.high),size=0.5,width=0)+
   geom_errorbarh(aes(xmin=verg.velocity.low,xmax=verg.velocity.high),height=0,size=0.5)+
@@ -364,9 +363,9 @@ ggplot(ciplot,aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('All cells')+
   annotate('text',-0.5,0,label=paste0('n = ',nrow(ciplot)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.both) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -381,9 +380,9 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant position AND velocity sensitivity')+
   annotate('text',-0.2,2,label=paste0('n = ',length(signif.both)))
-)
 
-ggplotly(
+
+
   ciplot %>%
     filter(neuron %in% signif.velocity) %>%
 ggplot(aes(verg.velocity,verg.angle,label=neuron))+
@@ -398,7 +397,7 @@ ggplot(aes(verg.velocity,verg.angle,label=neuron))+
   ylab('Sensitivity to Vergence Angle')+
   ggtitle('Cells with significant velocity sensitivity')+
   annotate('text',-0.5,-10,label=paste0('n = ',length(signif.velocity)))
-)
+
 
 
 ```
