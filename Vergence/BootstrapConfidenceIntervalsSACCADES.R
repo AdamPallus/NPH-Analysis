@@ -218,7 +218,7 @@ nn<-names(citable)
 names(citable)<- str_replace_all(nn,'[.]','_')
 names(citable)<- nn
 
-write.csv(citable,'SaccadeBootstrapCIs.csv')
+# write.csv(citable,'SaccadeBootstrapCIs.csv')
 
 ggplotly(
   ggplot(citable,aes(verg.velocity,verg.angle,label=neuron))+

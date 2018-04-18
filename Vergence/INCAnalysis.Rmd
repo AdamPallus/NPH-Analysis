@@ -44,10 +44,11 @@ select<- dplyr::select
 ```
 
 ```{r quickload,cache=FALSE,cache.lazy=FALSE,eval=FALSE}
-LoadFromFile<- FALSE
+LoadFromFile<- TRUE
 
 if (LoadFromFile){
-  o<- readRDS('INCstrab.RDS')
+  # o<- readRDS('INCstrab.RDS')
+  o<- readRDS('INCsaccadesmarked-DC.RDS')
 }else{
   o<-NULL
 }
@@ -56,7 +57,9 @@ if (LoadFromFile){
 #on the file name and then binds them all into one data frame. 
 #if a reference file is given, then it only loads new data files
 
-t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
+# t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
+# t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/DCcoils/",referencefile=o)
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/DC/",referencefile=o)
 
 t<- rbind(o,t)
 
@@ -67,15 +70,9 @@ o<-NULL
 ```{r mark saccades,cache=FALSE,eval=FALSE}
 
 measureSaccadesINC<-function(t){
-  # I set up a check because I want to apply blink removal only for data files 
-  #that come from visual eye tracking. There were errors when I tried to run normal 
-  #data through it, possibly since it didn't find any periods where the eye postiion 
-  #matched the criteria for a blink. I could edit my markSaccades function to handle
-  #what to do if there are no saccades found in the entire file, or make a separate 
-  #"markblinks" function, but this works well.
-  if (t$monkey[1]=='DC'){ 
+
     t%>%
-      mutate(blinks=markSaccades(rep,buffer=80,threshold=70), 
+      mutate(blinks=markSaccades(rep,buffer=80,threshold=70),
              #we put an 80ms buffer around each detected blink
              #then we force the velocity to be above threshold for the detected blinks
              #This causes all blinks to be marked as saccades, which means they are not
@@ -91,18 +88,7 @@ measureSaccadesINC<-function(t){
              conj.hor.v=(rev+lev)/2) %>%
       select(-blinks)->
       t
-  }else{
-    t %>%
-      mutate(dsnum=markSaccadesDouble(conj.velocity,threshold1=30,threshold2=15),
-              sdf=spikedensity(rasters,10),
-              sdf10=lag(sdf,10),
-              conj.vert=(repV+lepV)/2,
-              conj.vert.vel=(revV+levV)/2,
-              conj.hor=(rep+lep)/2,
-              conj.hor.v=(rev+lev)/2) ->
-      t
-  }
-  t
+
 }
 
 expandSaccades<- function(tt,buffer=80){
@@ -146,12 +132,13 @@ tt<- left_join(tt,x,by='time')
 #It also took over an hour to simply run saveRDS(t,''), so I think there were some
 #issues with memory management in executing this code. 
 t %>%
+  mutate(smi= monkey=='DC' & cellnum<=921)%>%
   group_by(neuron) %>%
-  do(measureSaccadesINC(.)) %>%
-  do(expandSaccades(.,buffer=80))->
+  do(measureSaccadesINC(.))-># %>%
+  # do(expandSaccades(.,buffer=80))->
   t
 
-# saveRDS(t,'INCsaccadesmarked.RDS')
+# saveRDS(t,'INCsaccadesmarked-DC.RDS')
 
 ```
 
@@ -328,6 +315,84 @@ return(list(nV,dir.slope,nH,dir.imp))
 
 }
 
+
+compare2eyes<- function(zp,zm,c1,maxEP=25,color1='black',color2='black',
+                         c1name=NA){
+  
+  if(is.na(c1name)){c1name=c1}
+
+  
+zp<- filter(zp,
+            neuron %in% c(c1),
+            dur>200,
+            abs(mean.R.H)<maxEP,
+            abs(mean.L.H)<maxEP,
+            abs(mean.R.V)<maxEP,
+            abs(mean.L.V)<maxEP,
+            meanFR<500)
+  
+RV<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.R.V,meanFR),color=color1)+
+  stat_smooth(aes(mean.R.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  theme_minimal()+
+  ylab(paste(c1name,'\nMean Firing Rate (spk/s)'))
+
+RH<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.R.H,meanFR),color=color1)+
+  stat_smooth(aes(mean.R.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('')+
+  theme_minimal()
+
+  LV<-ggplot(zp %>% filter(neuron==c1))+
+    geom_point(aes(mean.L.V,meanFR),color=color2)+
+    stat_smooth(aes(mean.L.V,meanFR),color='black',se=FALSE,method=lm)+
+    xlab('Mean Vertical Eye Position (deg)')+
+    ylab(paste(c1name,'\nMean Firing Rate (spk/s)'))+
+    theme_minimal()
+  
+  LH<-ggplot(zp %>% filter(neuron==c1))+
+    geom_point(aes(mean.L.H,meanFR),color=color2)+
+    stat_smooth(aes(mean.L.H,meanFR),color='black',se=FALSE,method=lm)+
+    xlab('Mean Horizontal Eye Position (deg)')+
+    ylab('')+
+    theme_minimal()
+
+
+#make a named list to manually color the direction plots
+
+
+dir.imp<-ggplot(zm %>% filter(neuron==c1))+
+  # geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp),color='black')+
+  geom_segment(aes(y=0,yend=1,x=dir.imp.R,xend=dir.imp.R),color='black')+
+   geom_segment(aes(y=0,yend=R2R,x=dir.imp.R,xend=dir.imp.R,color=neuron),size=2)+
+  # scale_color_manual(values=color.values)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction preference\nusing RIGHT eye')
+
+dir.slope<-ggplot(zm %>% filter(neuron == c1))+
+  geom_segment(aes(y=0,yend=1,x=dir.imp.L,xend=dir.imp.L),color='black')+
+  geom_segment(aes(y=0,yend=R2L,x=dir.imp.L,xend=dir.imp.L,color=neuron),size=2)+
+  # scale_color_manual(values=color.values)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction Preference\nusing LEFT eye')+
+  ylab('R-squared')
+
+# print(multiplot(nV,sV,dir.slope,nH,sH,dir.imp,cols=2))
+
+
+return(list(RV,LV,dir.slope,RH,LH,dir.imp))
+
+
+}
+
 ```
 
 ```{r Fixation_Analysis,cache=FALSE,warning=FALSE}
@@ -445,12 +510,14 @@ measureCell<-function(x){
 }
 
 zp %>%
+  filter(abs(mean.conj.velocity)<3) %>%
   group_by(neuron) %>%
   do(measureCell(.)) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
   zm
 
 zp %>%
+  filter(abs(mean.conj.velocity)<3) %>%
   group_by(neuron) %>%
   do(conj.measureCell(.)) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
@@ -473,8 +540,10 @@ A significant challenge in comparing the activity of INC neurons between normal 
 ###Regular Cells
 
 ```{r RegularCells,fig.height=7,fig.width=6}
-Ncell<- 'Bee-106'
-Scell<- 'DC-902'
+# Ncell<- 'Bee-106'
+# Scell<- 'DC-902'
+Ncell<- 'DC-945'
+Scell<- 'DC-944'
 
 maxEP<- 25
 zp<- filter(zp,
@@ -554,6 +623,12 @@ There appears to be a negative correlation between abnormal direction preference
 
 ```{r DirPrefR2,fig.height=4,fig.width=4}
 
+ggplot(zmc )+
+  geom_point(aes(90-abs(dir.pref.imp),R2,color=monkey),size=2)+
+  theme_minimal()+
+  xlab('Direction preference away from vertical')+
+  ylab(bquote(~R^2))
+
 ggplot(zmc %>% filter(any.sig))+
   geom_point(aes(90-abs(dir.pref.imp),R2,color=monkey),size=2)+
   theme_minimal()+
@@ -576,7 +651,17 @@ ggplot(zmc %>% filter(any.sig))+
   facet_wrap(~monkey,ncol=1)+
   xlab('Direction preference\nusing relative importance')
 
+ggplot(zmc)+
+  geom_segment(aes(y=0,yend=R2,x=dir.pref.imp,xend=dir.pref.imp,color=any.sig))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~cellnum<921,ncol=2)+
+  xlab('Direction preference\nusing relative importance')
+
 ```
+
 ```{r}
 multiplot(ggplot(zmc %>% filter(any.sig))+
             geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
@@ -727,8 +812,11 @@ Next, I want to look at the CV plot for something other than the "primary" posit
 
 ```{r next, fig.width=6,fig.height=7}
 
+
+FRthresh=10
+
 zp %>%
-  filter(meanFR>1,abs(mean.V)<5) %>%
+  filter(meanFR>FRthresh,abs(mean.V)<5) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE) %>%
   group_by(neuron,monkey) %>%
   summarize(mean.CV=mean(sd.sdf/meanFR,na.rm=T),
@@ -741,7 +829,7 @@ zmc %>%
   cvmeans
 
 zp %>%
-  filter(meanFR>1,mean.V > 8, mean.V< 12) %>%
+  filter(meanFR>FRthresh,mean.V > 8, mean.V< 12) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE) %>%
   group_by(neuron,monkey) %>%
   summarize(mean.CVpos=mean(sd.sdf/meanFR,na.rm=T),
@@ -749,7 +837,7 @@ zp %>%
   cvmeanspositive
 
 zp %>%
-  filter(meanFR>1,mean.V> -12,mean.V< -8) %>%
+  filter(meanFR>FRthresh,mean.V> -12,mean.V< -8) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE) %>%
   group_by(neuron,monkey) %>%
   summarize(mean.CVneg=mean(sd.sdf/meanFR,na.rm=T),
@@ -784,6 +872,21 @@ qplot(mean.CVmin,mean.FRmax,data=cvmeans,color=monkey,size=R2)+ggtitle('min')+
 
 
 ```
+
+
+```{r}
+cvmeans2<-left_join(cvmeans,select(zmc,dir.pref.imp),by='neuron')
+cvmeans2<- mutate(cvmeans2,skewness=abs(90-abs(dir.pref.imp)))
+
+ggplot(cvmeans2)+
+  geom_point(aes(mean.CVmin,mean.FRmax,color=monkey,size=skewness))+
+  ggtitle('min')+
+  scale_x_log10()+geom_vline(xintercept = 0.5)+theme(legend.position='bottom')
+```
+
+
+
+
 
 So Doing this adjustment puts almost all of the cells from the normal animal below the threshold identified by Fukushima in cats for the "pitch cells," but there is one cell that is still above it. Let's plot it now and compare it to one of the still-irregular cells from the Esotrope.
 

@@ -1,10 +1,11 @@
 % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\Nucleus Prepositus Hypoglossi');
-[filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\NRTP Vergence\Raw Data');
+% [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\NRTP Vergence\Raw Data');
 % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\SOA from Mark');
 % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\INC Recording');
 % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\NRTP Vergence\OMN');
 
-
+[filename, filepath]=uigetfile('.mat','Select Data File',...
+    'C:\Users\setup\Desktop\NRTP Vergence\OMN_matfiles');
 if filename == 0
     return
 end
@@ -44,3 +45,6 @@ handles.savecsv=uicontrol(handles.s,'string','Save as CSV','units','normalized',
     'position',[0.08 0.2 0.8 0.3],...
     'callback',{@savecsv});
 handles.savecsv.Enable='off';
+
+handles.quicksave=uicontrol(handles.s,'style','togglebutton','string','Quicksave','units','normalized',...
+    'position',[0.0800 0.0133 0.3133 0.1367]);

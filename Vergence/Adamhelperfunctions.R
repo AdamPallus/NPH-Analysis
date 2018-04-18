@@ -42,6 +42,9 @@ dynamiclead<-function(p,lags=seq(10,300,by=10),formula='rev+lev') {
 findSaccades<-function(ev,threshold=40){
   mindur<-1
   i<-which(abs(ev)>threshold) #find all the times when speed > threshold
+  if (length(i)==0){
+    return(data.frame())
+  }
   sacoff<-which(diff(i)>mindur) #minimum duration of an accepted saccade
   sacon<-c(1,sacoff+1) #first saccade
   sacoff<-c(sacoff,length(i)) #end of last saccade
@@ -53,14 +56,17 @@ findSaccades<-function(ev,threshold=40){
 markSaccades<-function(ev,buffer=15,threshold=40){
   #this function finds and marks saccades given a velocity input
   stimes<-findSaccades(ev,threshold)
-  
+
   #remove saccades without enough data at the end of the file, based on buffer size
   toolong<- stimes$saccade.offset> length(ev)-buffer
   tooshort<- stimes$saccade.onset<buffer+1
   stimes<- filter(stimes, !tooshort, !toolong)
   
   nsaccades=nrow(stimes)
-  
+  if (nsaccades==0){
+    return(NA)
+  }
+
   stimes$saccade.onset=stimes$saccade.onset-buffer
   stimes$saccade.offset=stimes$saccade.offset+buffer
   

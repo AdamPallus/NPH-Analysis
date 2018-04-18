@@ -210,7 +210,7 @@ t %>%
   group_by(neuron) %>%
   mutate(time=row_number()) %>%
   do(preparetoBOOTmarksaccs(.)) ->
-  preparedtoBOOT
+  t
 
 # preparedtoBOOT %>%
 #   group_by(neuron) %>%
@@ -242,12 +242,12 @@ t %>%
 
 
 
-preparedtoBOOT%>%
+t%>%
   group_by(neuron) %>%
   do(SaccadesBootstrap(.,nreps)) ->
   xx
 
-saveRDS(xx,'BootstrapSaccadesBoth3-12-2018.RDS')
+saveRDS(xx,'BootstrapSaccadesBoth3-26-2018.RDS')
 
 preparedtoBOOT%>%
   filter(saccade.type == 'left.only') %>%
@@ -255,7 +255,7 @@ preparedtoBOOT%>%
   do(SaccadesBootstrap(.,nreps)) ->
   xxLEFT
 
-saveRDS(xxLEFT,'BootstrapSaccadesLEFT3-12-2018.RDS')
+# saveRDS(xxLEFT,'BootstrapSaccadesLEFT3-12-2018.RDS')
 
 
 
@@ -265,7 +265,7 @@ preparedtoBOOT%>%
   do(SaccadesBootstrap(.,nreps)) ->
   xxRIGHT
 
-saveRDS(xxRIGHT,'BootstrapSaccadesRIGHT3-12-2018.RDS')
+# saveRDS(xxRIGHT,'BootstrapSaccadesRIGHT3-12-2018.RDS')
 
 # 
 ciplot<-bootstrap.ci(xx)

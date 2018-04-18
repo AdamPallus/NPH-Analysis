@@ -57,15 +57,9 @@ o<-NULL
 ```{r mark saccades,cache=FALSE,eval=FALSE}
 
 measureSaccadesINC<-function(t){
-  # I set up a check because I want to apply blink removal only for data files 
-  #that come from visual eye tracking. There were errors when I tried to run normal 
-  #data through it, possibly since it didn't find any periods where the eye postiion 
-  #matched the criteria for a blink. I could edit my markSaccades function to handle
-  #what to do if there are no saccades found in the entire file, or make a separate 
-  #"markblinks" function, but this works well.
-  if (t$monkey[1]=='DC'){ 
+
     t%>%
-      mutate(blinks=markSaccades(rep,buffer=80,threshold=70), 
+      mutate(blinks=markSaccades(rep,buffer=80,threshold=70),
              #we put an 80ms buffer around each detected blink
              #then we force the velocity to be above threshold for the detected blinks
              #This causes all blinks to be marked as saccades, which means they are not
@@ -81,18 +75,7 @@ measureSaccadesINC<-function(t){
              conj.hor.v=(rev+lev)/2) %>%
       select(-blinks)->
       t
-  }else{
-    t %>%
-      mutate(dsnum=markSaccadesDouble(conj.velocity,threshold1=30,threshold2=15),
-              sdf=spikedensity(rasters,10),
-              sdf10=lag(sdf,10),
-              conj.vert=(repV+lepV)/2,
-              conj.vert.vel=(revV+levV)/2,
-              conj.hor=(rep+lep)/2,
-              conj.hor.v=(rev+lev)/2) ->
-      t
-  }
-  t
+
 }
 
 expandSaccades<- function(tt,buffer=80){
@@ -139,8 +122,8 @@ tt<- left_join(tt,x,by='time')
 #update 3-30-2018 LOL, I disabled those programs and it literally took 4 minutes to run this
 t %>%
   group_by(neuron) %>%
-  do(measureSaccadesINC(.)) %>%
-  do(expandSaccades(.,buffer=80))->
+  do(measureSaccadesINC(.))-># %>%
+  # do(expandSaccades(.,buffer=80))->
   t
 
 # saveRDS(t,'INCsaccadesmarked.RDS')
@@ -172,6 +155,7 @@ t %>%
             sd.sdf=sd(sdf10),
             asleep=sd.conj.velocity>7.5 || dur>2000)->
   zp
+
 
 
 ```
@@ -342,9 +326,13 @@ conj.measureCell<- function(x,maxEP=25){
   #calculate direction preference based on relative slopes from multiple regression model
   dir.pref.slope<-as.numeric(atan2(V,H))*180/pi
 
-  #calculate direction preference based on relative importance of each factor in multiple regression model  
-  b=as.numeric(calc.relimp(mHV)$lmg)
-  dir.pref.imp<- atan2(b[2]*sign(V),b[1]*sign(H))*180/pi
+  #calculate direction preference based on relative importance of each factor in multiple regression model   
+  dir.pref.imp<-tryCatch({
+    b=as.numeric(calc.relimp(mHV)$lmg)
+    dir.pref.imp<- atan2(b[2]*sign(V),b[1]*sign(H))*180/pi
+    },error=function(e){return(NA)})
+  
+
   
   any.sig=V.p<0.001 | H.p <0.001
   
@@ -437,12 +425,14 @@ measureCell<-function(x){
 }
 
 zp %>%
+  filter(meanFR>10,dur<1000) %>%
   group_by(neuron) %>%
   do(measureCell(.)) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
   zm
 
 zp %>%
+  filter(meanFR>10,dur<1000) %>%
   group_by(neuron) %>%
   do(conj.measureCell(.)) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
@@ -452,8 +442,8 @@ zp %>%
 #Results
 
 ```{r RegularCells,fig.height=7,fig.width=6}
-Ncell<- 'Patos-104'
-Scell<- 'Kopachuck-102'
+Ncell<- 'Patos-107'
+Scell<- 'Patos-110'
 
 maxEP<- 25
 zp<- filter(zp,
@@ -660,7 +650,7 @@ ggplot(zm)+
   theme_minimal()+
   theme(legend.position='none')+
   facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nusing relative importance'),
+  xlab('Direction preference\nusing RIGHT eye'),
 ggplot(zm)+
   geom_segment(aes(y=0,yend=R2L,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
   scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
@@ -668,7 +658,7 @@ ggplot(zm)+
   theme_minimal()+
   theme(legend.position='none')+
   facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nusing relative importance')
+  xlab('Direction preference\nusing LEFT eye')
 )
 ```
 
@@ -677,7 +667,10 @@ ggplot(zm)+
 zm %>%
   mutate(dir.pref.min.R =minabs(c(dir.imp.R %% 90,dir.imp.R %% -90)),
          dir.pref.min.L =minabs(c(dir.imp.L %% 90,dir.imp.L %% -90)),
-         dir.pref.min = min(dir.pref.min.R,dir.pref.min.L))->
+         dir.pref.min = min(dir.pref.min.R,dir.pref.min.L),
+         right.eye.best=dir.pref.min.R<dir.pref.min.L,
+         best.dir=dir.imp.L,
+         best.dir=replace(best.dir,right.eye.best,dir.imp.R))->
   zm
 
 
@@ -727,6 +720,16 @@ ggplot(zm)+
   facet_wrap(~monkey,ncol=4)+
   xlab('Direction preference\nMinimum Skew')
 )
+
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2,x=best.dir,xend=best.dir,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nMinimum Skew')
+
 ```
 
 ```{r, fig.height=9}

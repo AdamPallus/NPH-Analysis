@@ -49,6 +49,7 @@ end
 
 if strcmp(keep,'Yes')
     assignin('base','spiketimes',spiketimes)
+    assignin('base','chosenCluster',xx{choice})
     h.savecsv.Enable='on';
 end
 

@@ -2,16 +2,16 @@
 function savecsvbehavior(b)
 
 % % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\Nucleus Prepositus Hypoglossi');
-% [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\NRTP Vergence\Raw Data');
+[filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\NRTP Vergence\Raw Data');
 % % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\SOA from Mark');
 % % [filename, filepath]=uigetfile('.mat','Select Data File','C:\Users\setup\Desktop\INC Recording');
-% 
-% 
-% if filename == 0
-%     return
-% end
-% 
-% b=load([filepath filename]);
+
+
+if filename == 0
+    return
+end
+
+b=load([filepath filename]);
 b.filepath=filepath;
 b.filename=filename;
 

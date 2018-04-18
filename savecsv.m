@@ -1,5 +1,14 @@
 function savecsv(~,~)
 b=evalin('base','b');
+h=evalin('base','handles');
+
+quicksave=h.quicksave.Value;
+% try
+%     quicksave=evalin('base','quicksave');
+% catch
+%     quicksave=false;
+% end
+chosenCluster=evalin('base','chosenCluster');
 
 hasspikes=isfield(b,'Unit');
 
@@ -7,17 +16,33 @@ try
 b.spiketimes= evalin('base','spiketimes');
 end
 
-if hasspikes
-    savespikes=questdlg('Save Spiketimes?','Save?');
-    savelocation=questdlg('Save .csv to same folder?','Save?');
+monkey=strtok(b.filename,'_');
+
+if ~quicksave
+    if hasspikes
+        savespikes=questdlg('Save Spiketimes?','Save?');
+        savelocation=questdlg('Save .csv to same folder?','Save?');
+    else
+        savespikes=0;
+        savelocation=questdlg(sprintf('No unit channel\nSave .csv to same folder?'),'Save?');
+    end
+    
+    
+    %Exotropes: Patos, Pilchuck
+    exa= strcmp(questdlg(['Is ',monkey,' an Exotrope?'],'EXO?','No','Yes','No'),'Yes');
 else
-    savespikes=0;
-    savelocation=questdlg(sprintf('No unit channel\nSave .csv to same folder?'),'Save?');
+    savespikes='Yes';
+    savelocation='Yes';
+    if strcmp(monkey,'Patos') || strcmp(monkey,'Pilchuck')
+        exa=true;
+        disp('Quicksaving EXOTROPE...')
+    else
+        disp('Quicksaving NORMAL')
+        exa=false;
+    end
 end
 
-monkey=strtok(b.filename,'_');
-%Exotropes: Patos, Pilchuck 
-exa= strcmp(questdlg(['Is ',monkey,' an Exotrope?'],'EXO?','No','Yes','No'),'Yes');
+ww= waitbar(0,'SAVING...');
 
 if strcmp(savespikes,'Yes')
     b.spikes=evalin('base','spikes');
@@ -134,12 +159,12 @@ else
 end
 
 if exa
-    defaultname=[b.filepath, b.filename(1:end-4),'-EXO','.csv'];
+    defaultname=[b.filepath, b.filename(1:end-4),'c',chosenCluster,'-EXO','.csv'];
 else
-    defaultname=[b.filepath, b.filename(1:end-4), '.csv'];
+    defaultname=[b.filepath, b.filename(1:end-4),'c',chosenCluster,'.csv'];
 end
 
-ww= waitbar(0,'SAVING...');
+
 if strcmp(savelocation,'Yes')
     writetable(t,defaultname)
 else
