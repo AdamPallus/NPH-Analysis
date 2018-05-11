@@ -1,0 +1,802 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set(echo=FALSE,message=FALSE,warning=FALSE,cache=FALSE)
+```
+
+```{r,message=FALSE,echo=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(broom)
+# library(grid)
+library(relaimpo)
+library(leaps)
+library(stringr)
+library(cladoRcpp)
+library(boot)
+source('Adamhelperfunctions.R')
+source('fixationanalysisfunctions.R')
+select<- dplyr::select
+```
+
+
+```{r plotFunctions,echo=FALSE}
+
+compare2cells<- function(zp,zmc,c1,c2,maxEP=25,color1='black',color2='black',
+                         c1name=NA,c2name=NA){
+  
+  if(is.na(c1name)){c1name=c1}
+  if(is.na(c2name)){c2name=c2}
+  
+zp<- filter(zp,
+            neuron %in% c(c1,c2),
+            dur>200,
+            abs(mean.R.H)<maxEP,
+            abs(mean.L.H)<maxEP,
+            abs(mean.R.V)<maxEP,
+            abs(mean.L.V)<maxEP,
+            meanFR<500)
+  
+tab<-zmc %>%
+  filter(neuron %in% c(c1,c2)) %>%
+  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
+
+nV<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.V,meanFR),color=color1)+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  theme_minimal()+
+  ylab(paste(c1name,'\nMean Firing Rate (spk/s)'))
+
+nH<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.H,meanFR),color=color1)+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('')+
+  ylab('')+
+  theme_minimal()
+
+  sV<-ggplot(zp %>% filter(neuron==c2))+
+    geom_point(aes(mean.V,meanFR),color=color2)+
+    stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+    xlab('Mean Vertical Eye Position (deg)')+
+    ylab(paste(c2name,'\nMean Firing Rate (spk/s)'))+
+    theme_minimal()
+  
+  sH<-ggplot(zp %>% filter(neuron==c2))+
+    geom_point(aes(mean.H,meanFR),color=color2)+
+    stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+    xlab('Mean Horizontal Eye Position (deg)')+
+    ylab('')+
+    theme_minimal()
+
+
+#make a named list to manually color the direction plots
+color.values<-NULL
+color.values[[c1]]<-color1
+color.values[[c2]]<-color2
+
+dir.imp<-ggplot(tab)+
+  # geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp),color='black')+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=neuron))+
+  scale_color_manual(values=color.values)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction preference\nusing relative importance')
+
+dir.slope<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.slope,xend=dir.pref.slope,color=neuron))+
+  scale_color_manual(values=color.values)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction Preference\nusing slopes')
+
+# print(multiplot(nV,sV,dir.slope,nH,sH,dir.imp,cols=2))
+
+
+return(list(nV,sV,dir.slope,nH,sH,dir.imp))
+
+
+}
+
+show1cell<- function(zp,zmc,c1,maxEP=25,color1='black',c1name=NA){
+  
+  if(is.na(c1name)){c1name=c1}
+
+zp<- filter(zp,
+            neuron == c1,
+            dur>200,
+            abs(mean.R.H)<maxEP,
+            abs(mean.L.H)<maxEP,
+            abs(mean.R.V)<maxEP,
+            abs(mean.L.V)<maxEP,
+            meanFR<500)
+  
+tab<-zmc %>%
+  filter(neuron == c1) %>%
+  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
+
+nV<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.V,meanFR),color=color1)+
+  stat_smooth(aes(mean.V,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Horizontal Eye Position (deg)')+
+  theme_minimal()+
+  ylab(paste(c1name,'\nMean Firing Rate (spk/s)'))
+
+nH<-ggplot(zp %>% filter(neuron==c1))+
+  geom_point(aes(mean.H,meanFR),color=color1)+
+  stat_smooth(aes(mean.H,meanFR),color='black',se=FALSE,method=lm)+
+  xlab('Mean Vertical Eye Position (deg)')+
+  ylab('')+
+  theme_minimal()
+
+
+#make a named list to manually color the direction plots
+color.values<-NULL
+color.values[[c1]]<-color1
+
+dir.imp<-ggplot(tab)+
+  # geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp),color='black')+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=neuron))+
+  scale_color_manual(values=color.values)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction preference\nusing relative importance')
+
+dir.slope<-ggplot(tab)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.slope,xend=dir.pref.slope,color=neuron))+
+  scale_color_manual(values=color.values)+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  xlab('Direction Preference\nusing slopes')
+
+# print(multiplot(nV,sV,dir.slope,nH,sH,dir.imp,cols=2))
+
+
+return(list(nV,dir.slope,nH,dir.imp))
+
+}
+
+```
+
+
+```{r load,cache=FALSE}
+#skip the next two chunks (quickload and mark saccades) if you load this.
+ # t<- readRDS('INCsaccadesmarked.RDS')
+ t<- readRDS('OMNstrabMeasured4-19-2018.RDS')
+ # t<-readRDS('INCmeasuredall.RDS')
+```
+
+```{r quickload,echo=FALSE,cache=TRUE}
+LoadFromFile<- FALSE
+
+if (LoadFromFile){
+  o<- readRDS('OMNstrab.RDS')
+}else{
+  o<-NULL
+}
+
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/OMNfinal/",referencefile=o)
+# t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/SOAstrab/",referencefile=o)
+
+t<- rbind(o,t)
+
+o<-NULL
+
+```
+
+
+```{r mark saccades,cache=FALSE,eval=FALSE}
+
+t %>%
+  group_by(neuron) %>%
+  mutate(time=row_numer()) %>%
+  do(measureSaccadesINC(.))-># %>%
+  # do(expandSaccades(.,buffer=80))->
+  t
+
+# saveRDS(t,'OMNstrabMeasured4-19-2018.RDS')
+
+```
+
+```{r Measure_Fixations,warning=FALSE}
+
+##fix some bad recordings with specificity:
+#remove the first 300 seconds from Patos-107 where the cell is not yet isolated
+# tt<-filter(t,neuron =='Patos-107',time>300000)
+#remove cells 119, 105 and 112
+t<- filter(t,!neuron %in% c('Patos-105','Patos-112','Patos-119'),!(neuron=='Patos-107'&time<300000))
+# t<- rbind(t,tt)
+
+zp<-measureFixations(t)
+# 
+# maxEP<- 35
+# zp<- filter(zp,
+#             dur>200,
+#             dur<2000,
+#             qrange<20,
+#             mean.verg.angle<19,
+#             mean.conj.velocity<5,
+#             abs(mean.R.H)<maxEP,
+#             abs(mean.L.H)<maxEP,
+#             abs(mean.R.V)<maxEP,
+#             abs(mean.L.V)<maxEP,
+#             meanFR<500)
+
+zp<- zp %>% filter(peak.conj.velocity<16,
+                   mean.verg.angle<19,
+                   mean.verg.angle>-50,
+                   dur<2000,
+                   dur>200,
+                   meanFR>1)
+
+
+
+```
+
+```{r bootstrap sensitivities}
+
+
+getObservedcoef<-function(z){
+  modR <- lm(meanFR ~ mean.R.H+mean.R.V,data=z)
+  modL <- lm(meanFR ~ mean.L.H+mean.L.V,data=z)
+  modRL<- lm(meanFR ~ mean.H+mean.V,data=z)
+  rn<- c('right','left','cyclopean')
+  dt<-as_tibble(rbind(as.numeric(coef(modR)),
+                      as.numeric(coef(modL)),
+                      as.numeric(coef(modRL))))
+  names(dt)<-c('intercept_o','horizontal_o','vertical_o')
+  dt$type=rn
+  dt 
+}
+
+bootstrapDirPref<-function(zboot,nreps){
+  
+  getcoef<-function(n,z){
+    z <- sample_frac(z,size= 1,replace=TRUE)
+    modR <- lm(meanFR ~ mean.R.H+mean.R.V,data=z)
+    modL <- lm(meanFR ~ mean.L.H+mean.L.V,data=z)
+    modRL<- lm(meanFR ~ mean.H+mean.V,data=z)
+    rn<- c('right','left','cyclopean')
+    dt<-as_tibble(rbind(as.numeric(coef(modR)),
+                        as.numeric(coef(modL)),
+                        as.numeric(coef(modRL))))
+    names(dt)<-c('intercept','horizontal','vertical')
+    dt$type=rn
+    dt$repN=n
+    dt 
+  }
+  
+  n<- matrix(1:nreps)
+  neuronName<- zboot$neuron[1]
+  x<- as.data.frame(rbindlist(lapply(n,getcoef,zboot))) #calls the function n times
+  x<- mutate(x,neuron=neuronName)
+}
+
+
+##########################################################
+#THIS BLOCK TAKES A LONG TIME SINCE IT FITS >600k linear models
+###########################################################
+# zb<-readRDS('INCbootstrap-4-24-2018.RDS')
+zp %>%
+  group_by(neuron) %>%
+  do(bootstrapDirPref(.,nreps=1999)) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  zbomn
+# saveRDS(zbomn,'OMNbootstrap-4-26-2018.RDS')
+
+zp %>%
+  group_by(neuron) %>%
+  do(getObservedcoef(.)) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  zoomn
+
+zbomn %>%
+  group_by(neuron,type) %>%
+  summarize(lowH=quantile(horizontal,probs=0.025),
+            lowV=quantile(vertical,probs=0.025),
+            highH=quantile(horizontal,probs=0.975),
+            highV=quantile(vertical,probs=0.975)) %>%
+  mutate(zerocrossH=lowH*highH < 0,
+         zerocrossV=lowV*highV < 0)->
+  zciomn
+
+zoomn<- left_join(zoomn,zciomn)
+```
+
+
+First we will plot all of the cells and their bootstrapped confidence intervals:
+
+```{r Bootstrapplots,fig.height=12,fig.width=8}
+ggplot(zoomn,aes(abs(horizontal_o),abs(vertical_o)))+
+  geom_errorbar(aes(ymin=lowV*sign(vertical_o),ymax=highV*sign(vertical_o)),
+                 width=0,size=0.5,alpha=0.3)+
+  geom_errorbarh(aes(xmin=lowH*sign(horizontal_o),xmax=highH*sign(horizontal_o)),
+                 height=0,size=0.5,alpha=0.3)+
+  geom_point(aes(color=monkey),size=2)+
+  geom_abline(size=2,linetype=2,alpha=0.2)+
+  coord_fixed()+
+  facet_wrap(~type,ncol=1)+
+  ylim(c(NA,3.9))+
+  theme_minimal()+
+  geom_vline(xintercept = 0,color='hotpink')+
+  geom_hline(yintercept = 0,color='hotpink')+
+  xlab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  ylab('Sensitivfity to Vertical Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position='bottom')
+```
+
+```{r,fig.height=6,fig.width=8}
+ggplot(zoomn %>% filter(type=='left'),aes(abs(horizontal_o),abs(vertical_o)))+
+  geom_errorbar(aes(ymin=lowV*sign(vertical_o),ymax=highV*sign(vertical_o)),
+                 width=0,size=0.5,alpha=0.3)+
+  geom_errorbarh(aes(xmin=lowH*sign(horizontal_o),xmax=highH*sign(horizontal_o)),
+                 height=0,size=0.5,alpha=0.3)+
+  geom_point(aes(color=monkey),size=2)+
+  geom_abline(size=2,linetype=2,alpha=0.2)+
+  coord_fixed()+
+  facet_wrap(~monkey,ncol=3)+
+  # ylim(c(NA,3.9))+
+  theme_minimal()+
+  geom_vline(xintercept = 0,color='hotpink')+
+  geom_hline(yintercept = 0,color='hotpink')+
+  xlab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  ylab('Sensitivfity to Vertical Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position='bottom')
+```
+
+
+```{r,fig.height=8,fig.width=8}
+ggplot(zoomn %>% filter(type=='left'),aes(abs(horizontal_o),abs(vertical_o)))+
+  geom_point(aes(color=monkey),size=2)+
+  geom_abline(size=2,linetype=2,alpha=0.2)+
+  geom_segment(x=0,y=0,aes(xend=abs(horizontal_o),yend=abs(vertical_o),color=monkey),alpha=0.5)+
+  coord_fixed()+
+  facet_wrap(~monkey,ncol=3)+
+  # ylim(c(NA,3.9))+
+  theme_minimal()+
+  geom_vline(xintercept = 0,color='hotpink')+
+  geom_hline(yintercept = 0,color='hotpink')+
+  xlab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  ylab('Sensitivfity to Vertical Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position='bottom')
+```
+```{r,fig.height=8,fig.width=8}
+ggplot(zoomn %>% filter(type=='left'),aes(horizontal_o,vertical_o))+
+  geom_point(aes(color=monkey),size=2)+
+  geom_abline(size=2,linetype=2,alpha=0.2)+
+  geom_segment(x=0,y=0,aes(xend=horizontal_o,yend=vertical_o,color=monkey),alpha=0.5)+
+  coord_fixed()+
+  facet_wrap(~monkey,ncol=3)+
+  ylim(c(NA,3.9))+
+  theme_minimal()+
+  geom_vline(xintercept = 0,color='hotpink')+
+  geom_hline(yintercept = 0,color='hotpink')+
+  xlab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  ylab('Sensitivfity to Vertical Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position='bottom')
+```
+```{r,fig.height=8,fig.width=8}
+ggplot(zoomn %>% filter(type=='left',!(zerocrossV&zerocrossH)),aes(horizontal_o,vertical_o))+
+  geom_point(aes(color=monkey),size=2)+
+  geom_abline(size=2,linetype=2,alpha=0.2)+
+  geom_segment(x=0,y=0,aes(xend=horizontal_o,yend=vertical_o,color=monkey),alpha=0.5)+
+  geom_errorbar(aes(ymin=lowV,ymax=highV),
+                 width=0,size=0.5,alpha=0.3)+
+  geom_errorbarh(aes(xmin=lowH,xmax=highH),
+                 height=0,size=0.5,alpha=0.3)+
+  coord_fixed()+
+  facet_wrap(~monkey,ncol=2)+
+  ylim(c(NA,3.9))+
+  theme_minimal()+
+  geom_vline(xintercept = 0,color='hotpink')+
+  geom_hline(yintercept = 0,color='hotpink')+
+  xlab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  ylab('Sensitivfity to Vertical Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position='bottom')
+```
+Here's a plot I think could be published - maybe just one column
+
+```{r,fig.height=8,fig.width=6}
+ggplot(zoomn,aes(horizontal_o,vertical_o))+
+  # geom_abline(size=2,linetype=2,alpha=0.2)+
+  geom_segment(x=0,y=0,aes(xend=horizontal_o,yend=vertical_o,color=monkey),alpha=0.5)+
+  geom_errorbar(aes(ymin=lowV,ymax=highV),
+                width=0,size=0.5,alpha=0.3)+
+  geom_errorbarh(aes(xmin=lowH,xmax=highH),
+                 height=0,size=0.5,alpha=0.3)+
+  geom_point(aes(color=monkey),size=1.5,alpha=0.5)+
+  coord_fixed()+
+  facet_grid(monkey~type)+
+  # ylim(c(NA,3.9))+
+  theme_minimal()+
+  geom_vline(xintercept = 0,color='black',alpha=0.4)+
+  geom_hline(yintercept = 0,color='black',alpha=0.4)+
+  xlab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  ylab('Sensitivfity to Vertical Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position='bottom')
+```
+
+
+```{r}
+zoomn<- mutate(zoomn,magnitude=sqrt(horizontal_o^2+vertical_o^2))
+
+zoomn %>%
+  filter(type=='right') %>%
+  group_by(monkey) %>%
+  summarize(meanHsens=mean(abs(horizontal_o)),
+            sdHsens=sd(abs(horizontal_o))) %>%
+  kable(digits=2)
+
+zoomn %>%
+  filter(type=='right') %>%
+  ggplot()+
+  geom_boxplot(aes(monkey,abs(horizontal_o),fill=monkey))
+  
+summary(aov(abs(horizontal_o)~monkey,data=zoomn))
+
+```
+
+```{r}
+zoomn<- mutate(zoomn,magnitude=sqrt(horizontal_o^2+vertical_o^2))
+
+zoomn %>%
+  filter(type=='right') %>%
+  group_by(monkey) %>%
+  summarize(meanVsens=mean(abs(vertical_o)),
+            sdVsens=sd(abs(horizontal_o))) %>%
+  kable(digits=2)
+
+zoomn %>%
+  filter(type=='right') %>%
+  ggplot()+
+  geom_boxplot(aes(monkey,abs(vertical_o),fill=monkey))
+  
+summary(aov(abs(vertical_o)~monkey,data=zoomn))
+
+```
+
+
+
+```{r statfigsV}
+
+zoomn %>%
+  filter(type=='right') %>%
+ggboxplot(x = "monkey", y='abs(vertical_o)',
+         color = "monkey", palette = "npg",
+         # facet.by = c("subject","amp.bins.15"), short.panel.labs = TRUE)
+         short.panel.labs = TRUE) + 
+  stat_compare_means(label.y=5)+
+  stat_compare_means(ref.group='Bee')+
+  # stat_compare_means(label = "p.signif")+
+  xlab('Monkey')+
+  ylab('Sensitivity to Vertical Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position = 'bottom')
+
+```
+
+
+Horizontal sensitivity is not significantly different, but there are a lot of cells included here where the slopes are not significant.
+
+```{r statfigsH}
+
+zoomn %>%
+  filter(type=='right') %>%
+ggboxplot(x = "monkey", y='abs(horizontal_o)',
+         color = "monkey", palette = "npg",
+         # facet.by = c("subject","amp.bins.15"), short.panel.labs = TRUE)
+         short.panel.labs = TRUE) + 
+  stat_compare_means(label.y=1.6)+
+  stat_compare_means(ref.group='Bee')+
+  # stat_compare_means(label = "p.signif")+
+  xlab('Monkey')+
+  ylab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position = 'bottom')
+
+```
+
+
+However, if we just look at cells where there is a significant sensitivity to horizontal eye position, then the differences are significant, but not remarkably so.
+
+```{r statfigsHsignif}
+
+zoomn %>%
+  filter(type=='right',!zerocrossH) %>%
+ggboxplot(x = "monkey", y='abs(horizontal_o)',
+         color = "monkey", palette = "npg",
+         # facet.by = c("subject","amp.bins.15"), short.panel.labs = TRUE)
+         short.panel.labs = TRUE) + 
+  stat_compare_means(label.y=1.6)+
+  stat_compare_means(comparisons = list(c('Bee','DC'),c('Bee','Kopachuck'),c('DC','Kopachuck')))+
+  # stat_compare_means(label = "p.signif")+
+  xlab('Monkey')+
+  ylab('Sensitivity to Horizontal Eye Position ((spk/s)/(deg/s))')+
+  theme(legend.position = 'bottom')
+
+```
+
+
+
+
+
+```{r Fixation_Analysis,cache=FALSE,warning=FALSE}
+
+
+zp %>%
+    filter(meanFR>0,dur<1000,mean.conj.velocity<10) %>%
+  group_by(neuron) %>%
+  mutate(n=n()) %>%
+  filter(n>20) %>%
+  do(calculateDirPrefFixations(.)) %>%
+  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
+  zm
+
+
+
+```
+#Results
+
+```{r RegularCells,fig.height=7,fig.width=6}
+Ncell<- 'Patos-107'
+Scell<- 'Patos-110'
+
+
+
+tab<-zmc %>%
+  filter(neuron %in% c(Ncell,Scell)) %>%
+  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
+
+multiplot(plotlist=compare2cells(zp,zmc,Ncell,Scell,color1='purple',color2='orange',
+                                 c1name=Ncell,c2name=Scell),cols=2)
+
+kable(tab,digits=2)
+
+```
+
+\pagebreak
+
+###Direction Preferences
+Using RIGHT EYE only
+```{r,fig.height=6}
+multiplot(
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=1,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('')+
+  ylab(''),
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2R,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nusing relative importance')+
+  ylab('R-squared'),
+cols=1
+)
+
+```
+
+```{r lefteye, fig.height=6}
+multiplot(
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=1,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('')+
+  ylab(''),
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2L,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nusing relative importance')+
+  ylab('R-squared'),
+cols=1
+)
+
+```
+
+
+CONJUGATE
+```{r conjugate, fig.height=6}
+multiplot(
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp, xend=dir.pref.imp,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('')+
+  ylab(''),
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nusing relative importance')+
+  ylab('R-squared'),
+cols=1
+)
+
+```
+
+
+When Mark asked me about the methods for how I was calculating direction preference for his grant, he wanted to avoid using the relative importance metric, but using slopes directly introduces noise unnecessarily because the magnitude of the slope isn't related to how good the fit is.
+
+My new idea was to replace any non-significant slope with zero. At this point, I am using a p-value of 0.001 for the linear model. I came up with that number because it's 0.05 divided by 50, but I have also been considering doing a bootstrap confidence interval. 
+
+
+```{r goodslopes_R, fig.height=6}
+multiplot(
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=1,x=dir.goodslopes.R, xend=dir.goodslopes.R,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('')+
+  ylab(''),
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2R,x=dir.goodslopes.R,xend=dir.goodslopes.R,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nusing only significant slopes and RIGHT eye only')+
+  ylab('R-squared'),
+cols=1
+)
+
+```
+
+
+```{r goodslopes_L, fig.height=6}
+multiplot(
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=1,x=dir.goodslopes.L, xend=dir.goodslopes.L,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('')+
+  ylab(''),
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2L,x=dir.goodslopes.L,xend=dir.goodslopes.L,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nusing only significant slopes and LEFT eye only')+
+  ylab('R-squared'),
+cols=1
+)
+
+```
+
+
+```{r goodslopes_conj, fig.height=6}
+multiplot(
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=1,x=dir.goodslopes, xend=dir.goodslopes,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('')+
+  ylab(''),
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2,x=dir.goodslopes,xend=dir.goodslopes,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nusing only significant slopes and LEFT eye only')+
+  ylab('R-squared'),
+cols=1
+)
+
+```
+
+Let's compare methods now... The right eye seems to be the best for DC
+
+```{r dirpref_compare, fig.height=15,fig.width=6}
+multiplot(
+  #slopes
+    ggplot(zm)+
+    geom_segment(aes(y=0,yend=R2L,x=dir.pref.L,xend=dir.pref.L,color=monkey))+
+    scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+    coord_polar(start=pi/2,direction=-1)+
+    theme_minimal()+
+    theme(legend.position='none')+
+    facet_wrap(~monkey,ncol=4)+
+    xlab('Direction preference\nusing slopes and LEFT eye only')+
+    ylab('R-squared'),
+      ggplot(zm)+
+    geom_segment(aes(y=0,yend=R2R,x=dir.pref.R,xend=dir.pref.R,color=monkey))+
+    scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+    coord_polar(start=pi/2,direction=-1)+
+    theme_minimal()+
+    theme(legend.position='none')+
+    facet_wrap(~monkey,ncol=4)+
+    xlab('Direction preference\nusing slopes and RIGHT eye only')+
+    ylab('R-squared'),
+  #Relative Importance  
+    ggplot(zm)+
+    geom_segment(aes(y=0,yend=R2L,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
+    scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+    coord_polar(start=pi/2,direction=-1)+
+    theme_minimal()+
+    theme(legend.position='none')+
+    facet_wrap(~monkey,ncol=4)+
+    xlab('Direction preference\nusing relative importance and LEFT eye only')+
+    ylab('R-squared'),
+    ggplot(zm)+
+    geom_segment(aes(y=0,yend=R2R,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
+    scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+    coord_polar(start=pi/2,direction=-1)+
+    theme_minimal()+
+    theme(legend.position='none')+
+    facet_wrap(~monkey,ncol=4)+
+    xlab('Direction preference\nusing relative importance and RIGHT eye only')+
+    ylab('R-squared'),
+  #Significant Slopes
+    
+  ggplot(zm)+
+    geom_segment(aes(y=0,yend=R2L,x=dir.goodslopes.L,xend=dir.goodslopes.L,color=monkey))+
+    scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+    coord_polar(start=pi/2,direction=-1)+
+    theme_minimal()+
+    theme(legend.position='none')+
+    facet_wrap(~monkey,ncol=4)+
+    xlab('Direction preference\nusing only significant slopes and LEFT eye only')+
+    ylab('R-squared'),
+  ggplot(zm)+
+    geom_segment(aes(y=0,yend=R2R,x=dir.goodslopes.R,xend=dir.goodslopes.R,color=monkey))+
+    scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+    coord_polar(start=pi/2,direction=-1)+
+    theme_minimal()+
+    theme(legend.position='none')+
+    facet_wrap(~monkey,ncol=4)+
+    xlab('Direction preference\nusing only significant slopes and RIGHT eye only')+
+    ylab('R-squared'),
+
+  cols=1
+)
+
+```

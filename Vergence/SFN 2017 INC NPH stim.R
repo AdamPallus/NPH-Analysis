@@ -48,7 +48,8 @@ sx %>% #now go back to the original data with stimulation trains marked
          repVDIFF=repV-repV[counter==0],
          lepVDIFF=lepV-lepV[counter==0],
         stim=counter>0&counter<(stim.dur),
-        interrupted=1 %in% sign(saccades[stim]))->
+        interrupted=1 %in% sign(saccades[stim]),
+        blink = max(abs(conj.velocity))>1000)->
   sp
 
 #manually select stim trials
@@ -68,15 +69,14 @@ stimlength=ceiling(d$stim.dur[1]/10)*10
 maxplot=bufferlength+stimlength
 
 
-d<- mutate(d,peak.conj.velocity=
-             max(conj.velocity[bufferlength:bufferlength+stimlength],
+d<- mutate(d,peak.conj.velocity=max(conj.velocity[bufferlength:bufferlength+stimlength],
                                     na.rm=TRUE),
            IEP.H=(first(rep)+first(lep))/2,
            IEP.V=(first(repV)+first(lepV)/2))
 
 # d<- filter(d,stimes %in% c(1, 3, 4,6,7))
 
-ggplot(d,aes(group=stimes))+
+ggplot(d %>% filter(!blink,!interrupted),aes(group=stimes))+
   geom_line(aes(counter,repDIFF+10),color='red')+
   geom_line(aes(counter,lepDIFF+10),color='blue')+
   geom_line(aes(counter,repVDIFF-5),color='red',linetype=2)+
@@ -287,7 +287,7 @@ sp %>%
   filter(!interrupted)%>%
   # filter(stimes<20) %>%
   group_by(neuron,counter) %>%
-  summarize_each(funs(mean))->
+  summarize_all(funs(mean))->
   dallmean
 
 sp %>%
@@ -331,7 +331,7 @@ geom_point()+
   theme_minimal()+
   geom_errorbar(aes(ymin=RLratioLow,ymax=RLratioHigh))
 
-ggplot(ampMeans,
+ggplot(ampMeans %>% filter(RLratiomean<20),
        aes(nstims,RLratiomean,color=neuron))+
   geom_point()+
   geom_hline(yintercept = mean(ampMeans$RLratiomean))+

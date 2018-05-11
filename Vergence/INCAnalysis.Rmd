@@ -59,7 +59,7 @@ if (LoadFromFile){
 
 # t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/",referencefile=o)
 # t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/DCcoils/",referencefile=o)
-t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/DC/",referencefile=o)
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/INCstrab/new/",referencefile=o)
 
 t<- rbind(o,t)
 
@@ -132,7 +132,7 @@ tt<- left_join(tt,x,by='time')
 #It also took over an hour to simply run saveRDS(t,''), so I think there were some
 #issues with memory management in executing this code. 
 t %>%
-  mutate(smi= monkey=='DC' & cellnum<=921)%>%
+  # mutate(smi= monkey=='DC' & cellnum<=921)%>%
   group_by(neuron) %>%
   do(measureSaccadesINC(.))-># %>%
   # do(expandSaccades(.,buffer=80))->

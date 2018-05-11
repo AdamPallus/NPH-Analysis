@@ -24,19 +24,19 @@ library(stringr)
 library(cladoRcpp)
 library(boot)
 source('Adamhelperfunctions.R')
+source('fixationanalysisfunctions.R')
 select<- dplyr::select
 ```
 
 ```{r load,cache=FALSE}
-
 #skip the next two chunks (quickload and mark saccades) if you load this.
  # t<- readRDS('INCsaccadesmarked.RDS')
- t<- readRDS('OMNsaccadesmarked.RDS') 
+ t<- readRDS('OMNstrabMeasured4-19-2018.RDS') 
 
 ```
 
 ```{r quickload,echo=FALSE,cache=TRUE}
-LoadFromFile<- TRUE
+LoadFromFile<- FALSE
 
 if (LoadFromFile){
   o<- readRDS('OMNstrab.RDS')
@@ -44,7 +44,7 @@ if (LoadFromFile){
   o<-NULL
 }
 
-t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/OMN/",referencefile=o)
+t<- loadnewcsv2(path="C:/Users/setup/Desktop/NRTP Vergence/OMNfinal/",referencefile=o)
 
 
 t<- rbind(o,t)
@@ -56,105 +56,30 @@ o<-NULL
 
 ```{r mark saccades,cache=FALSE,eval=FALSE}
 
-measureSaccadesINC<-function(t){
-
-    t%>%
-      mutate(blinks=markSaccades(rep,buffer=80,threshold=70),
-             #we put an 80ms buffer around each detected blink
-             #then we force the velocity to be above threshold for the detected blinks
-             #This causes all blinks to be marked as saccades, which means they are not
-             #included in any fixation analyses
-             #When analyzing blinks, remember to omit saccades where the eye postions are extreme
-             dsnum=markSaccadesDouble(replace(conj.velocity,blinks>0,150),
-                                      threshold1=30,threshold2=15,maxreject=100000),
-             sdf=spikedensity(rasters,10),
-             sdf10=lag(sdf,10),
-             conj.vert=(repV+lepV)/2,
-             conj.vert.vel=(revV+levV)/2,
-             conj.hor=(rep+lep)/2,
-             conj.hor.v=(rev+lev)/2) %>%
-      select(-blinks)->
-      t
-
-}
-
-expandSaccades<- function(tt,buffer=80){
-  #this little function adds a new grouping variable
-  #so that we can analyze what happens after saccades
-  #without losing our ability to just grab the saccades with group_by
-  #This way we can group_by(dsnum) to get just the saccades
-  #or group_by(dsnum_extended) to get the saccade plus some period after 
-  
-  maxtime<- max(tt$time)
-  tt %>%
-    filter(dsnum>0) %>%
-    group_by(dsnum) %>%
-    summarize(saccade.end=last(time),
-              saccade.start=first(time)) %>%
-    filter(saccade.end+buffer<maxtime) %>%
-    mutate(saccade.end=saccade.end+80)-> 
-    tcount
-  
-tcount$saccade.end<-tcount$saccade.end+buffer
-
-jsac<- function(stimes){
-  df<- data.frame(time=stimes[['saccade.start']]:stimes[['saccade.end']],
-                  dsnum_extended=stimes[['dsnum']])
-  return(df)
-}
-
-x<-rbindlist(apply(tcount,1,jsac))
-
-tt<- left_join(tt,x,by='time')
-
-}
-
-#The next block took 2 hours to run
-#I needed to increase the memory.limit() otherwise it would error
-#I was able to run it by just doubling the limit with  memory.limit(32652)
-#Doing this causes the whole computer to freeze up for the two hours while it calculate
-#I'm not sure how much time was added by Sophos simultanesouly trying to virus scan
-#and the WDBackupEngine doing whatever it does. If I had to run this again I would 
-#be sure to disable both of those programs.
-#It also took over an hour to simply run saveRDS(t,''), so I think there were some
-#issues with memory management in executing this code. 
-
-#update 3-30-2018 LOL, I disabled those programs and it literally took 4 minutes to run this
 t %>%
   group_by(neuron) %>%
+  mutate(time=row_numer()) %>%
   do(measureSaccadesINC(.))-># %>%
   # do(expandSaccades(.,buffer=80))->
   t
 
-# saveRDS(t,'INCsaccadesmarked.RDS')
+# saveRDS(t,'OMNstrabMeasured4-19-2018.RDS')
 
 ```
 
 ```{r Measure_Fixations,warning=FALSE}
-t %>%
-  group_by(neuron)%>%
-  mutate(time=row_number()) %>%
-  filter(dsnum<0) %>% #fixations only
-  group_by(neuron,dsnum) %>%
-  summarize(sd.conj.velocity=sd(conj.velocity),
-            mean.conj.velocity=mean(conj.velocity),
-            spread=max(conj.velocity)-min(conj.velocity),
-            qrange=quantile(conj.velocity,0.975)-quantile(conj.velocity,0.025),
-            dur=n(),
-            starttime=first(time),
-            c2eyes=cor(repV,lepV),
-            meanFR=sum(rasters)/dur*1000,
-            mean.V=mean(conj.vert),
-            mean.H=mean(conj.hor),
-            mean.R.H=mean(rep),
-            mean.L.H=mean(lep),
-            mean.R.V=mean(repV),
-            mean.L.V=mean(lepV),
-            mean.T.V=mean(tvp),
-            mean.T.H=mean(thp),
-            sd.sdf=sd(sdf10),
-            asleep=sd.conj.velocity>7.5 || dur>2000)->
-  zp
+
+
+zp<-measureFixations(t)
+
+maxEP<- 25
+zp<- filter(zp,
+            dur>200,
+            abs(mean.R.H)<maxEP,
+            abs(mean.L.H)<maxEP,
+            abs(mean.R.V)<maxEP,
+            abs(mean.L.V)<maxEP,
+            meanFR<500)
 
 
 
@@ -307,136 +232,18 @@ return(list(nV,dir.slope,nH,dir.imp))
 ```
 
 ```{r Fixation_Analysis,cache=FALSE,warning=FALSE}
-#In this chunk, we calculate direction preferences for each  neuron based on the measured fixations
-conj.measureCell<- function(x,maxEP=25){
-  #Remove bad fixations that are too short or are outside of the normal range of eye movements
-  # x<- filter(x,dur>200,abs(mean.R.H)<50,abs(mean.L.H)<50)
-  x<- filter(x,dur>200,abs(mean.R.H)<maxEP,abs(mean.L.H)<maxEP)
-  
-  #calculate using mean eye position:
-  mH<-lm(meanFR~mean.H,data=x)
-  mV<-lm(meanFR~mean.V,data=x)
-  mHV<-lm(meanFR~mean.H+mean.R.V,data=x)
-  
-  H.p=anova(mH)$'Pr(>F)'[1]
-  V.p<- anova(mV)$'Pr(>F)'[1]
-  H<-as.numeric(coef(mHV)[2])
-  V<-as.numeric(coef(mHV)[3]) 
-  
-  #calculate direction preference based on relative slopes from multiple regression model
-  dir.pref.slope<-as.numeric(atan2(V,H))*180/pi
 
-  #calculate direction preference based on relative importance of each factor in multiple regression model   
-  dir.pref.imp<-tryCatch({
-    b=as.numeric(calc.relimp(mHV)$lmg)
-    dir.pref.imp<- atan2(b[2]*sign(V),b[1]*sign(H))*180/pi
-    },error=function(e){return(NA)})
-  
-
-  
-  any.sig=V.p<0.001 | H.p <0.001
-  
-  R2<- summary(mHV)$r.squared
-  
-  H.R2<- summary(mH)$r.squared #conj horizontal fit only
-  V.R2<- summary(mV)$r.squared #conj vertical fit only
-  
-  d<-data.frame(neuron=unique(x$neuron),
-                any.sig,
-                H.p,V.p,H,V,dir.pref.imp,dir.pref.slope,
-                R2,H.R2,V.R2)
-                
-}
-
-measureCell<-function(x){
-  #Remove bad fixations that are too short or are outside of the normal range of eye movements
-  x<- filter(x,dur>200,abs(mean.R.H)<50,abs(mean.L.H)<50)
-  
-  #calculate linear regression models on horizontal, vertical and combined
-  #calculate each eye separately 
-  mRH<-lm(meanFR~mean.R.H,data=x)
-  mLH<-lm(meanFR~mean.L.H,data=x)
-  mRV<-lm(meanFR~mean.R.V,data=x)
-  mLV<-lm(meanFR~mean.L.V,data=x)
-  mRHV<-lm(meanFR~mean.R.H+mean.R.V,data=x)
-  mLHV<-lm(meanFR~mean.L.H+mean.L.V,data=x)
-  
-  #calculate using mean eye position:
-  mH<-lm(meanFR~mean.H,data=x)
-  mV<-lm(meanFR~mean.V,data=x)
-  mHV<-lm(meanFR~mean.H+mean.R.V,data=x)
-
-  
-  #Summarize desired information about models
-  RH.p=anova(mRH)$'Pr(>F)'[1]
-  LH.p=anova(mLH)$'Pr(>F)'[1]
-  LV.p<- anova(mLV)$'Pr(>F)'[1]
-  RV.p<- anova(mRV)$'Pr(>F)'[1]
-  RH<-as.numeric(coef(mRHV)[2])
-  RV<-as.numeric(coef(mRHV)[3]) 
-  LH<-as.numeric(coef(mLHV)[2])
-  LV<-as.numeric(coef(mLHV)[3])  
-  
-  H.p=anova(mH)$'Pr(>F)'[1]
-  V.p<- anova(mV)$'Pr(>F)'[1]
-  H<-as.numeric(coef(mHV)[2])
-  V<-as.numeric(coef(mHV)[3]) 
-
-  
-  
-  #two methods to calculate direction preferences:
-
-  #calculate direction preference using slopes of regression lines
-  dir.pref.R<-as.numeric(atan2(RV,RH))*180/pi
-  dir.pref.L<-as.numeric(atan2(LV,LH))*180/pi
-  
-  #calculate direction preference using relative importance of horizontal and vertical
-  br=as.numeric(calc.relimp(mRHV)$lmg)
-  bl=as.numeric(calc.relimp(mLHV)$lmg)
-  dir.imp.R<- atan2(br[2]*sign(RV),br[1]*sign(RH))*180/pi
-  dir.imp.L<- atan2(bl[2]*sign(LV),bl[1]*sign(LH))*180/pi
-  
-  any.sig=RV.p<0.001 | LV.p<0.001| LH.p <0.001| RH.p<0.001
-  R2R<-summary(mRHV)$r.squared
-  R2L<- summary(mLHV)$r.squared
-  R2<- summary(mHV)$r.squared
-  H.R2<- summary(mH)$r.squared #conj horizontal fit only
-  V.R2<- summary(mV)$r.squared #conj vertical fit only
-  
-  #Calculate RMSE - compare with R-squared?
-  # rmseR=sqrt(c(crossprod(mRHV$residuals))/mRHV$df.residual)
-  # rmseL=sqrt(c(crossprod(mLHV$residuals))/mLHV$df.residual)
-  rmseR=summary(mRHV)$sigma
-  rmseL=summary(mLHV)$sigma
-  
-  #Calculate relationship between firing rate and standard deviation
-  msd=lm(sd.sdf~meanFR,data=x)
-  sd.int=as.numeric(coef(msd)[1])
-  sd.slope=as.numeric(coef(msd)[2])
-  
-  #This data frame that I am returning is getting kind of big. 
-  #I plan to remove the unused measurements once I am past the exploratory phase
-  d<-data.frame(neuron=unique(x$neuron),
-                RH=RH,RV=RV,LH=LH,LV=LV,dir.pref.R=dir.pref.R,dir.pref.L=dir.pref.L,
-                RH.p=RH.p,LH.p=LH.p,RV.p=RV.p,LV.p=LV.p,any.sig=any.sig,
-                H.p=H.p,V.p=V.p,H=H,V=V,
-                R2R,R2L,dir.imp.R,dir.imp.L,R2=R2,
-                rmseR=rmseR,rmseL=rmseL,sd.int,sd.slope)
-}
 
 zp %>%
-  filter(meanFR>10,dur<1000) %>%
+    filter(meanFR>0,dur<1000,mean.conj.velocity<3) %>%
   group_by(neuron) %>%
-  do(measureCell(.)) %>%
+  mutate(n=n()) %>%
+  filter(n>20) %>%
+  do(calculateDirPrefFixations(.)) %>%
   separate(neuron,c('monkey','cellnum'),remove=FALSE)->
   zm
 
-zp %>%
-  filter(meanFR>10,dur<1000) %>%
-  group_by(neuron) %>%
-  do(conj.measureCell(.)) %>%
-  separate(neuron,c('monkey','cellnum'),remove=FALSE)->
-  zmc
+
 
 ```
 #Results
@@ -445,14 +252,7 @@ zp %>%
 Ncell<- 'Patos-107'
 Scell<- 'Patos-110'
 
-maxEP<- 25
-zp<- filter(zp,
-            dur>200,
-            abs(mean.R.H)<maxEP,
-            abs(mean.L.H)<maxEP,
-            abs(mean.R.V)<maxEP,
-            abs(mean.L.V)<maxEP,
-            meanFR<500)
+
 
 tab<-zmc %>%
   filter(neuron %in% c(Ncell,Scell)) %>%
@@ -468,216 +268,8 @@ kable(tab,digits=2)
 \pagebreak
 
 ###Direction Preferences
-Now let's plot the direction preferences for all the cells using this method:
-
-```{r DirectionPlots,fig.height=5}
-
-ggplot(zmc)+
-  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nusing relative importance')
-
-```
-
-But some of these cells do not have a detectable sensitivity to eye position. Using a threshold of p<0.001, we remove 18/83 of these cells:
-
-```{r DirectionPlotsSignificant,fig.height=5}
-
-ggplot(zmc %>% filter(any.sig))+
-  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nusing relative importance')
-
-```
-
-
-There appears to be a negative correlation between abnormal direction preference and goodness of fit. 
-
-```{r DirPrefR2,fig.height=4,fig.width=4}
-
-ggplot(zmc %>% filter(any.sig))+
-  geom_point(aes(90-abs(dir.pref.imp),R2,color=monkey),size=2)+
-  theme_minimal()+
-  xlab('Direction preference away from vertical')+
-  ylab(bquote(~R^2))
-
-ggplot(zmc %>% filter(any.sig))+
-  geom_point(aes(dir.pref.imp,R2,color=monkey),size=2)+
-  theme_minimal()+
-  xlab('Direction preference away from vertical')+
-  ylab(bquote(~R^2))+
-  geom_vline(xintercept = c(-180,-90,90,0))
-
-zmc %>%
-  mutate(dir.pref.min =minabs(c(dir.pref.imp %% 90,dir.pref.imp %% -90)))->
-  zmc
-
-ggplot(zmc %>% filter(any.sig))+
-  geom_point(aes(dir.pref.min,R2,color=monkey))+
-  theme_minimal()+
-  xlab('Direction preference away from vertical or horizontal')+
-  ylab(bquote(~R^2))
-
-```
-
-
-Let's scale these lines by the goodness of fit:
-
-```{r DirectionPlotsScaled,fig.height=7}
-
-ggplot(zmc %>% filter(any.sig))+
-  geom_segment(aes(y=0,yend=R2,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nusing relative importance')
-
-```
-
-```{r OddCells,fig.height=7,fig.width=6}
-Ncell<- 'Patos-101'
-Scell<- 'Patos-124'
-
-maxEP<- 25
-zp<- filter(zp,
-            dur>200,
-            abs(mean.R.H)<maxEP,
-            abs(mean.L.H)<maxEP,
-            abs(mean.R.V)<maxEP,
-            abs(mean.L.V)<maxEP,
-            meanFR<500)
-
-tab<-zmc %>%
-  filter(neuron %in% c(Ncell,Scell)) %>%
-  select(neuron,R2,H.R2,V.R2,dir.pref.slope,dir.pref.imp)
-
-multiplot(plotlist=compare2cells(zp,zmc,Ncell,Scell,color1='purple',color2='orange',
-                                 c1name='Exotrope',c2name='Exotrope'),cols=2)
-
-kable(tab,digits=2)
-
-```
-
-```{r MonocularDirectionpref,fig.height=6,fig.width=6}
-
-zm %>%
-  mutate(r.skew=90-abs(dir.imp.R), 
-         l.skew=90-abs(dir.imp.L)) ->
-  bsummary
-
-skew.plot.full<- ggplot(bsummary) +
-  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
-  geom_abline()
-
-
-skew.plot.zoom<- ggplot(bsummary %>% filter(abs(r.skew)<25 | abs(l.skew)<25)) +
-  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
-  geom_abline()+
-    labs(caption='Showing cells where left or right eye are skewed less than 25 deg')
-
-skew.plot.zoom2<- ggplot(bsummary %>% filter(abs(r.skew)<25, abs(l.skew)<25)) +
-  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
-  geom_abline()+
-  labs(caption='Showing cells where both left and right eye are skewed less than 25 deg')
-
-multiplot(skew.plot.full,skew.plot.zoom,skew.plot.zoom2)
-
-ggplot(bsummary)+
-  geom_point(aes(R2R,R2L,color=monkey))+
-  geom_abline()+
-  xlab('Right Eye R^2')+
-  ylab('Left Eye R^2')
-
-```
-
-```{r MonocularFixationDirectionpref,fig.height=6,fig.width=6}
-
-zm %>%
-  mutate(r.skew=90-abs(dir.imp.R), 
-         l.skew=90-abs(dir.imp.L)) ->
-  zm
-
-skew.plot.abs<- ggplot(zm) +
-  geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
-  geom_abline()+
-  labs(caption = 'Showing absolute value of skew')
-
-
-
-skew.plot.full<- ggplot(zm) +
-  geom_point(aes(r.skew,l.skew,color=monkey),size=3)+
-  geom_abline()
-
-skew.plot.zoom<- ggplot(zm %>% filter(abs(r.skew)<25, abs(l.skew)<25)) +
-  geom_point(aes(r.skew,l.skew,color=monkey),size=3)+
-  geom_abline()+
-  labs(caption = 'Zooming in on cells with less than 25 deg of skew')
-
-
-
-multiplot(skew.plot.abs,skew.plot.full,skew.plot.zoom)
-
-# ggplotly(skew.plot.full)
-# skew.plot.zoom<- ggplot(zm %>% filter(abs(r.skew)<25 | abs(l.skew)<25)) +
-#   geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
-#   geom_abline()
-# 
-# skew.plot.zoom2<- ggplot(zm %>% filter(abs(r.skew)<25, abs(l.skew)<25)) +
-#   geom_point(aes(abs(r.skew),abs(l.skew),color=monkey),size=3)+
-#   geom_abline()+
-#   ggtitle('Showing cells where both left and right eye are skewed less than 20')
-# 
-# multiplot(skew.plot.full,skew.plot.zoom,skew.plot.zoom2)
-```
-
-```{r}
-
-multiplot(
-ggplot(zm)+
-  geom_segment(aes(y=0,yend=R2R,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nusing RIGHT eye'),
-ggplot(zm)+
-  geom_segment(aes(y=0,yend=R2L,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nusing LEFT eye')
-)
-```
-
-```{r,fig.height=8}
-
-zm %>%
-  mutate(dir.pref.min.R =minabs(c(dir.imp.R %% 90,dir.imp.R %% -90)),
-         dir.pref.min.L =minabs(c(dir.imp.L %% 90,dir.imp.L %% -90)),
-         dir.pref.min = min(dir.pref.min.R,dir.pref.min.L),
-         right.eye.best=dir.pref.min.R<dir.pref.min.L,
-         best.dir=dir.imp.L,
-         best.dir=replace(best.dir,right.eye.best,dir.imp.R))->
-  zm
-
-
-zm %>%
-  mutate(dir.min=min(dir.imp.R,dir.imp.L))->
-  zm
-
+Using RIGHT EYE only
+```{r,fig.height=6}
 multiplot(
 ggplot(zm)+
   geom_segment(aes(y=0,yend=1,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
@@ -686,7 +278,24 @@ ggplot(zm)+
   theme_minimal()+
   theme(legend.position='none')+
   facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nRight Eye'),
+  xlab('')+
+  ylab(''),
+ggplot(zm)+
+  geom_segment(aes(y=0,yend=R2R,x=dir.imp.R,xend=dir.imp.R,color=monkey))+
+  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
+  coord_polar(start=pi/2,direction=-1)+
+  theme_minimal()+
+  theme(legend.position='none')+
+  facet_wrap(~monkey,ncol=4)+
+  xlab('Direction preference\nusing relative importance')+
+  ylab('R-squared'),
+cols=1
+)
+
+```
+
+```{r lefteye, fig.height=6}
+multiplot(
 ggplot(zm)+
   geom_segment(aes(y=0,yend=1,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
   scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
@@ -694,62 +303,45 @@ ggplot(zm)+
   theme_minimal()+
   theme(legend.position='none')+
   facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nLeft Eye'),
-ggplot(zmc)+
-  geom_segment(aes(y=0,yend=1,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nConjugate'),
+  xlab('')+
+  ylab(''),
 ggplot(zm)+
-  geom_segment(aes(y=0,yend=1,x=dir.pref.min,xend=dir.pref.min,color=monkey))+
+  geom_segment(aes(y=0,yend=R2L,x=dir.imp.L,xend=dir.imp.L,color=monkey))+
   scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
   coord_polar(start=pi/2,direction=-1)+
   theme_minimal()+
   theme(legend.position='none')+
   facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nMinimum Skew'),
-ggplot(zm)+
-  geom_segment(aes(y=0,yend=R2,x=dir.pref.min,xend=dir.pref.min,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nMinimum Skew')
+  xlab('Direction preference\nusing relative importance')+
+  ylab('R-squared'),
+cols=1
 )
-
-ggplot(zm)+
-  geom_segment(aes(y=0,yend=R2,x=best.dir,xend=best.dir,color=monkey))+
-  scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
-  coord_polar(start=pi/2,direction=-1)+
-  theme_minimal()+
-  theme(legend.position='none')+
-  facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nMinimum Skew')
 
 ```
 
-```{r, fig.height=9}
+
+CONJUGATE
+```{r conjugate, fig.height=6}
 multiplot(
 ggplot(zm)+
-  geom_segment(aes(y=0,yend=1,x=dir.pref.min,xend=dir.pref.min,color=monkey))+
+  geom_segment(aes(y=0,yend=1,x=dir.pref.imp, xend=dir.pref.imp,color=monkey))+
   scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
   coord_polar(start=pi/2,direction=-1)+
   theme_minimal()+
   theme(legend.position='none')+
   facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nMinimum Skew'),
+  xlab('')+
+  ylab(''),
 ggplot(zm)+
-  geom_segment(aes(y=0,yend=R2,x=dir.pref.min,xend=dir.pref.min,color=monkey))+
+  geom_segment(aes(y=0,yend=R2,x=dir.pref.imp,xend=dir.pref.imp,color=monkey))+
   scale_x_continuous(limits=c(-180,180),breaks=c(0,90,180,-90))+
   coord_polar(start=pi/2,direction=-1)+
   theme_minimal()+
   theme(legend.position='none')+
   facet_wrap(~monkey,ncol=4)+
-  xlab('Direction preference\nMinimum Skew')
+  xlab('Direction preference\nusing relative importance')+
+  ylab('R-squared'),
+cols=1
 )
-```
 
+```

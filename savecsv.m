@@ -28,12 +28,12 @@ if ~quicksave
     end
     
     
-    %Exotropes: Patos, Pilchuck
+    %Exotropes: Patos, Pilchuck, DC
     exa= strcmp(questdlg(['Is ',monkey,' an Exotrope?'],'EXO?','No','Yes','No'),'Yes');
 else
     savespikes='Yes';
     savelocation='Yes';
-    if strcmp(monkey,'Patos') || strcmp(monkey,'Pilchuck')
+    if strcmp(monkey,'Patos') || strcmp(monkey,'Pilchuck') || strcmp(monkey,'DC')
         exa=true;
         disp('Quicksaving EXOTROPE...')
     else
